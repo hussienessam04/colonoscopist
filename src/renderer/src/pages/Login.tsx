@@ -6,10 +6,18 @@ import type { AuthStatus } from '@shared/ipc-contract';
 
 export default function Login(): JSX.Element {
   const [status, setStatus] = useState<AuthStatus | null>(null);
+  const apiReady = typeof window !== 'undefined' && 'api' in window;
 
   useEffect(() => {
+    // Guard for environments without the Electron preload (e.g. opening the
+    // dev server URL in a regular browser). Page still renders; we just
+    // skip the IPC round-trip and surface a small console hint.
+    if (!apiReady) {
+      console.warn('[Login] window.api is undefined — preload did not run. Open this URL in the Electron app, not a browser.');
+      return;
+    }
     void window.api.auth.status().then(setStatus);
-  }, []);
+  }, [apiReady]);
 
   return (
     <main className="min-h-screen grid place-items-center bg-slate-50 p-6">
@@ -52,6 +60,12 @@ export default function Login(): JSX.Element {
           >
             {JSON.stringify(status)}
           </pre>
+        )}
+
+        {!apiReady && (
+          <p className="text-xs text-amber-600 font-mono text-center">
+            (preload not detected — IPC disabled in this context)
+          </p>
         )}
       </section>
     </main>
