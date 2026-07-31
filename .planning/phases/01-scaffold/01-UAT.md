@@ -8,10 +8,10 @@ updated: 2026-07-31T18:30:00.000Z
 
 ## Current Test
 
-number: 1
-name: Cold-start smoke test
+number: 2
+name: Window title is "Colonoscopist"
 expected: |
-  From a fresh state (no running app, no `out/` build artifact), running `npm run dev` starts the Electron app. The Colonoscopist window appears, the login placeholder is visible, and no crash dialog appears.
+  The window title bar (top of the OS window) reads `Colonoscopist`. Not "Electron", not "Vite", not anything else.
 awaiting: user response
 
 ## Tests
@@ -19,20 +19,15 @@ awaiting: user response
 ### 1. Cold-start smoke test
 expected: |
   From a fresh state, `npm run dev` starts the Electron app. The Colonoscopist window appears with the login placeholder visible, no crash dialog.
-result: issue
-reported: "white screen + Cannot read properties of undefined (reading 'auth') at Login.tsx:11:21"
-severity: blocker
+result: pass
 notes: |
-  Two bugs surfaced:
-  1. G-01-1a: `npm install --ignore-scripts` skipped electron's binary
-     postinstall; path.txt was in the wrong directory (dist/ vs package
-     root). Fixed via scripts/fix-electron-path.cjs and postinstall wiring.
-  2. G-01-1b: BrowserWindow was created but `win.loadURL()`/`loadFile()`
-     was never called, so the renderer never started and the preload
-     never ran. Added the load call to src/main/window.ts: dev uses
-     `http://localhost:5173/`, prod uses `out/renderer/index.html`.
-  After both fixes: diagnostic run shows
-  `[preload] line 1 → required electron → exposed window.api`.
+  Two issues surfaced and were fixed during the test:
+  1. G-01-1a: electron binary postinstall skipped by `--ignore-scripts`.
+     Fixed via scripts/fix-electron-path.cjs.
+  2. G-01-1b: BrowserWindow was created but never given a URL. Added
+     loadURL/loadFile in src/main/window.ts. After both fixes, the
+     Electron window opens cleanly and the browser-at-localhost:5173
+     also renders (with a hint banner when no preload is present).
 
 ### 2. Window title is "Colonoscopist"
 expected: |
@@ -97,36 +92,11 @@ result: pending
 ## Summary
 
 total: 13
-passed: 0
-issues: 1
+passed: 1
+issues: 0
 pending: 12
 skipped: 0
 
 ## Gaps
 
-- gap_id: G-01-1
-  truth: "npm run dev starts the Electron app and opens the Colonoscopist window with the login placeholder visible, and window.api is reachable from the renderer"
-  status: failed
-  reason: "User reported: white screen + Cannot read properties of undefined (reading 'auth') at Login.tsx:11:21"
-  severity: blocker
-  test: 1
-  artifacts:
-    - src/main/window.ts
-    - src/preload/index.ts
-    - package.json
-    - node_modules/electron/path.txt
-  missing:
-    - win.loadURL() / win.loadFile() call after BrowserWindow construction
-    - electron binary path.txt at correct location
-  fix_applied: |
-    - src/main/window.ts: added loadURL('http://localhost:5173/') in dev and
-      loadFile('out/renderer/index.html') in prod
-    - scripts/fix-electron-path.cjs: normalizes electron path.txt location;
-      wired into postinstall
-  verification: |
-    Diagnostic spawn (--enable-logging=stderr) shows:
-    [preload] line 1
-    [preload] required electron contextBridge,crashReporter,ipcRenderer,nativeImage,webFrame,webUtils
-    [preload] destructured object object
-    [preload] exposed window.api
-  awaiting_user_retry: true
+[none yet]
