@@ -7,13 +7,10 @@ const api: IpcContract = {
   },
 };
 
-if (process.contextIsolated) {
-  try {
-    contextBridge.exposeInMainWorld('api', api);
-  } catch (error) {
-    console.error('Failed to expose API to renderer:', error);
-  }
-} else {
-  // @ts-expect-error - contextIsolation should be enabled; fallback for dev only
-  window.api = api;
+try {
+  contextBridge.exposeInMainWorld('api', api);
+} catch (error) {
+  // Phase 1 ships a hardened renderer (contextIsolation: true). The expose call
+  // must succeed; failure here means the BrowserWindow webPreferences drifted.
+  console.error('Failed to expose API to renderer:', error);
 }

@@ -16,7 +16,12 @@ const STEPS = [
 ];
 
 for (const step of STEPS) {
-  const res = spawnSync(step.cmd, step.args, { stdio: 'inherit', shell: process.platform === 'win32' });
+  // On Windows, npx and node resolve to .cmd shims. Use the shell only for
+  // npx invocations (which need .cmd resolution); direct `node` calls go
+  // through spawnSync without a shell to avoid cmd.exe splitting paths
+  // containing spaces into separate argv entries.
+  const useShell = process.platform === 'win32' && step.cmd === 'npx';
+  const res = spawnSync(step.cmd, step.args, { stdio: 'inherit', shell: useShell });
   if (res.status !== 0) {
     console.error(`PHASE 1 VERIFY FAILED at step ${step.name}`);
     process.exit(res.status ?? 1);
