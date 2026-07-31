@@ -46,3 +46,7 @@
 - Tailwind v3.4 + shadcn component placement for placeholder login.
 - Exact copy of the hint banner (substance in D-08).
 - Clinic logo placeholder rendering (inline SVG vs Tailwind `<div>`).
+
+## D-01 Confirmation
+
+CONFIRMED — Colonoscopist / com.colonoscopist.app (auto-resolved from Phase 1 discussion, 2026-07-31T00:00:00Z)
