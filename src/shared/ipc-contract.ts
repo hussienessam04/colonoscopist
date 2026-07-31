@@ -1,8 +1,8 @@
 // Single source of truth for IPC channel names and contract types.
 // Imported by main, preload, and renderer (via global Window augmentation).
 //
-// No `users:*` channels in Phase 1 (SET-04 stub is rendered in the renderer,
-// not wired through IPC — real CRUD ships in Phase 2).
+// No SET-04 (user management) channels in Phase 1 — the stub is rendered in
+// the renderer, not wired through IPC. Real CRUD ships in Phase 2.
 
 export const IPC = {
   AUTH_STATUS: 'auth:status',
@@ -18,4 +18,10 @@ export interface IpcContract {
   auth: {
     status: () => Promise<AuthStatus>;
   };
+}
+
+declare global {
+  interface Window {
+    api: IpcContract;
+  }
 }

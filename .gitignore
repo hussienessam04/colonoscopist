@@ -6,4 +6,6 @@ dist/
 .env
 .env.local
 .vite/
-.cache/
+.cache/"tsconfig.node.tsbuildinfo"  
+"tsconfig.web.tsbuildinfo"  
+"out/"  
