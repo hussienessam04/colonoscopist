@@ -20,16 +20,19 @@ awaiting: user response
 expected: |
   From a fresh state, `npm run dev` starts the Electron app. The Colonoscopist window appears with the login placeholder visible, no crash dialog.
 result: issue
-reported: "Error: Electron uninstall"
+reported: "white screen + Cannot read properties of undefined (reading 'auth') at Login.tsx:11:21"
 severity: blocker
 notes: |
-  Root cause: `npm install --ignore-scripts` (used in Plan 01-01 to bypass the
-  no-VS-Build-Tools node-gyp fallback for better-sqlite3) ALSO skipped
-  Electron's own postinstall, which downloads the binary. Fix: extracted the
-  cached electron-v32.3.3 zip into node_modules/electron/dist/ and wrote
-  path.txt. The postinstall in package.json should also call
-  `node node_modules/electron/install.js` after `electron-rebuild` to handle
-  the `--ignore-scripts` case.
+  Two bugs surfaced:
+  1. G-01-1a: `npm install --ignore-scripts` skipped electron's binary
+     postinstall; path.txt was in the wrong directory (dist/ vs package
+     root). Fixed via scripts/fix-electron-path.cjs and postinstall wiring.
+  2. G-01-1b: BrowserWindow was created but `win.loadURL()`/`loadFile()`
+     was never called, so the renderer never started and the preload
+     never ran. Added the load call to src/main/window.ts: dev uses
+     `http://localhost:5173/`, prod uses `out/renderer/index.html`.
+  After both fixes: diagnostic run shows
+  `[preload] line 1 → required electron → exposed window.api`.
 
 ### 2. Window title is "Colonoscopist"
 expected: |
@@ -102,15 +105,28 @@ skipped: 0
 ## Gaps
 
 - gap_id: G-01-1
-  truth: "npm run dev starts the Electron app and opens the Colonoscopist window with the login placeholder visible"
+  truth: "npm run dev starts the Electron app and opens the Colonoscopist window with the login placeholder visible, and window.api is reachable from the renderer"
   status: failed
-  reason: "User reported: Error: Electron uninstall"
+  reason: "User reported: white screen + Cannot read properties of undefined (reading 'auth') at Login.tsx:11:21"
   severity: blocker
   test: 1
   artifacts:
+    - src/main/window.ts
+    - src/preload/index.ts
     - package.json
-    - node_modules/electron/dist/
+    - node_modules/electron/path.txt
   missing:
-    - node_modules/electron/dist/electron.exe
-  fix_applied: "extracted cached electron-v32.3.3 zip into node_modules/electron/dist/; wrote path.txt"
-  fix_outstanding: "package.json postinstall script should also run `node node_modules/electron/install.js` after electron-rebuild to handle --ignore-scripts case"
+    - win.loadURL() / win.loadFile() call after BrowserWindow construction
+    - electron binary path.txt at correct location
+  fix_applied: |
+    - src/main/window.ts: added loadURL('http://localhost:5173/') in dev and
+      loadFile('out/renderer/index.html') in prod
+    - scripts/fix-electron-path.cjs: normalizes electron path.txt location;
+      wired into postinstall
+  verification: |
+    Diagnostic spawn (--enable-logging=stderr) shows:
+    [preload] line 1
+    [preload] required electron contextBridge,crashReporter,ipcRenderer,nativeImage,webFrame,webUtils
+    [preload] destructured object object
+    [preload] exposed window.api
+  awaiting_user_retry: true

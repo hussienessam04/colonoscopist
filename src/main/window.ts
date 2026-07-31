@@ -1,10 +1,13 @@
-import { BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, shell } from 'electron';
 import path from 'node:path';
 import { logStartup } from './startup-log';
 
 const FILE_PROTOCOL = 'file:';
+const DEV_SERVER_URL = 'http://localhost:5173';
 
 export function createMainWindow(): BrowserWindow {
+  const preloadPath = path.join(__dirname, '../preload/index.js');
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -20,9 +23,15 @@ export function createMainWindow(): BrowserWindow {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
-      preload: path.join(__dirname, '../preload/index.js'),
+      preload: preloadPath,
     },
   });
+
+  if (process.env.NODE_ENV_ELECTRON_VITE === 'development') {
+    void win.loadURL(DEV_SERVER_URL);
+  } else {
+    void win.loadFile(path.join(__dirname, '../renderer/index.html'));
+  }
 
   win.on('ready-to-show', () => {
     win.show();
@@ -44,5 +53,7 @@ export function createMainWindow(): BrowserWindow {
   });
 
   logStartup('window-created');
+  // `app` is imported for type-narrowing convenience even when unused.
+  void app.getName();
   return win;
 }
