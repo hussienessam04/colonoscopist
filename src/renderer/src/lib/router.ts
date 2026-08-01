@@ -1,4 +1,4 @@
-// State-based router hook — NO react-router dependency. Per Plan 02-03 D-04 + T-02-REN-04.
+// State-based router hook — no external routing library. Per Plan 02-03 D-04 + T-02-REN-04.
 // Routes are a tagged union; deep-link URLs are a v2 upgrade.
 
 import { useCallback, useEffect, useState } from 'react';
