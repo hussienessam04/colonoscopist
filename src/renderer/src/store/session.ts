@@ -40,7 +40,13 @@ async function refresh(): Promise<void> {
     return;
   }
   const status = await window.api.auth.status();
-  // After auth.status we have a userId; fetch the public user record for name/avatar.
+  // ponytail: tolerate undefined status (e.g. when the mock hasn't been seeded
+  // yet for a particular test) — leave loading=false + null currentUser.
+  if (!status) {
+    state = { status: null, loading: false, currentUser: null };
+    emit();
+    return;
+  }
   let currentUser: UserPublic | null = null;
   if (status.authenticated && status.userId) {
     const users = await window.api.auth.usersList();
@@ -64,6 +70,11 @@ export const session = {
   refresh,
   signOut,
   setAfterLogin,
+  // ponytail: explicit reset for tests + dev hot-reload.
+  reset: () => {
+    state = { status: null, loading: true, currentUser: null };
+    emit();
+  },
 };
 
 export function useSession(): {

@@ -6,6 +6,7 @@ import { afterEach, beforeEach, vi } from 'vitest';
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { initialRoute, setRoute } from '@/lib/router';
+import { session } from '@/store/session';
 
 type MockApi = {
   auth: {
@@ -76,6 +77,7 @@ export function getApi(): MockApi {
 beforeEach(() => {
   mockApi();
   setRoute(initialRoute);
+  session.reset();
 });
 
 afterEach(() => {

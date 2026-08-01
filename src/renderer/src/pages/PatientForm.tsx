@@ -1,0 +1,331 @@
+// Patient create/edit form. Per PAT-01 (create) + PAT-03 (edit).
+// Uses react-hook-form + zod resolver against patientInput / patientPatchInput.
+// Per Fix 6: on IPC_VALIDATION { field: 'mrn' } renders the inline error.
+import { useEffect, useState } from 'react';
+import { useForm, Controller, type UseFormReturn } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import type { z } from 'zod';
+import { ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useRoute } from '@/lib/router';
+import { toast } from 'sonner';
+import { IpcErrorException } from '@shared/errors';
+import { patientInput, patientPatchInput } from '@shared/validators';
+import type { Patient } from '@shared/ipc-contract';
+
+type Props = {
+  mode: 'create' | 'edit';
+  patientId?: string;
+};
+
+type CreateValues = z.infer<typeof patientInput>;
+type PatchValues = z.infer<typeof patientPatchInput>;
+
+const GENDER_OPTIONS = [
+  { value: '__none__', label: '—' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'other', label: 'Other' },
+] as const;
+
+export default function PatientForm({ mode, patientId }: Props): JSX.Element {
+  const { navigate } = useRoute();
+  const [submitting, setSubmitting] = useState(false);
+  const [mrnError, setMrnError] = useState<string | null>(null);
+  const [loaded, setLoaded] = useState(mode === 'create');
+
+  const isCreate = mode === 'create';
+
+  const createForm = useForm<CreateValues>({
+    resolver: zodResolver(patientInput),
+    defaultValues: { fullName: '', dob: '', gender: null, mrn: null, phone: null, notes: null },
+  });
+
+  const editForm = useForm<PatchValues>({
+    resolver: zodResolver(patientPatchInput),
+    defaultValues: { fullName: '', dob: '', gender: null, mrn: null, phone: null, notes: null },
+  });
+
+  // Load existing patient in edit mode.
+  useEffect(() => {
+    if (mode === 'edit' && patientId) {
+      void (async () => {
+        const row: Patient | null = await window.api.patients.get(patientId);
+        if (!row) {
+          toast.error('Patient not found');
+          navigate({ name: 'patients' });
+          return;
+        }
+        editForm.reset({
+          fullName: row.fullName,
+          dob: row.dob,
+          gender: row.gender,
+          mrn: row.mrn,
+          phone: row.phone,
+          notes: row.notes,
+        });
+        setLoaded(true);
+      })();
+    }
+  }, [mode, patientId, editForm, navigate]);
+
+  if (!loaded) {
+    return (
+      <main className="min-h-screen grid place-items-center bg-slate-50">
+        <p className="text-sm text-slate-500">Loading…</p>
+      </main>
+    );
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-xl flex flex-col gap-4">
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => navigate({ name: 'patients' })}
+          className="self-start"
+        >
+          <ArrowLeft className="size-4 mr-1" />
+          Back to patients
+        </Button>
+        <Card>
+          <CardHeader>
+            <CardTitle>{isCreate ? 'New patient' : 'Edit patient'}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {isCreate ? (
+              <CreateForm
+                form={createForm}
+                submitting={submitting}
+                setSubmitting={setSubmitting}
+                mrnError={mrnError}
+                setMrnError={setMrnError}
+              />
+            ) : (
+              <EditForm
+                form={editForm}
+                patientId={patientId!}
+                submitting={submitting}
+                setSubmitting={setSubmitting}
+                mrnError={mrnError}
+                setMrnError={setMrnError}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </main>
+  );
+}
+
+type CreateFormProps = {
+  form: UseFormReturn<CreateValues>;
+  submitting: boolean;
+  setSubmitting: (v: boolean) => void;
+  mrnError: string | null;
+  setMrnError: (v: string | null) => void;
+};
+
+function CreateForm({ form, submitting, setSubmitting, mrnError, setMrnError }: CreateFormProps): JSX.Element {
+  const { navigate } = useRoute();
+  const { handleSubmit, register, control, formState: { errors } } = form;
+
+  async function onSubmit(values: CreateValues): Promise<void> {
+    setSubmitting(true);
+    setMrnError(null);
+    try {
+      await window.api.patients.create({
+        fullName: values.fullName,
+        dob: values.dob,
+        gender: values.gender ?? null,
+        mrn: values.mrn ?? null,
+        phone: values.phone ?? null,
+        notes: values.notes ?? null,
+      });
+      toast.success('Patient created.');
+      navigate({ name: 'patients' });
+    } catch (err) {
+      if (err instanceof IpcErrorException && err.ipc.code === 'IPC_VALIDATION' && err.ipc.field === 'mrn') {
+        setMrnError('MRN already in use');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Create failed';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+      <Field label="Full name" id="fullName" error={errors.fullName?.message}>
+        <Input id="fullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} />
+      </Field>
+      <Field label="Date of birth" id="dob" error={errors.dob?.message}>
+        <Input id="dob" type="date" {...register('dob')} aria-invalid={!!errors.dob} />
+      </Field>
+      <Field label="Gender" id="gender" error={errors.gender?.message}>
+        <Controller
+          control={control}
+          name="gender"
+          render={({ field }) => {
+            const value = (field.value ?? '__none__') as string;
+            return (
+              <Select
+                value={value}
+                onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+              >
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          }}
+        />
+      </Field>
+      <Field label="MRN" id="mrn" error={mrnError ?? errors.mrn?.message}>
+        <Input id="mrn" {...register('mrn')} aria-invalid={!!mrnError || !!errors.mrn} />
+      </Field>
+      <Field label="Phone" id="phone" error={errors.phone?.message}>
+        <Input id="phone" {...register('phone')} />
+      </Field>
+      <Field label="Notes" id="notes" error={errors.notes?.message}>
+        <textarea
+          id="notes"
+          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          {...register('notes')}
+        />
+      </Field>
+      <Button type="submit" disabled={submitting} className="mt-2">
+        {submitting ? 'Saving…' : 'Create patient'}
+      </Button>
+    </form>
+  );
+}
+
+type EditFormProps = {
+  form: UseFormReturn<PatchValues>;
+  patientId: string;
+  submitting: boolean;
+  setSubmitting: (v: boolean) => void;
+  mrnError: string | null;
+  setMrnError: (v: string | null) => void;
+};
+
+function EditForm({ form, patientId, submitting, setSubmitting, mrnError, setMrnError }: EditFormProps): JSX.Element {
+  const { navigate } = useRoute();
+  const { handleSubmit, register, control, formState: { errors } } = form;
+
+  async function onSubmit(values: PatchValues): Promise<void> {
+    setSubmitting(true);
+    setMrnError(null);
+    try {
+      const patch: PatchValues = {};
+      if (values.fullName !== undefined) patch.fullName = values.fullName;
+      if (values.dob !== undefined) patch.dob = values.dob;
+      if (values.gender !== undefined) patch.gender = values.gender;
+      if (values.mrn !== undefined) patch.mrn = values.mrn;
+      if (values.phone !== undefined) patch.phone = values.phone;
+      if (values.notes !== undefined) patch.notes = values.notes;
+
+      await window.api.patients.update(patientId, patch);
+      toast.success('Patient updated.');
+      navigate({ name: 'patients' });
+    } catch (err) {
+      if (err instanceof IpcErrorException && err.ipc.code === 'IPC_VALIDATION' && err.ipc.field === 'mrn') {
+        setMrnError('MRN already in use');
+        return;
+      }
+      const msg = err instanceof Error ? err.message : 'Update failed';
+      toast.error(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
+      <Field label="Full name" id="fullName" error={errors.fullName?.message}>
+        <Input id="fullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} />
+      </Field>
+      <Field label="Date of birth" id="dob" error={errors.dob?.message}>
+        <Input id="dob" type="date" {...register('dob')} aria-invalid={!!errors.dob} />
+      </Field>
+      <Field label="Gender" id="gender" error={errors.gender?.message}>
+        <Controller
+          control={control}
+          name="gender"
+          render={({ field }) => {
+            const value = (field.value ?? '__none__') as string;
+            return (
+              <Select
+                value={value}
+                onValueChange={(v) => field.onChange(v === '__none__' ? null : v)}
+              >
+                <SelectTrigger id="gender">
+                  <SelectValue placeholder="—" />
+                </SelectTrigger>
+                <SelectContent>
+                  {GENDER_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>
+                      {o.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            );
+          }}
+        />
+      </Field>
+      <Field label="MRN" id="mrn" error={mrnError ?? errors.mrn?.message}>
+        <Input id="mrn" {...register('mrn')} aria-invalid={!!mrnError || !!errors.mrn} />
+      </Field>
+      <Field label="Phone" id="phone" error={errors.phone?.message}>
+        <Input id="phone" {...register('phone')} />
+      </Field>
+      <Field label="Notes" id="notes" error={errors.notes?.message}>
+        <textarea
+          id="notes"
+          className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          {...register('notes')}
+        />
+      </Field>
+      <Button type="submit" disabled={submitting} className="mt-2">
+        {submitting ? 'Saving…' : 'Save changes'}
+      </Button>
+    </form>
+  );
+}
+
+function Field({ label, id, error, children }: { label: string; id: string; error?: string; children: React.ReactNode }): JSX.Element {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={id}>{label}</Label>
+      {children}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
