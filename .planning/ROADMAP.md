@@ -39,9 +39,9 @@
 **Notes:** Sets up every table needed by later phases (`patients`, `users`, `audit_log`, `settings`) so Phase 3+ can layer in procedures/screenshots/reports without a migration conflict.
 
 Plans:
-- [ ] 02-01-PLAN.md — Database foundation + auth + audit + users infrastructure (DB open, migrations, WAL, scrypt PIN, rate-limit, audit log triggers, auth/users IPC, session state, tests)
-- [ ] 02-02-PLAN.md — Patient CRUD + search IPC + audit integration (patientRepo, list/get/create/update/softDelete/restore, name substring + MRN exact search, pagination, audit writes)
-- [ ] 02-03-PLAN.md — Renderer — Wizard + two-step Login + Patient List + Settings → Users (state-based router, shadcn primitives, two-step login, patient list/form, admin users page, tests)
+- [x] 02-01-PLAN.md — Database foundation + auth + audit + users infrastructure (DB open, migrations, WAL, scrypt PIN, rate-limit, audit log triggers, auth/users IPC, session state, tests)
+- [x] 02-02-PLAN.md — Patient CRUD + search IPC + audit integration (patientRepo, list/get/create/update/softDelete/restore, name substring + MRN exact search, pagination, audit writes)
+- [x] 02-03-PLAN.md — Renderer — Wizard + two-step Login + Patient List + Settings → Users (state-based router, shadcn primitives, two-step login, patient list/form, admin users page, tests)
 
 ---
 
