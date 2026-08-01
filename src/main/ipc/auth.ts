@@ -7,17 +7,14 @@ import { IPC } from '@shared/ipc-contract';
 import {
   acceptRecoveryFile,
   bootstrapStatus,
-  createUser,
   listUsers,
   login,
   logout,
   recoveryRequest,
-  removeUser,
-  resetPin,
   status,
   wizardBootstrap,
 } from '../auth';
-import { resetPinInput, userInput, userRemoveInput, wizardInput } from '@shared/validators';
+import { wizardInput } from '@shared/validators';
 import { IpcErrorException } from '@shared/errors';
 
 export function registerAuthIpc(): void {
@@ -70,36 +67,10 @@ export function registerAuthIpc(): void {
     }
   });
 
-  // The 8 user-management channels live in src/main/ipc/users.ts.
-  // We also wire createUser/removeUser/resetPin through auth.ts as a convenience
-  // because both modules share IPC namespace; concrete handlers below use the
-  // matching auth.* funcs so admin gating stays in one place.
-  ipcMain.handle(IPC.USERS_CREATE, async (_e, raw) => {
-    const parsed = userInput.parse(raw);
-    try {
-      return await createUser(parsed);
-    } catch (err) {
-      throw asIpcError(err);
-    }
-  });
-
-  ipcMain.handle(IPC.USERS_REMOVE, (_e, raw) => {
-    const parsed = userRemoveInput.parse(raw);
-    try {
-      return removeUser(parsed);
-    } catch (err) {
-      throw asIpcError(err);
-    }
-  });
-
-  ipcMain.handle(IPC.USERS_RESET_PIN, async (_e, raw) => {
-    const parsed = resetPinInput.parse(raw);
-    try {
-      return await resetPin(parsed);
-    } catch (err) {
-      throw asIpcError(err);
-    }
-  });
+  // The USERS_CREATE / USERS_REMOVE / USERS_RESET_PIN handlers live in
+  // src/main/ipc/users.ts (single registration — Electron's ipcMain.handle
+  // rejects duplicates). Per D-03 + SET-04 admin gating is enforced in
+  // src/main/auth/index.ts.
 
   // Wizard bootstrap lives here so the 4-step submit on first launch uses
   // the same IPC namespace as login. Per D-01.
