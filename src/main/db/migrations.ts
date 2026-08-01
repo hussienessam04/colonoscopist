@@ -3,38 +3,19 @@
 // Per D-01 first-launch atomicity.
 
 import type Database from 'better-sqlite3';
-import { readFileSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-// Resolve the migrations dir relative to this file.
-// In the dev/test build electron-vite leaves migrations/ alongside this module;
-// in the packaged build the directory is co-located via ASAR.
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
-const FILE_PATTERN = /^(\d{4})_(.+)\.sql$/;
+import initSql from './migrations/0001_init.sql?raw';
 
 type Migration = {
   id: number;
   name: string;
-  up: (db: Database.Database) => void;
+  up: string;
 };
 
-function loadMigrations(): Migration[] {
-  const files = readdirSync(MIGRATIONS_DIR).filter((f) => FILE_PATTERN.test(f));
-  files.sort();
-  return files.map((f) => {
-    const match = f.match(FILE_PATTERN)!;
-    return {
-      id: parseInt(match[1], 10),
-      name: match[2],
-      up: (db) => {
-        const sql = readFileSync(path.join(MIGRATIONS_DIR, f), 'utf8');
-        db.exec(sql);
-      },
-    };
-  });
+// SQL is embedded by Vite's ?raw import — no filesystem read at runtime.
+const MIGRATIONS: Migration[] = [{ id: 1, name: 'init', up: initSql }];
+
+function loadMigrations(): typeof MIGRATIONS {
+  return MIGRATIONS;
 }
 
 export function runMigrations(db: Database.Database): { applied: number[]; skipped: number[] } {
@@ -62,7 +43,7 @@ export function runMigrations(db: Database.Database): { applied: number[]; skipp
       continue;
     }
     const txn = db.transaction(() => {
-      m.up(db);
+      db.exec(m.up);
       insertApplied.run(m.id, m.name, Date.now());
     });
     txn();
