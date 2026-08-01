@@ -66,3 +66,13 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer base {
+  /* shadcn sonner toaster surface — per Plan 02-03. */
+  .toaster {
+    --normal-bg: hsl(var(--popover));
+    --normal-text: hsl(var(--popover-foreground));
+    --normal-border: hsl(var(--border));
+  }
+}
+

@@ -1,10 +1,15 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import { IPC, type IpcContract } from '@shared/ipc-contract';
 
+// IpcContract bridge exposed via contextBridge.exposeInMainWorld('api', api).
+// Renderer is sandboxed; every method is ipcRenderer.invoke(IPC.X, ...args) against the
+// matching IPC constant. No extra surface (per Fix 4 — auth.status + auth.login channels
+// pinned consistently with Plan 02-01).
 const api: IpcContract = {
   auth: {
     status: () => ipcRenderer.invoke(IPC.AUTH_STATUS),
     bootstrap: () => ipcRenderer.invoke(IPC.AUTH_BOOTSTRAP),
+    wizard: (input) => ipcRenderer.invoke(IPC.AUTH_WIZARD, input),
     login: (input) => ipcRenderer.invoke(IPC.AUTH_LOGIN, input),
     logout: () => ipcRenderer.invoke(IPC.AUTH_LOGOUT),
     usersList: () => ipcRenderer.invoke(IPC.AUTH_USERS_LIST),
@@ -20,7 +25,9 @@ const api: IpcContract = {
     list: (query) => ipcRenderer.invoke(IPC.PATIENTS_LIST, query),
     get: (id) => ipcRenderer.invoke(IPC.PATIENTS_GET, id),
     create: (input) => ipcRenderer.invoke(IPC.PATIENTS_CREATE, input),
-    update: (id, patch) => ipcRenderer.invoke(IPC.PATIENTS_UPDATE, id, patch),
+    // Main handler reads { id, patch } as one arg; wrap so the IpcContract signature stays
+    // ergonomic (id, patch).
+    update: (id, patch) => ipcRenderer.invoke(IPC.PATIENTS_UPDATE, { id, patch }),
     softDelete: (id) => ipcRenderer.invoke(IPC.PATIENTS_SOFT_DELETE, id),
     restore: (id) => ipcRenderer.invoke(IPC.PATIENTS_RESTORE, id),
   },

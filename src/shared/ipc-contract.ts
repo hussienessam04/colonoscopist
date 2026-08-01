@@ -8,6 +8,7 @@ export const IPC = {
   // Auth
   AUTH_STATUS: 'auth:status',
   AUTH_BOOTSTRAP: 'auth:bootstrap',
+  AUTH_WIZARD: 'auth:wizard-bootstrap',
   AUTH_LOGIN: 'auth:login',
   AUTH_LOGOUT: 'auth:logout',
   AUTH_USERS_LIST: 'auth:users-list',
@@ -84,11 +85,29 @@ export type RecoveryResponse = {
   mailto: string;
 };
 
+// Wizard bootstrap submit shape (per D-01). Renderer submits this once on first launch.
+// Main registers the channel under IPC.AUTH_WIZARD (auth:wizard-bootstrap) and returns
+// { accepted: true, userId, clinicName } but does NOT log the user in — the renderer
+// then calls auth.login() to land on the patient list.
+export type WizardSubmitInput = {
+  fullName: string;
+  clinicName: string;
+  pin: string;
+  confirmPin: string;
+};
+
+export type WizardSubmitResult = {
+  accepted: true;
+  userId: string;
+  clinicName: string;
+};
+
 // What `contextBridge.exposeInMainWorld('api', api)` exposes to the renderer.
 export interface IpcContract {
   auth: {
     status: () => Promise<AuthStatus>;
     bootstrap: () => Promise<{ hasUsers: boolean; clinicName: string | null; userId: string | null }>;
+    wizard: (input: WizardSubmitInput) => Promise<WizardSubmitResult>;
     login: (input: { userId: string; pin: string }) => Promise<LoginResult>;
     logout: () => Promise<{ ok: true }>;
     usersList: () => Promise<UserPublic[]>;
@@ -112,10 +131,7 @@ export interface IpcContract {
     create: (
       input: Omit<Patient, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>,
     ) => Promise<Patient>;
-    update: (
-      id: string,
-      patch: Partial<Pick<Patient, 'fullName' | 'dob' | 'gender' | 'mrn' | 'phone' | 'notes'>>,
-    ) => Promise<Patient>;
+    update: (id: string, patch: Partial<Pick<Patient, 'fullName' | 'dob' | 'gender' | 'mrn' | 'phone' | 'notes'>>) => Promise<Patient>;
     softDelete: (id: string) => Promise<{ ok: true }>;
     restore: (id: string) => Promise<{ ok: true }>;
   };
