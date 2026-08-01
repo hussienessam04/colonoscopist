@@ -3,6 +3,7 @@ import { createMainWindow } from './window';
 import { registerAuthIpc } from './ipc/auth';
 import { registerUsersIpc } from './ipc/users';
 import { registerAuditIpc } from './ipc/audit';
+import { registerPatientsIpc } from './ipc/patients';
 import { getDb, closeDb } from './db';
 import { logStartup } from './startup-log';
 
@@ -16,11 +17,14 @@ if (process.platform === 'win32') {
 }
 
 // per D-01 + AUDIT-01 — DB open + migrations BEFORE any IPC handler registration.
+// patients IPC registers AFTER auth/users/audit so admin gating + audit helpers exist when its handlers run.
 app.whenReady().then(() => {
   getDb();
   registerAuthIpc();
   registerUsersIpc();
   registerAuditIpc();
+  registerPatientsIpc();
+  logStartup('patients-ipc-registered');
   createMainWindow();
   logStartup('app-ready');
 });
