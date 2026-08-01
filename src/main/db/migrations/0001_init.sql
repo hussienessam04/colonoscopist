@@ -5,7 +5,7 @@
 -- (CREATE TABLE IF NOT EXISTS) before this script runs; do not recreate here.
 
 -- 2. users (admin is the row with is_first_admin = 1; only one such row at any time)
--- ponytail: no role column — single admin per D-02; adding roles requires a migration + per-action RBAC
+-- ponytail: single admin per D-02; adding permissions requires a migration + per-action RBAC
 CREATE TABLE users (
   id                  TEXT PRIMARY KEY,
   full_name           TEXT NOT NULL,
