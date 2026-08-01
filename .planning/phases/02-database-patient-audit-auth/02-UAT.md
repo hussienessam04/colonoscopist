@@ -1,25 +1,18 @@
 ---
-status: testing
+status: complete
 phase: 02-database-patient-audit-auth
 source:
   - 02-01-SUMMARY.md
   - 02-02-SUMMARY.md
   - 02-03-SUMMARY.md
+  - 02-04-SUMMARY.md (gap-closure fix)
 started: 2026-08-01
 updated: 2026-08-01
 ---
 
 ## Current Test
 
-number: 13
-name: Backend Lockout After 10 Wrong PINs
-expected: |
-  The 10th consecutive wrong PIN locks the account. A subsequent
-  attempt — even with the correct PIN — shows "Account locked —
-  contact admin". The locked row stays in the user list. Restarting
-  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
-  in the DB).
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -110,17 +103,679 @@ expected: |
   contact admin". The locked row stays in the user list. Restarting
   the app preserves the lock (`is_locked=1` + sentinel `locked_until`
   in the DB).
-result: issue
-reported: |
-  Lockout works (backoff + 10th-failure lockout + restart preserve
-  are all correct). But the UX is subpar:
-  (1) "Try again in N seconds" is static — should be a live countdown.
-  (2) Enter button is NOT disabled during the backoff.
-  (3) When the account is locked, no visual badge indicates the lock
-      state — only the inline text "Account locked — contact admin".
-  (4) Enter button is still callable on a locked account (will just
-      return IPC_LOCKED again, but should be disabled).
-severity: minor
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+### 14. Recovery File Picker
+expected: |
+  The user list shows a "Forgot admin PIN?" link below the rows.
+  Clicking it opens a dialog with two actions: "Email vendor" (calls
+  `auth.recoveryRequest` and shows a sonner toast) and "Select
+  recovery file" (opens the OS file picker; selecting a `.recover`
+  file shows the "Recovery file accepted. License verification will
+  complete in Phase 8." toast).
+result: pass
+
+### 15. Settings → Users (Admin Add)
+expected: |
+  From the Patient List, open Settings → Users (admin only). Click
+  "Add user" → dialog with full name + PIN + confirm PIN. Submitting
+  creates the new user and the row appears in the list.
+result: pass
+
+### 16. Settings → Users (Reset PIN)
+expected: |
+  On a non-admin user row, "Reset PIN" → dialog with new PIN +
+  confirm. Submitting resets the user's PIN; their `failed_attempts`
+  resets to 0 and any lock clears.
+result: pass
+
+### 17. Settings → Users (Admin Cannot Remove Self)
+expected: |
+  On the admin's own row, the "Remove" action is disabled (greyed
+  out) with a tooltip "You cannot remove yourself". The backend
+  also rejects the request even if the renderer is bypassed.
+result: pass
+
+### 18. Settings → Users (Remove Other User)
+expected: |
+  On a non-admin user row, "Remove" → confirm dialog → confirming
+  removes the user (soft-delete — `deleted_at` populates).
+result: pass
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+### 14. Recovery File Picker
+expected: |
+  The user list shows a "Forgot admin PIN?" link below the rows.
+  Clicking it opens a dialog with two actions: "Email vendor" (calls
+  `auth.recoveryRequest` and shows a sonner toast) and "Select
+  recovery file" (opens the OS file picker; selecting a `.recover`
+  file shows the "Recovery file accepted. License verification will
+  complete in Phase 8." toast).
+result: pass
+
+### 15. Settings → Users (Admin Add)
+expected: |
+  From the Patient List, open Settings → Users (admin only). Click
+  "Add user" → dialog with full name + PIN + confirm PIN. Submitting
+  creates the new user and the row appears in the list.
+result: pass
+
+### 16. Settings → Users (Reset PIN)
+expected: |
+  On a non-admin user row, "Reset PIN" → dialog with new PIN +
+  confirm. Submitting resets the user's PIN; their `failed_attempts`
+  resets to 0 and any lock clears.
+result: pass
+
+### 17. Settings → Users (Admin Cannot Remove Self)
+expected: |
+  On the admin's own row, the "Remove" action is disabled (greyed
+  out) with a tooltip "You cannot remove yourself". The backend
+  also rejects the request even if the renderer is bypassed.
+result: pass
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+### 14. Recovery File Picker
+expected: |
+  The user list shows a "Forgot admin PIN?" link below the rows.
+  Clicking it opens a dialog with two actions: "Email vendor" (calls
+  `auth.recoveryRequest` and shows a sonner toast) and "Select
+  recovery file" (opens the OS file picker; selecting a `.recover`
+  file shows the "Recovery file accepted. License verification will
+  complete in Phase 8." toast).
+result: pass
+
+### 15. Settings → Users (Admin Add)
+expected: |
+  From the Patient List, open Settings → Users (admin only). Click
+  "Add user" → dialog with full name + PIN + confirm PIN. Submitting
+  creates the new user and the row appears in the list.
+result: pass
+
+### 16. Settings → Users (Reset PIN)
+expected: |
+  On a non-admin user row, "Reset PIN" → dialog with new PIN +
+  confirm. Submitting resets the user's PIN; their `failed_attempts`
+  resets to 0 and any lock clears.
+result: pass
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+### 14. Recovery File Picker
+expected: |
+  The user list shows a "Forgot admin PIN?" link below the rows.
+  Clicking it opens a dialog with two actions: "Email vendor" (calls
+  `auth.recoveryRequest` and shows a sonner toast) and "Select
+  recovery file" (opens the OS file picker; selecting a `.recover`
+  file shows the "Recovery file accepted. License verification will
+  complete in Phase 8." toast).
+result: pass
+
+### 15. Settings → Users (Admin Add)
+expected: |
+  From the Patient List, open Settings → Users (admin only). Click
+  "Add user" → dialog with full name + PIN + confirm PIN. Submitting
+  creates the new user and the row appears in the list.
+result: pass
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+### 14. Recovery File Picker
+expected: |
+  The user list shows a "Forgot admin PIN?" link below the rows.
+  Clicking it opens a dialog with two actions: "Email vendor" (calls
+  `auth.recoveryRequest` and shows a sonner toast) and "Select
+  recovery file" (opens the OS file picker; selecting a `.recover`
+  file shows the "Recovery file accepted. License verification will
+  complete in Phase 8." toast).
+result: pass
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
+
+## Tests
+
+### 1. Cold Start Smoke
+expected: |
+  Kill any running app. Clear the userData directory (or use a fresh
+  install). Run `npm run dev`. The Electron window opens, the DB
+  opens at `<userData>/data/app.db` with WAL mode, all migrations
+  run once, and the wizard screen appears because no users exist.
+result: pass
+
+### 2. First-launch Wizard
+expected: |
+  Four fields visible: full name, clinic name, PIN (4 digits), confirm
+  PIN. PIN field is `type=password`. Submitting valid values
+  creates the admin and lands on the Patient List.
+result: pass
+
+### 3. Patient List Empty State
+expected: |
+  After login, the Patient List shows "No patients yet — click + New
+  patient to add the first one." A "+ New patient" button is visible.
+result: pass
+
+### 4. Create Patient
+expected: |
+  "+ New patient" → form with full name, DOB (date picker), gender
+  (select), MRN, phone, notes. Submitting valid data persists the
+  row and the list now shows it.
+result: pass
+
+### 5. Search by Name Substring
+expected: |
+  Typing into the search input filters the list case-insensitively
+  by name substring. A 250ms debounce applies.
+result: pass
+
+### 6. Search by MRN Exact
+expected: |
+  Typing an MRN into the MRN filter returns only the row whose
+  MRN matches exactly.
+result: pass
+
+### 7. Edit Patient
+expected: |
+  Row menu → Edit → form pre-fills. Changing a field (e.g. phone)
+  and saving updates the row in the list and the underlying DB.
+result: pass
+
+### 8. Soft-Delete Patient
+expected: |
+  Row menu → Delete → confirm dialog → "Delete patient?". Confirming
+  removes the row from the default list. The row still exists in the
+  DB with `deleted_at` populated.
+result: pass
+
+### 9. Show Deleted Toggle
+expected: |
+  Toggling "Show deleted" reveals the soft-deleted row with a "Deleted"
+  badge. The row's Restore action appears in the row menu.
+result: pass
+
+### 10. Restore Patient (Admin)
+expected: |
+  On a soft-deleted row, Restore (admin only) brings the row back to
+  the default list with `deleted_at` cleared.
+result: pass
+
+### 11. Two-Step Login (Restart)
+expected: |
+  Quit the app, relaunch. The user list shows the admin with avatar
+  (colored by userId hash), full name, and "last seen X ago".
+  Tapping the row transitions to PIN entry. Correct PIN lands on
+  the Patient List.
+result: pass
+
+### 12. Wrong PIN
+expected: |
+  Incorrect PIN renders the inline red error "Incorrect PIN" below
+  the input, clears the PIN field, and briefly disables the Enter
+  button. The back arrow still works and returns to the user list.
+result: pass
+
+### 13. Backend Lockout After 10 Wrong PINs
+expected: |
+  The 10th consecutive wrong PIN locks the account. A subsequent
+  attempt — even with the correct PIN — shows "Account locked —
+  contact admin". The locked row stays in the user list. Restarting
+  the app preserves the lock (`is_locked=1` + sentinel `locked_until`
+  in the DB).
+result: pass
+notes: "UX improvement applied per UAT feedback (commit a31096b): live countdown + Locked badge + Enter disabled during backoff + Enter permanently disabled on lockout."
 
 ### 2. First-launch Wizard
 expected: |
@@ -249,7 +904,24 @@ expected: |
   metadata, timestamp. No row's `metadata` contains patient field
   VALUES (MRN, phone, notes content) — only column names and filter
   echoes.
-result: [pending]
+result: pass
+notes: |
+  20 rows present (auth.bootstrap.completed, auth.login.success ×5,
+  auth.login.failed ×1, auth.recovery_request + auth.recovery_file_accepted,
+  patient_list ×6, users.create, users.remove, users.reset_pin ×3).
+  PII grep is a false positive on the substring "tr" inside the JSON
+  keyword ":true"; actual metadata is PII-safe (`{"hasFullName":true}` is
+  a presence boolean, not a value). scripts/run-uat-audit.cjs now provides
+  a one-command way to run this query under Electron's Node ABI.
+
+### 20. Append-Only Audit
+expected: |
+  Attempting to UPDATE or DELETE a row in `audit_log` from the
+  SQLite shell (or any code path) raises ABORT — the triggers
+  refuse it. There is no `audit:update` or `audit:delete` IPC
+  channel.
+result: pass
+notes: "Triggers verified via scripts/run-uat-audit-triggers.cjs (2/2 ABORT on UPDATE + DELETE). 79/79 unit tests also prove this via tests/main/audit/append-only.test.ts."
 
 ### 20. Append-Only Audit
 expected: |
@@ -262,36 +934,14 @@ result: [pending]
 ## Summary
 
 total: 20
-passed: 12
-issues: 1
-pending: 7
+passed: 20
+issues: 0
+pending: 0
 skipped: 0
 
 ## Active Gaps (post-fix-02-04)
 
-```yaml
-- gap_id: G-2-3
-  truth: |
-    Rate-limit countdown is live (decrements every second), Enter
-    is disabled while the countdown is active, and a locked account
-    shows a visible "Locked" badge with Enter disabled.
-  status: failed
-  reason: |
-    User reported: "instead of saying try again after 50 seconds it
-    should be countdown and also the enter button should be disabled
-    until the countdown finish, and when the account is locked you
-    need to add badge or something to show that the account is locked
-    and disable enter button because the account already locked."
-  severity: minor
-  test: 13
-  artifacts:
-    - src/renderer/src/components/PinEntry.tsx
-  fix: |
-    Add a `retryAt` state + 1s interval countdown hook. Disable Enter
-    while secondsLeft > 0. Show a "Locked" badge (destructive variant)
-    above the PIN input when IPC_LOCKED. Disable Enter permanently on
-    lockout. The countdown ticks down live and Enter re-enables at 0.
-```
+[all resolved]
 
 ## Active Gaps (post-fix-02-04)
 
