@@ -11,6 +11,7 @@ import PatientsList from './pages/PatientsList';
 import PatientForm from './pages/PatientForm';
 import SettingsUsers from './pages/SettingsUsers';
 import SettingsCapture from './pages/SettingsCapture';
+import SettingsHub from './pages/SettingsHub';
 import ProcedureRoom from './pages/ProcedureRoom';
 
 export default function App(): JSX.Element {
@@ -68,18 +69,22 @@ export default function App(): JSX.Element {
       return <PatientForm mode="create" />;
     case 'patient-edit':
       return <PatientForm mode="edit" patientId={route.id} />;
-    case 'patient-detail':
-      // Skeleton route — Phase 4 owns the procedure timeline.
-      return (
-        <main className="min-h-screen grid place-items-center bg-slate-50">
-          <p className="text-sm text-slate-500">Patient detail (Phase 4) — id: {route.id}</p>
-        </main>
-      );
+    case 'settings-hub':
+      return <SettingsHub />;
     case 'settings-users':
       return <SettingsUsers />;
     case 'settings-capture':
       return <SettingsCapture />;
     case 'procedure-room':
       return <ProcedureRoom />;
+    default:
+      // The only unhandled variant is `patient-detail`, preserved in the
+      // Route union for backward-compat with persisted deep-links + audit
+      // payloads, but never dispatched by App in Phase 3+ (the patient
+      // surface is the Procedure Room, reached from PatientRow). Persisted
+      // deep-links that still carry 'patient-detail' fall through to the
+      // Patient List so the renderer never re-renders the Phase 1
+      // placeholder.
+      return <PatientsList />;
   }
 }

@@ -32,7 +32,10 @@ const IPC_CONTRACT_SRC = read('src/shared/ipc-contract.ts');
 const PRELOAD_SRC = read('src/preload/index.ts');
 const PROCEDURE_ROOM_SRC = read('src/renderer/src/pages/ProcedureRoom.tsx');
 const SETTINGS_CAPTURE_SRC = read('src/renderer/src/pages/SettingsCapture.tsx');
+const SETTINGS_HUB_SRC = read('src/renderer/src/pages/SettingsHub.tsx');
 const PATIENTS_LIST_SRC = read('src/renderer/src/pages/PatientsList.tsx');
+const PATIENT_ROW_SRC = read('src/renderer/src/components/PatientRow.tsx');
+const APP_SRC = read('src/renderer/src/App.tsx');
 const USE_VIDEO_PREVIEW_SRC = read('src/renderer/src/hooks/useVideoPreview.ts');
 const USE_CAPTURE_DEVICE_MAP_SRC = read('src/renderer/src/hooks/useCaptureDeviceMap.ts');
 const CAPTURE_IPC_SRC = read('src/main/ipc/capture.ts');
@@ -169,22 +172,73 @@ describe('D-01 — ProcedureRoom does NOT persist; SettingsCapture is the only c
   });
 });
 
-describe('Plan 03-04 — Patient List is the entry point for Settings → Capture (G-03-1 / G-03-2)', () => {
-  it('PatientsList.tsx navigates to settings-capture so every doctor can reach the device picker', () => {
-    // ponytail: a static-analysis contract — PatientsList must call
-    // `navigate({ name: 'settings-capture' })` somewhere so the existing
-    // SettingsCapture page is reachable from the Patient List header.
-    // Single or double quotes both count; the literal is the only thing
-    // that matters.
-    expect(PATIENTS_LIST_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
+describe('Plan 03-04 — Patient List is the entry point for Settings → Capture (G-03-1 / G-03-2) — superseded by 03-05 hub', () => {
+  // ponytail: Plan 03-05 (G-03-3) replaced the PatientsList DropdownMenu
+  // with a single Button that opens the SettingsHub page. The Capture and
+  // Users destinations are now navigated to from SettingsHub's sidebar
+  // (asserted in the 03-05 block below), so the prior 03-04 positive
+  // assertions (`navigate({ name: 'settings-capture' })` and
+  // `'settings-users'` literal in PatientsList) are no longer the right
+  // contract. We keep the describe block as a marker; the new contract
+  // lives in the 03-05 block.
+  it('PatientsList.tsx no longer navigates directly to settings-capture or settings-users (the hub is the new entry)', () => {
+    expect(PATIENTS_LIST_SRC).not.toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
+    expect(PATIENTS_LIST_SRC).not.toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-users['"]\s*\}/);
+  });
+});
+
+describe('Plan 03-05 — Settings hub page (G-03-3)', () => {
+  it('PatientsList header Settings affordance navigates to settings-hub (not a transient menu)', () => {
+    // ponytail: the new entry surface is a single Button that lands on the
+    // SettingsHub page. The literal `navigate({ name: 'settings-hub' })`
+    // is the new entry; the absence of a DropdownMenu wrapper is asserted
+    // by checking PatientsList no longer imports or instantiates one.
+    expect(PATIENTS_LIST_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-hub['"]\s*\}/);
+    // No transient menu wrapper for the Settings affordance.
+    expect(PATIENTS_LIST_SRC).not.toMatch(/DropdownMenuTrigger/);
+    expect(PATIENTS_LIST_SRC).not.toMatch(/DropdownMenuContent/);
   });
 
-  it('PatientsList.tsx still routes to settings-users for the admin settings path', () => {
-    // ponytail: the fix must not drop admin access to Settings → Users.
-    // Accepts either `navigate({ name: 'settings-users' })` or a direct
-    // `setRoute({ name: 'settings-users' })` call — both keep the
-    // destination alive in the source.
-    expect(PATIENTS_LIST_SRC).toMatch(/['"]settings-users['"]/);
+  it('SettingsHub.tsx contains a navigation call to settings-users (admin-gated)', () => {
+    // The Users sidebar entry must call navigate({ name: 'settings-users' })
+    // so the static-analysis contract pins the admin destination.
+    expect(SETTINGS_HUB_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-users['"]\s*\}/);
+  });
+
+  it('SettingsHub.tsx contains a navigation call to settings-capture (every doctor)', () => {
+    // The Capture sidebar entry must call navigate({ name: 'settings-capture' })
+    // so the static-analysis contract pins the existing device picker.
+    expect(SETTINGS_HUB_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
+  });
+
+  it('SettingsHub.tsx imports useSession and gates Users on isFirstAdmin', () => {
+    // T-3-16 — admin gate binds the Users button to currentUser.isFirstAdmin.
+    expect(SETTINGS_HUB_SRC).toMatch(/useSession/);
+    expect(SETTINGS_HUB_SRC).toMatch(/isFirstAdmin/);
+  });
+
+  it('App.tsx renders the settings-hub case', () => {
+    // The router shell must dispatch the new route to <SettingsHub />.
+    expect(APP_SRC).toMatch(/case\s+['"]settings-hub['"]/);
+    expect(APP_SRC).toMatch(/SettingsHub/);
+  });
+});
+
+describe('Plan 03-05 — PatientRow Open Procedure Room entry (G-03-4)', () => {
+  it('PatientRow.tsx navigates to procedure-room with the patientId for non-deleted patients', () => {
+    // ponytail: the typed literal `navigate({ name: 'procedure-room', patientId: ... })`
+    // is the single source of truth for the new row action. T-3-18.
+    expect(PATIENT_ROW_SRC).toMatch(
+      /navigate\(\s*\{\s*name:\s*['"]procedure-room['"]\s*,\s*patientId\s*:\s*patient\.id\s*\}\s*\)/,
+    );
+  });
+
+  it('App.tsx no longer renders the Phase 1 patient-detail placeholder case (T-3-19)', () => {
+    // The placeholder case was a Phase 1 stub ("Patient detail (Phase 4) — id: ...").
+    // Removing it closes the dead UI surface; the route variant stays in
+    // the Route union for backward-compat with persisted deep-links.
+    expect(APP_SRC).not.toMatch(/case\s+['"]patient-detail['"]/);
+    expect(APP_SRC).not.toMatch(/Patient detail \(Phase 4\)/);
   });
 });
 

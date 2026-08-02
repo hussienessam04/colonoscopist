@@ -8,6 +8,7 @@ export type Route =
   | { name: 'patient-new' }
   | { name: 'patient-edit'; id: string }
   | { name: 'patient-detail'; id: string }
+  | { name: 'settings-hub' }
   | { name: 'settings-users' }
   | { name: 'settings-capture' }
   | { name: 'procedure-room'; patientId?: string };

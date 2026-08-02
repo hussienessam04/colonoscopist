@@ -152,94 +152,23 @@ describe('PatientsList', () => {
   });
 });
 
-// Plan 03-04 — Settings DropdownMenu surfaces Capture (every doctor) and Users (admin only).
-// Closes G-03-1 + G-03-2: the missing entry point into the existing Settings → Capture page.
-describe('PatientsList — Settings menu', () => {
-  it('renders a Settings trigger that opens a menu with Capture and Users items for an admin', async () => {
+// Plan 03-05 — PatientsList header Settings Button routes to the new
+// settings-hub page (G-03-3). The prior DropdownMenu surface shipped in
+// 03-04 was replaced by a single Button that opens the Settings hub; the
+// hub's right-side sidebar handles per-section gating (admin only for
+// Users, every doctor for Capture).
+describe('PatientsList — Settings hub entry', () => {
+  it('header Settings Button (not a DropdownMenu) routes to settings-hub for any authenticated session', async () => {
     setRoute(initialRoute);
     setAdminSession();
     await session.refresh();
     const user = userEvent.setup();
     render(<PatientsList />);
     await screen.findByText('Alice Carter');
-    const settingsTrigger = await screen.findByRole('button', { name: /^settings$/i });
-    expect(settingsTrigger).not.toBeDisabled();
+    const settingsTrigger = await screen.findByTestId('settings-trigger');
+    expect(settingsTrigger).toBeInstanceOf(HTMLButtonElement);
+    // Single button — no transient menu wrapper.
     await user.click(settingsTrigger);
-    const capture = await screen.findByRole('menuitem', { name: /^capture$/i });
-    const users = await screen.findByRole('menuitem', { name: /^users$/i });
-    // Admin sees both items enabled (D-09 / SET-01 reachability).
-    expect(capture).not.toHaveAttribute('data-disabled', '');
-    expect(users).not.toHaveAttribute('data-disabled', '');
-  });
-
-  it('renders Capture enabled and Users disabled for a non-admin (T-3-13)', async () => {
-    setRoute(initialRoute);
-    setNonAdminSession();
-    await session.refresh();
-    const user = userEvent.setup();
-    render(<PatientsList />);
-    await screen.findByText('Alice Carter');
-    const settingsTrigger = await screen.findByRole('button', { name: /^settings$/i });
-    expect(settingsTrigger).not.toBeDisabled();
-    await user.click(settingsTrigger);
-    const capture = await screen.findByRole('menuitem', { name: /^capture$/i });
-    const users = await screen.findByRole('menuitem', { name: /^users$/i });
-    // Capture is always reachable for any authenticated doctor (G-03-1 / G-03-2).
-    expect(capture).not.toHaveAttribute('data-disabled', '');
-    // Users is gated to first admin (D-02 / SET-04).
-    expect(users).toHaveAttribute('data-disabled', '');
-  });
-
-  it('admin: clicking Capture routes to settings-capture', async () => {
-    setRoute(initialRoute);
-    setAdminSession();
-    await session.refresh();
-    const user = userEvent.setup();
-    render(<PatientsList />);
-    await screen.findByText('Alice Carter');
-    await user.click(await screen.findByRole('button', { name: /^settings$/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /^capture$/i }));
-    await waitFor(() => expect(getRoute().name).toBe('settings-capture'));
-  });
-
-  it('non-admin: clicking Capture still routes to settings-capture (G-03-1 / G-03-2)', async () => {
-    setRoute(initialRoute);
-    setNonAdminSession();
-    await session.refresh();
-    const user = userEvent.setup();
-    render(<PatientsList />);
-    await screen.findByText('Alice Carter');
-    await user.click(await screen.findByRole('button', { name: /^settings$/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /^capture$/i }));
-    await waitFor(() => expect(getRoute().name).toBe('settings-capture'));
-  });
-
-  it('admin: clicking Users routes to settings-users', async () => {
-    setRoute(initialRoute);
-    setAdminSession();
-    await session.refresh();
-    const user = userEvent.setup();
-    render(<PatientsList />);
-    await screen.findByText('Alice Carter');
-    await user.click(await screen.findByRole('button', { name: /^settings$/i }));
-    await user.click(await screen.findByRole('menuitem', { name: /^users$/i }));
-    await waitFor(() => expect(getRoute().name).toBe('settings-users'));
-  });
-
-  it('non-admin: clicking the disabled Users item does NOT navigate', async () => {
-    setRoute({ name: 'patients' });
-    setNonAdminSession();
-    await session.refresh();
-    const user = userEvent.setup();
-    render(<PatientsList />);
-    await screen.findByText('Alice Carter');
-    await user.click(await screen.findByRole('button', { name: /^settings$/i }));
-    const users = await screen.findByRole('menuitem', { name: /^users$/i });
-    expect(users).toHaveAttribute('data-disabled', '');
-    // Radix + the data-disabled CSS rule swallow the click; route must stay on 'patients'.
-    await user.click(users);
-    // Give Radix a tick to (not) advance the route.
-    await new Promise((r) => setTimeout(r, 25));
-    expect(getRoute().name).toBe('patients');
+    await waitFor(() => expect(getRoute().name).toBe('settings-hub'));
   });
 });
