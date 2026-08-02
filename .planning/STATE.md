@@ -3,7 +3,7 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_3_plan_1_complete
-stopped_at: Completed 03-01-PLAN.md
+stopped_at: Completed 03-02-PLAN.md
 last_updated: "2026-08-02T16:46:00Z"
 progress:
   total_phases: 3
@@ -23,7 +23,7 @@ progress:
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: 03-01 complete (commit `f15ab5f`). 94 tests pass (15 new canonicalize + 79 existing). `npm run typecheck:node` clean. Next: `/gsd-execute-phase 3` continues with 03-02 (renderer hooks + pages + Zustand capture store; depends on 03-01).
+Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: 03-01 and 03-02 complete (commits `f15ab5f`, `22ee0d8`, `e1bea28`, `74675bb`). 115 tests pass (16 new for 03-02: 5 hook + 5 procedure-room + 6 settings-capture, plus 79 pre-existing). `npm run typecheck` clean. Next: `/gsd-execute-phase 3` continues with 03-03 (validation: moved test files + security-baseline + integration suite + Windows hardware smoke UAT).
 
 ## Project Reference
 
@@ -49,7 +49,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Plan | Title | Status |
 |------|-------|--------|
 | 03-01 | Main foundation: DirectShow enumeration + canonicalization + session-scoped IPC + preload + media permission + canonicalize test | complete |
-| 03-02 | Renderer: useVideoPreview/useCaptureDeviceMap + Procedure Room + Settings Capture with reactive preview + no-device audit hook + previousRoute Finish | pending |
+| 03-02 | Renderer: useVideoPreview/useCaptureDeviceMap + Procedure Room + Settings Capture with reactive preview + no-device audit hook + previousRoute Finish | complete |
 | 03-03 | Validation: moved test files + security-baseline + scope guards + integration suite + Windows hardware smoke UAT | pending |
 
 ## Open Questions / Decisions to Make in Planning
