@@ -149,16 +149,16 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | PAT-02 | Phase 2 | Pending |
 | PAT-03 | Phase 2 | Pending |
 | PAT-04 | Phase 2 | Pending |
-| CAPT-01 | Phase 3 | Pending |
-| CAPT-02 | Phase 3 | Pending |
-| CAPT-03 | Phase 3 | Pending |
+| CAPT-01 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
+| CAPT-02 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
+| CAPT-03 | Phase 3 | Pending (03-02) |
 | CAPT-04 | Phase 4 | Pending |
 | CAPT-05 | Phase 4 | Pending |
 | CAPT-06 | Phase 4 | Pending |
 | CAPT-07 | Phase 4 | Pending |
 | CAPT-08 | Phase 4 | Pending |
 | CAPT-09 | Phase 4 | Pending |
-| CAPT-10 | Phase 3 | Pending |
+| CAPT-10 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
 | SCRN-01 | Phase 5 | Pending |
 | SCRN-02 | Phase 5 | Pending |
 | REV-01 | Phase 5 | Pending |
@@ -175,8 +175,8 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | SRCH-01 | Phase 7 | Pending |
 | SRCH-02 | Phase 7 | Pending |
 | SRCH-03 | Phase 7 | Pending |
-| SET-01 | Phase 3 | Pending |
-| SET-02 | Phase 3 | Pending |
+| SET-01 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
+| SET-02 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
 | SET-03 | Phase 1 | Pending |
 | SET-04 | Phase 1 | Pending |
 | SET-05 | Phase 7 | Pending |
