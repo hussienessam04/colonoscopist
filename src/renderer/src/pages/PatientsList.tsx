@@ -1,12 +1,21 @@
 // Patient List — default landing after login.
 // Per PAT-02 + PAT-04: search + MRN exact + show-deleted toggle + page-size + soft-delete.
 // Per Fix 6: every patients.list call writes a patient_list audit row in main.
+// Per Plan 03-04 (G-03-1 / G-03-2): header Settings is a DropdownMenu so every
+// authenticated doctor reaches the existing Settings → Capture page; Users stays
+// admin-gated via currentUser.isFirstAdmin.
 import { useEffect, useState } from 'react';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import PageSizeSelector from '@/components/PageSizeSelector';
 import PatientRow from '@/components/PatientRow';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -102,14 +111,34 @@ export default function PatientsList(): JSX.Element {
             <p className="text-sm text-muted-foreground">{total} total</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate({ name: 'settings-users' })}
-              disabled={!canRestore}
-              title={canRestore ? 'Manage users' : 'Admin only'}
-            >
-              Settings
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  title="Settings"
+                  data-testid="settings-trigger"
+                >
+                  <SettingsIcon className="size-4 mr-1" aria-hidden="true" />
+                  Settings
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  onSelect={() => navigate({ name: 'settings-capture' })}
+                  data-testid="settings-menu-capture"
+                >
+                  Capture
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onSelect={() => navigate({ name: 'settings-users' })}
+                  disabled={!canRestore}
+                  title={canRestore ? 'Manage users' : 'Admin only'}
+                  data-testid="settings-menu-users"
+                >
+                  Users
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button onClick={() => navigate({ name: 'patient-new' })}>
               <Plus className="size-4 mr-1" /> New patient
             </Button>

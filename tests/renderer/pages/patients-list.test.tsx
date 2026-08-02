@@ -227,7 +227,7 @@ describe('PatientsList — Settings menu', () => {
   });
 
   it('non-admin: clicking the disabled Users item does NOT navigate', async () => {
-    setRoute(initialRoute);
+    setRoute({ name: 'patients' });
     setNonAdminSession();
     await session.refresh();
     const user = userEvent.setup();
