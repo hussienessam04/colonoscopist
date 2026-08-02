@@ -254,6 +254,22 @@ blocked: 8
     - "Replace the PatientsList DropdownMenu trigger with a button that navigates to the Settings hub"
     - "Re-test entry-point navigation: Patient List → Settings → (Users|Capture)"
 
+- gap_id: G-03-4
+  truth: "Procedure Room is reachable from a patient row in the Patient List"
+  status: failed
+  reason: "User reported: cannot reach Procedure Room from anywhere. PatientRow has only Edit/Delete/Restore actions; patient-detail route renders a Phase 1 placeholder. Phase 3 shipped the Procedure Room page but no UI navigation to it."
+  severity: blocker
+  test: 2
+  artifacts:
+    - path: "src/renderer/src/components/PatientRow.tsx"
+      issue: "No 'Open Procedure Room' or 'View Details' navigation"
+    - path: "src/renderer/src/App.tsx"
+      issue: "patient-detail route still shows 'Patient detail (Phase 4) — id: ...' placeholder"
+  missing:
+    - "Add an 'Open Procedure Room' action to PatientRow (or row-click → procedure-room) for non-deleted patients"
+    - "Either remove the patient-detail placeholder route or alias it to procedure-room"
+    - "Procedure Room entry must preserve previousRoute so Finish returns to Patient List (Q-B)"
+
 ## Deferred Follow-Ups
 
 [none yet]
