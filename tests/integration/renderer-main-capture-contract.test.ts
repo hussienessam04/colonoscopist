@@ -32,6 +32,7 @@ const IPC_CONTRACT_SRC = read('src/shared/ipc-contract.ts');
 const PRELOAD_SRC = read('src/preload/index.ts');
 const PROCEDURE_ROOM_SRC = read('src/renderer/src/pages/ProcedureRoom.tsx');
 const SETTINGS_CAPTURE_SRC = read('src/renderer/src/pages/SettingsCapture.tsx');
+const PATIENTS_LIST_SRC = read('src/renderer/src/pages/PatientsList.tsx');
 const USE_VIDEO_PREVIEW_SRC = read('src/renderer/src/hooks/useVideoPreview.ts');
 const USE_CAPTURE_DEVICE_MAP_SRC = read('src/renderer/src/hooks/useCaptureDeviceMap.ts');
 const CAPTURE_IPC_SRC = read('src/main/ipc/capture.ts');
@@ -165,6 +166,25 @@ describe('D-01 — ProcedureRoom does NOT persist; SettingsCapture is the only c
         /window\.api\.capture\.setDefaultDevice/.test(fs.readFileSync(file, 'utf8')),
     );
     expect(callers, `unexpected callers: ${callers.join(', ')}`).toEqual([]);
+  });
+});
+
+describe('Plan 03-04 — Patient List is the entry point for Settings → Capture (G-03-1 / G-03-2)', () => {
+  it('PatientsList.tsx navigates to settings-capture so every doctor can reach the device picker', () => {
+    // ponytail: a static-analysis contract — PatientsList must call
+    // `navigate({ name: 'settings-capture' })` somewhere so the existing
+    // SettingsCapture page is reachable from the Patient List header.
+    // Single or double quotes both count; the literal is the only thing
+    // that matters.
+    expect(PATIENTS_LIST_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
+  });
+
+  it('PatientsList.tsx still routes to settings-users for the admin settings path', () => {
+    // ponytail: the fix must not drop admin access to Settings → Users.
+    // Accepts either `navigate({ name: 'settings-users' })` or a direct
+    // `setRoute({ name: 'settings-users' })` call — both keep the
+    // destination alive in the source.
+    expect(PATIENTS_LIST_SRC).toMatch(/['"]settings-users['"]/);
   });
 });
 
