@@ -78,9 +78,9 @@ export function parseDshowVideoDevices(stderr: string): CaptureDevice[] {
       continue;
     }
     if (!inVideo) continue;
-    // ponytail: strict quoted match — anything outside the quotes is dropped.
-    // ffmpeg emits lines like:  "USB Video Device"
-    const m = line.match(/^\s*"([^"]+)"\s*$/);
+    // ponytail: real ffmpeg output looks like `[dshow @ 0x...]  "USB Video Device"`.
+    // The `[dshow …]` prefix is optional so banner-only strings still match.
+    const m = line.match(/^\s*(?:\[[^\]]+\])?\s*"([^"]+)"\s*$/);
     if (!m) continue;
     const raw = m[1];
     try {

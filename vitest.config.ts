@@ -13,7 +13,12 @@ export default defineConfig({
     alias: rendererAlias,
   },
   test: {
-    include: ['tests/main/**/*.test.ts', 'tests/renderer/**/*.test.{ts,tsx}'],
+    include: [
+      'tests/main/**/*.test.ts',
+      'tests/renderer/**/*.test.{ts,tsx}',
+      'tests/shell/**/*.test.ts',
+      'tests/integration/**/*.test.ts',
+    ],
     environment: 'node',
     // Renderer tests opt into happy-dom via the per-file directive `// @vitest-environment happy-dom`.
     environmentMatchGlobs: [

@@ -19,6 +19,7 @@ import {
 import { enumerateDshowDevices } from '../capture/devices';
 import { presetRepo } from '../capture/preset-repo';
 import { autoDetectPreset, type MatchedPattern } from '../capture/auto-detect-preset';
+import { canonicalizeOrThrow } from '../capture/canonicalize';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
 
@@ -82,12 +83,15 @@ export function getDefaultDevice(): string | null {
 export function setDefaultDevice(input: unknown): { ok: true } {
   const { deviceId } = captureDeviceIdInput.parse(input);
   const doctorId = requireSession();
-  presetRepo.setDefault(doctorId, deviceId);
+  // ponytail: canonicalize BEFORE both the settings write and the audit row so
+  // audit metadata always echoes the same form (D-11 — single canonical name).
+  const canonical = canonicalizeOrThrow(deviceId);
+  presetRepo.setDefault(doctorId, canonical);
   audit({
     action: 'capture.device_changed',
     entityType: 'capture',
     entityId: null,
-    metadata: { stage: 'save', deviceName: deviceId },
+    metadata: { stage: 'save', deviceName: canonical },
   });
   return { ok: true };
 }
@@ -123,12 +127,15 @@ export function getPreset(input: unknown): { preset: QualityPreset; matched: Mat
 export function setPreset(input: unknown): { ok: true } {
   const { deviceId, preset } = capturePresetInput.parse(input);
   const doctorId = requireSession();
-  presetRepo.setPreset(doctorId, deviceId, preset);
+  // ponytail: canonicalize BEFORE both the settings write and the audit row
+  // (D-11). presetRepo already canonicalizes, but the audit needs the same form.
+  const canonical = canonicalizeOrThrow(deviceId);
+  presetRepo.setPreset(doctorId, canonical, preset);
   audit({
     action: 'capture.preset_changed',
     entityType: 'capture',
-    entityId: deviceId,
-    metadata: { deviceName: deviceId, preset: preset.preset },
+    entityId: canonical,
+    metadata: { deviceName: canonical, preset: preset.preset },
   });
   return { ok: true };
 }
