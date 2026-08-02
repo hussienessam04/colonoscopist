@@ -10,6 +10,7 @@ import Login from './pages/Login';
 import PatientsList from './pages/PatientsList';
 import PatientForm from './pages/PatientForm';
 import SettingsUsers from './pages/SettingsUsers';
+import SettingsCapture from './pages/SettingsCapture';
 import ProcedureRoom from './pages/ProcedureRoom';
 
 export default function App(): JSX.Element {
@@ -77,16 +78,7 @@ export default function App(): JSX.Element {
     case 'settings-users':
       return <SettingsUsers />;
     case 'settings-capture':
-      return (
-        <main className="min-h-screen bg-slate-50 p-6">
-          <div className="mx-auto max-w-5xl">
-            <h1 className="text-2xl font-semibold">Settings · Capture</h1>
-            <p className="text-sm text-muted-foreground">
-              Choose a default capture device and verify its quality preset.
-            </p>
-          </div>
-        </main>
-      );
+      return <SettingsCapture />;
     case 'procedure-room':
       return <ProcedureRoom />;
   }

@@ -41,7 +41,7 @@ export default function ProcedureRoom(): JSX.Element {
   const [preset, setPreset] = useState<QualityPreset>();
   const [defaultLoaded, setDefaultLoaded] = useState(false);
   const initialized = useRef(false);
-  const preview = useVideoPreview(selectedBrowserId, preset);
+  const preview = useVideoPreview(null, preset);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,7 +89,6 @@ export default function ProcedureRoom(): JSX.Element {
   }, [selectedCanonical]);
 
   function finish(): void {
-    preview.stop();
     navigate(previous ?? { name: 'patients' });
   }
 
@@ -143,7 +142,6 @@ export default function ProcedureRoom(): JSX.Element {
               <Select
                 value={selectedBrowserId ?? undefined}
                 onValueChange={(value) => {
-                  preview.stop();
                   setSelectedBrowserId(value);
                 }}
                 disabled={loading || browser.length === 0}

@@ -40,6 +40,7 @@ function presetHints(preset?: QualityPreset): {
 
 export function useVideoPreview(browserDeviceId: string | null, preset?: QualityPreset): {
   videoRef: React.RefObject<HTMLVideoElement>;
+  startRequested: boolean;
   active: boolean;
   starting: boolean;
   error: PreviewError | null;
@@ -49,7 +50,7 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const requestRef = useRef(0);
-  const [requested, setRequested] = useState(false);
+  const [startRequested, setStartRequested] = useState(false);
   const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<PreviewError | null>(null);
@@ -66,7 +67,7 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
 
   const stop = useCallback(() => {
     release();
-    setRequested(false);
+    setStartRequested(false);
     setActive(false);
     setStarting(false);
   }, [release]);
@@ -74,14 +75,18 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   const start = useCallback(() => {
     if (!browserDeviceId) return;
     setError(null);
-    setRequested(true);
+    setStartRequested(true);
   }, [browserDeviceId]);
 
   const resolution = presetHints(preset).resolution;
   const framerate = presetHints(preset).framerate;
 
   useEffect(() => {
-    if (!requested || !browserDeviceId) return;
+    if (!startRequested || !browserDeviceId) return;
+
+    // ponytail: temporary diagnostic to confirm hook firing in test
+    // eslint-disable-next-line no-console
+    console.log('[useVideoPreview] opening stream', { browserDeviceId, startRequested });
 
     release();
     const request = requestRef.current;
@@ -127,12 +132,12 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
         if (request !== requestRef.current) return;
         setStarting(false);
         setActive(false);
-        setRequested(false);
+        setStartRequested(false);
         setError(previewError(cause));
       });
 
     return release;
-  }, [browserDeviceId, framerate, release, requested, resolution?.[0], resolution?.[1]]);
+  }, [browserDeviceId, framerate, release, startRequested, resolution?.[0], resolution?.[1]]);
 
   useEffect(() => {
     return () => {
@@ -140,5 +145,5 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
     };
   }, [release]);
 
-  return { videoRef, active, starting, error, start, stop };
+  return { videoRef, startRequested, active, starting, error, start, stop };
 }
