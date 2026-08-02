@@ -59,6 +59,13 @@ Plans:
 **Pitfalls addressed:** Pitfall 3 (device enumeration race — preview-only path; main-side ffmpeg open happens in Phase 4 with explicit sequencing).
 **Notes:** The choice of last-used device is stored per doctor. This phase does NOT spawn ffmpeg yet.
 
+**Plans:** 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Main foundation: DirectShow enumeration, canonicalization, session-scoped IPC, preload, preset repo, media permission, canonicalize test (Wave 1)
+- [ ] 03-02-PLAN.md — Renderer: deviceId bridge (dshow ↔ browser), useVideoPreview/useCaptureDeviceMap, Procedure Room + Settings Capture with reactive preview, no-device audit hook, previousRoute Finish (Wave 2, depends_on: 03-01)
+- [ ] 03-03-PLAN.md — Validation: moved test files, security-baseline + scope guards, integration contract test, full suite + typecheck + build, Windows hardware smoke UAT (Wave 2, depends_on: 03-01, 03-02)
+
 ---
 
 ## Phase 4 — Recording (ffmpeg child process + procedure timer + device-lost handling)
