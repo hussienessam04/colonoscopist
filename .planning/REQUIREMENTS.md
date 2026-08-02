@@ -25,9 +25,9 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Procedure Capture
 
-- [ ] **CAPT-01**: App auto-enumerates all USB DirectShow video devices on launch.
+- [x] **CAPT-01**: App auto-enumerates all USB DirectShow video devices on launch.
 - [ ] **CAPT-02**: Doctor can pick a device from a dropdown; the choice is remembered for the next procedure (per-doctor last-used device).
-- [ ] **CAPT-03**: Live preview shows in the renderer via `getUserMedia`; preview is decoupled from the recorder and continues to work even when no recording is active.
+- [x] **CAPT-03**: Live preview shows in the renderer via `getUserMedia`; preview is decoupled from the recorder and continues to work even when no recording is active.
 - [ ] **CAPT-04**: Recording uses `ffmpeg-static` as a child process; spawned from main; one child process per active procedure.
 - [ ] **CAPT-05**: mp4 is written to `<userData>/data/media/patients/<patientId>/<procedureId>/video.mp4` with `-c:v libx264 -preset veryfast -crf 23 -movflags +faststart`.
 - [ ] **CAPT-06**: On Stop, ffmpeg receives SIGTERM with grace (5s) → SIGKILL fallback; mp4 has a valid moov atom and fsync on close.
@@ -63,7 +63,7 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Settings
 
-- [ ] **SET-01**: User can pick the default capture device from a dropdown (Settings → Capture).
+- [x] **SET-01**: User can pick the default capture device from a dropdown (Settings → Capture).
 - [ ] **SET-02**: User can pick a quality preset: SD analog (720×480), HD digital (1920×1080), or custom (resolution + framerate).
 - [ ] **SET-03**: User can set the data storage path (advanced; default is `<userData>/data`).
 - [ ] **SET-04**: Admin can add, edit, and remove users (PIN reset, role change).
@@ -192,6 +192,7 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | LIC-04 | Phase 8 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 50 total
 - Mapped to phases: 50
 - Unmapped: 0 ✓

@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_3_plan_1_complete
-stopped_at: Phase 3 plans executed — human UAT pending (Windows bench)
-last_updated: "2026-08-02T16:00:51.018Z"
+status: phase_3_plans_complete
+stopped_at: Phase 3 plan 03-04 complete — G-03-1 / G-03-2 closed, hardware UAT unblocked
+last_updated: "2026-08-02T20:18:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -23,7 +23,7 @@ progress:
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: 03-01 and 03-02 complete (commits `f15ab5f`, `22ee0d8`, `e1bea28`, `74675bb`). 115 tests pass (16 new for 03-02: 5 hook + 5 procedure-room + 6 settings-capture, plus 79 pre-existing). `npm run typecheck` clean. Next: `/gsd-execute-phase 3` continues with 03-03 (validation: moved test files + security-baseline + integration suite + Windows hardware smoke UAT).
+Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: 03-01, 03-02, 03-03, AND 03-04 complete (commits `8d8c0fb`, `2f17fdc`, `744e6cb` for 03-04). 197 tests pass (baseline 189 + 8 new: 6 component + 2 integration contract). `npm run typecheck` clean. Plan 03-04 closed the diagnosed UAT gaps **G-03-1** and **G-03-2** by exposing a Settings DropdownMenu in the Patient List header with Capture (every authenticated doctor) + Users (admin only) items. Next: `/gsd-verify-work` to reconcile the two gaps to `status: resolved` and run the 7 Windows-hardware-dependent UAT items now unblocked. Phase 4 (recording) is unblocked.
 
 ## Project Reference
 
@@ -50,7 +50,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 |------|-------|--------|
 | 03-01 | Main foundation: DirectShow enumeration + canonicalization + session-scoped IPC + preload + media permission + canonicalize test | complete |
 | 03-02 | Renderer: useVideoPreview/useCaptureDeviceMap + Procedure Room + Settings Capture with reactive preview + no-device audit hook + previousRoute Finish | complete |
-| 03-03 | Validation: moved test files + security-baseline + scope guards + integration suite + Windows hardware smoke UAT | pending |
+| 03-03 | Validation: moved test files + security-baseline + scope guards + integration suite + Windows hardware smoke UAT | complete |
+| 03-04 | Gap closure: Settings → Capture entry from Patient List header (DropDownMenu, role-aware, G-03-1 + G-03-2) | complete |
 
 ## Open Questions / Decisions to Make in Planning
 
@@ -74,11 +75,11 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Requirements traceability (Phase 3)
 
-- **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts)
+- **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts) + 03-04 (Patient List entry point for Settings → Capture dropdown)
 - **CAPT-02**: 03-01 (presetRepo + IPC) + 03-02 (Settings → Capture UI)
-- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero)
+- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero) + 03-04 (Patient List entry point makes the existing D-09 live preview reachable)
 - **CAPT-10**: 03-01 (canonicalizeName + 15 tests)
-- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker)
+- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker) + 03-04 (header DropdownMenu surfaces it for every doctor)
 - **SET-02**: 03-01 (qualityPresetSchema + autoDetectPreset) + 03-02 (Settings → Capture preset UI)
 
 ## Workflow Notes
@@ -88,14 +89,14 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `f15ab5f feat(03-01): capture enumeration + canonicalization + session-scoped IPC + media permission`
+- Last commit: `744e6cb test(03-04): pin Patient List -> settings-capture contract`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 
 ---
-*State last updated: 2026-08-02 after Plan 03-01 completion*
+*State last updated: 2026-08-02 after Plan 03-04 completion (G-03-1 / G-03-2 closed)*
 
 ## Session
 
-**Last session:** 2026-08-02T16:00:50.995Z
-**Stopped at:** Phase 3 plans executed — human UAT pending (Windows bench)
-**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-03-SUMMARY.md
+**Last session:** 2026-08-02T20:18:00.000Z
+**Stopped at:** Phase 3 plan 03-04 complete — G-03-1 / G-03-2 closed, 7 hardware UAT items unblocked
+**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-04-SUMMARY.md
