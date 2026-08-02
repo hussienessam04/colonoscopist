@@ -1,7 +1,5 @@
-// State-based router hook — no external routing library. Per Plan 02-03 D-04 + T-02-REN-04.
-// Routes are a tagged union; deep-link URLs are a v2 upgrade.
-
-import { useCallback, useEffect, useState } from 'react';
+// State-based router — no external routing library.
+// Routes are a tagged union; current/previous state lives in store/route.ts.
 
 export type Route =
   | { name: 'wizard' }
@@ -10,35 +8,10 @@ export type Route =
   | { name: 'patient-new' }
   | { name: 'patient-edit'; id: string }
   | { name: 'patient-detail'; id: string }
-  | { name: 'settings-users' };
+  | { name: 'settings-users' }
+  | { name: 'settings-capture' }
+  | { name: 'procedure-room'; patientId?: string };
 
 export const initialRoute: Route = { name: 'login' };
 
-let listeners: Array<(r: Route) => void> = [];
-let current: Route = initialRoute;
-
-export function getRoute(): Route {
-  return current;
-}
-
-export function setRoute(next: Route): void {
-  current = next;
-  for (const l of listeners) l(next);
-}
-
-export function navigate(route: Route): void {
-  setRoute(route);
-}
-
-export function useRoute(): { route: Route; navigate: (r: Route) => void } {
-  const [route, setLocal] = useState<Route>(current);
-  useEffect(() => {
-    const listener = (r: Route) => setLocal(r);
-    listeners.push(listener);
-    return () => {
-      listeners = listeners.filter((l) => l !== listener);
-    };
-  }, []);
-  const nav = useCallback((r: Route) => setRoute(r), []);
-  return { route, navigate: nav };
-}
+export { getRoute, setRoute, navigate, useRoute } from '@/store/route';

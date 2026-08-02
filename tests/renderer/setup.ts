@@ -35,6 +35,14 @@ type MockApi = {
   audit: {
     list: ReturnType<typeof vi.fn>;
   };
+  capture: {
+    listDevices: ReturnType<typeof vi.fn>;
+    getDefaultDevice: ReturnType<typeof vi.fn>;
+    setDefaultDevice: ReturnType<typeof vi.fn>;
+    getPreset: ReturnType<typeof vi.fn>;
+    setPreset: ReturnType<typeof vi.fn>;
+    noDeviceAudit: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -64,6 +72,14 @@ export function mockApi(): MockApi {
     },
     audit: {
       list: vi.fn(),
+    },
+    capture: {
+      listDevices: vi.fn(),
+      getDefaultDevice: vi.fn(),
+      setDefaultDevice: vi.fn(),
+      getPreset: vi.fn(),
+      setPreset: vi.fn(),
+      noDeviceAudit: vi.fn(),
     },
   };
   (window as unknown as { api: MockApi }).api = api;
