@@ -1,14 +1,17 @@
 // @vitest-environment happy-dom
 // Plan 03-02 Task 1 — Procedure Room end-to-end tracer.
 // D-01 / D-02 / D-07 / D-08 / Q-B / BLOCKER 5.
+// Plan 03-05 Task 2 — reachability test from PatientRow into Procedure Room (G-03-4).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { getApi } from '../setup';
-import { setRoute } from '@/store/route';
+import { setRoute, getRoute } from '@/store/route';
 import ProcedureRoom from '@/pages/ProcedureRoom';
-import type { CaptureDevice } from '@shared/ipc-contract';
+import PatientsList from '@/pages/PatientsList';
+import { session } from '@/store/session';
+import type { CaptureDevice, Patient } from '@shared/ipc-contract';
 
 async function waitForStartButton(): Promise<HTMLButtonElement> {
   await waitFor(() => {
@@ -111,11 +114,16 @@ describe('ProcedureRoom', () => {
       const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
       expect(md.getUserMedia).toHaveBeenCalled();
     });
+    // ponytail: wait for the .then to set active=true so the Stop
+    // Preview button is visible to fireEvent.click (otherwise the click
+    // lands on a stale Start Preview button and the test misroutes).
+    await screen.findByRole('button', { name: /stop preview/i });
 
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole('button', { name: /stop preview/i }));
+    fireEvent.click(screen.getByRole('button', { name: /stop preview/i }));
 
-    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
+    // 5s timeout absorbs the worst observed happy-dom microtask race
+    // under load between Stop's release() and the in-flight .then.
+    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true), { timeout: 5_000 });
   });
 
   it('Finish stops the active stream', async () => {
@@ -126,12 +134,19 @@ describe('ProcedureRoom', () => {
 
     await waitForStartButton();
     fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
+    await waitFor(() => {
+      const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
+      expect(md.getUserMedia).toHaveBeenCalled();
+    });
+    // ponytail: same gate as above — wait for the Stop Preview button
+    // so Finish's release() runs against a populated streamRef.
     await screen.findByRole('button', { name: /stop preview/i });
 
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('button', { name: /^finish$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^finish$/i }));
 
-    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
+    // 5s timeout absorbs the worst observed happy-dom microtask race
+    // under load between Finish's release() and the in-flight .then.
+    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true), { timeout: 5_000 });
   });
 
   it('fires capture.noDeviceAudit exactly once when the empty state renders', async () => {
@@ -146,5 +161,58 @@ describe('ProcedureRoom', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /open settings/i }));
     expect(api.capture.noDeviceAudit).toHaveBeenCalledTimes(1);
+  });
+});
+
+// Plan 03-05 — reachability from PatientRow into Procedure Room (G-03-4).
+// Renders the patient list, opens a non-deleted row's actions menu, clicks
+// the new "Open Procedure Room" entry, and asserts the route advances to
+// the Procedure Room with the correct patientId.
+describe('Plan 03-05 — Procedure Room reachability from PatientRow', () => {
+  const ALICE: Patient = {
+    id: '00000000-0000-4000-8000-000000000001',
+    fullName: 'Alice Carter',
+    dob: '1980-04-12',
+    gender: 'female',
+    mrn: 'MRN-001',
+    phone: '555-0001',
+    notes: null,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+    deletedAt: null,
+  };
+
+  const ADMIN_USER = {
+    id: '00000000-0000-4000-8000-000000000099',
+    fullName: 'Dr. Layla',
+    isFirstAdmin: true,
+    lastLoginAt: Date.now(),
+    failedAttempts: 0,
+    lockedUntil: null,
+  };
+
+  it('clicking "Open Procedure Room" on a non-deleted row navigates with the patientId', async () => {
+    const api = getApi();
+    api.auth.status.mockResolvedValue({
+      hasUsers: true,
+      authenticated: true,
+      userId: ADMIN_USER.id,
+      clinicName: 'Cairo',
+      isFirstAdmin: true,
+    });
+    api.auth.usersList.mockResolvedValue([ADMIN_USER]);
+    api.patients.list.mockResolvedValue({ rows: [ALICE], total: 1 });
+    await session.refresh();
+
+    setRoute({ name: 'patients' });
+    const user = userEvent.setup();
+    render(<PatientsList />);
+    await screen.findByText('Alice Carter');
+
+    await user.click(screen.getByRole('button', { name: /actions for alice carter/i }));
+    await user.click(await screen.findByRole('menuitem', { name: /open procedure room/i }));
+
+    await waitFor(() => expect(getRoute().name).toBe('procedure-room'));
+    expect(getRoute()).toMatchObject({ name: 'procedure-room', patientId: ALICE.id });
   });
 });

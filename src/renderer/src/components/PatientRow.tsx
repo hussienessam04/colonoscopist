@@ -1,4 +1,7 @@
-// Patient table row + actions menu (Edit / Delete / Restore).
+// Patient table row + actions menu (Open Procedure Room / Edit / Delete / Restore).
+// Per Plan 03-05 (G-03-4): a non-deleted row exposes an "Open Procedure Room"
+// entry that navigates to { name: 'procedure-room', patientId } — the
+// destination preserves the route snapshot so Finish returns to Patient List.
 import { MoreHorizontal } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -7,6 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useRoute } from '@/lib/router';
 import type { Patient } from '@shared/ipc-contract';
 
 type Props = {
@@ -18,6 +22,7 @@ type Props = {
 };
 
 export default function PatientRow({ patient, canRestore, onEdit, onDelete, onRestore }: Props): JSX.Element {
+  const { navigate } = useRoute();
   const isDeleted = patient.deletedAt !== null;
   return (
     <tr className="border-b last:border-b-0">
@@ -47,6 +52,14 @@ export default function PatientRow({ patient, canRestore, onEdit, onDelete, onRe
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            {!isDeleted ? (
+              <DropdownMenuItem
+                onSelect={() => navigate({ name: 'procedure-room', patientId: patient.id })}
+                data-testid="open-procedure-room"
+              >
+                Open Procedure Room
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuItem onSelect={() => onEdit(patient)}>Edit</DropdownMenuItem>
             {isDeleted ? (
               <DropdownMenuItem
