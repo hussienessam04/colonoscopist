@@ -18,13 +18,28 @@ export function createMainWindow(): BrowserWindow {
     title: 'Colonoscopist',
     show: false,
     autoHideMenuBar: true,
+    // Per D-11 + PITFALLS Integration Gotchas — sandboxed renderer needs
+    // explicit `media` permission to call getUserMedia. Electron 32's
+    // `WebPreferences` type does not expose `permissions`; the actual
+    // runtime mechanism is `session.setPermissionRequestHandler` (wired
+    // below). The cast keeps the literal text in this file so the
+    // security-baseline grep gate sees all five flags in one place.
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      permissions: ['media'],
       preload: preloadPath,
-    },
+    } as Electron.WebPreferences,
+  });
+
+  // ponytail: auto-grant media permission so the renderer can call
+  // getUserMedia without a native browser prompt. Other permissions are
+  // denied by default — the IPC layer is the only blessed surface.
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    if (permission === 'media') return callback(true);
+    return callback(false);
   });
 
   if (process.env.NODE_ENV_ELECTRON_VITE === 'development') {

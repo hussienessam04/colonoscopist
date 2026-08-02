@@ -27,7 +27,32 @@ export const IPC = {
   PATIENTS_RESTORE: 'patients:restore',
   // Audit
   AUDIT_LIST: 'audit:list',
+  // Capture (Plan 03-01)
+  CAPTURE_LIST_DEVICES: 'capture:list-devices',
+  CAPTURE_GET_DEFAULT_DEVICE: 'capture:get-default-device',
+  CAPTURE_SET_DEFAULT_DEVICE: 'capture:set-default-device',
+  CAPTURE_GET_PRESET: 'capture:get-preset',
+  CAPTURE_SET_PRESET: 'capture:set-preset',
+  CAPTURE_NO_DEVICE_AUDIT: 'capture:no-device-audit',
 } as const;
+
+// CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
+// (NFC + trim + collapse-spaces) used everywhere; `rawName` is the original
+// ffmpeg string, kept for audit only.
+export type CaptureDevice = {
+  deviceId: string;
+  rawName: string;
+  index: number;
+  type: 'dshow';
+};
+
+// SET-02 / D-05 — discriminated preset. Custom exposes exactly the two
+// fields the spec locks (resolution + framerate); bitrate/pixel-format/GOP
+// are Phase 4 ffmpeg concerns.
+export type QualityPreset =
+  | { preset: 'sd' }
+  | { preset: 'hd' }
+  | { preset: 'custom'; resolution: string; framerate: number };
 
 // Authoritative auth state — single source of truth shared across main + preload + renderer.
 // Per Fix 4. Renderer mirrors this shape; main owns the truth.
@@ -144,6 +169,17 @@ export interface IpcContract {
       page?: number;
       pageSize?: number;
     }) => Promise<{ rows: AuditEntry[]; total: number }>;
+  };
+  // Per D-01 + BLOCKER 4: setPreset / setDefaultDevice payloads do NOT include
+  // a doctorId field. Main derives the doctorId from `requireSession()` and
+  // the renderer cannot impersonate another doctor.
+  capture: {
+    listDevices: () => Promise<CaptureDevice[]>;
+    getDefaultDevice: () => Promise<string | null>;
+    setDefaultDevice: (input: { deviceId: string }) => Promise<{ ok: true }>;
+    getPreset: (input: { deviceId: string }) => Promise<QualityPreset | null>;
+    setPreset: (input: { deviceId: string; preset: QualityPreset }) => Promise<{ ok: true }>;
+    noDeviceAudit: () => Promise<{ ok: true }>;
   };
 }
 

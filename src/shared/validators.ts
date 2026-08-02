@@ -84,6 +84,42 @@ export type PatientInput = z.infer<typeof patientInput>;
 export type PatientPatchInput = z.infer<typeof patientPatchInput>;
 export type PatientListQueryInput = z.infer<typeof patientListQueryInput>;
 
+// Plan 03-01 capture schemas (CAPT-01/02/10, SET-01/02).
+// D-05 — custom resolution matches `W[ x ×]H` with 2–5 digit sides; framerate
+// exactly 25/30/50/60 (standard NTSC/PAL/EU/HD). No bitrate/pixel-format/GOP:
+// those are Phase 4 ffmpeg concerns.
+export const captureDeviceIdInput = z.object({
+  deviceId: z.string().min(1).max(500),
+});
+
+export const qualityPresetSchema = z.discriminatedUnion('preset', [
+  z.object({ preset: z.literal('sd') }),
+  z.object({ preset: z.literal('hd') }),
+  z.object({
+    preset: z.literal('custom'),
+    resolution: z.string().regex(/^\d{2,5}[x×]\d{2,5}$/, 'Resolution must be WxH like 1920x1080'),
+    framerate: z.number().int().refine((n) => [25, 30, 50, 60].includes(n), 'Framerate must be 25/30/50/60'),
+  }),
+]);
+
+export const capturePresetInput = z.object({
+  deviceId: z.string().min(1).max(500),
+  preset: qualityPresetSchema,
+});
+
+export const capturePresetQueryInput = z.object({
+  deviceId: z.string().min(1).max(500),
+});
+
+// Per D-02 + Q-A: `noDeviceAudit` is a renderer-side marker; no payload required.
+export const noDeviceAuditInput = z.object({}).strict();
+
+export type CaptureDeviceIdInput = z.infer<typeof captureDeviceIdInput>;
+export type QualityPresetInput = z.infer<typeof qualityPresetSchema>;
+export type CapturePresetInput = z.infer<typeof capturePresetInput>;
+export type CapturePresetQueryInput = z.infer<typeof capturePresetQueryInput>;
+export type NoDeviceAuditInput = z.infer<typeof noDeviceAuditInput>;
+
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);
 }

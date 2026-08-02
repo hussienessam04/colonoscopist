@@ -34,6 +34,14 @@ const api: IpcContract = {
   audit: {
     list: (query) => ipcRenderer.invoke(IPC.AUDIT_LIST, query),
   },
+  capture: {
+    listDevices: () => ipcRenderer.invoke(IPC.CAPTURE_LIST_DEVICES),
+    getDefaultDevice: () => ipcRenderer.invoke(IPC.CAPTURE_GET_DEFAULT_DEVICE),
+    setDefaultDevice: (input) => ipcRenderer.invoke(IPC.CAPTURE_SET_DEFAULT_DEVICE, input),
+    getPreset: (input) => ipcRenderer.invoke(IPC.CAPTURE_GET_PRESET, input),
+    setPreset: (input) => ipcRenderer.invoke(IPC.CAPTURE_SET_PRESET, input),
+    noDeviceAudit: () => ipcRenderer.invoke(IPC.CAPTURE_NO_DEVICE_AUDIT),
+  },
 };
 
 try {
