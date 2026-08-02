@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_3_plans_complete
-stopped_at: Phase 3 gap closure 03-04 complete - 197/197 tests pass - UAT gaps G-03-1, G-03-2 closed
-last_updated: "2026-08-02T17:06:22.817Z"
+stopped_at: Phase 3 gap closure 03-05 complete - 209/197 baseline tests (+12) - UAT gaps G-03-3, G-03-4 closed
+last_updated: "2026-08-02T21:36:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 3
-  total_plans: 11
-  completed_plans: 11
+  total_plans: 12
+  completed_plans: 12
 ---
 
 # State: Colonoscopist
@@ -19,11 +19,11 @@ progress:
 **Mode:** yolo
 **Granularity:** standard
 **Workflow:** research, plan_check, verifier, nyquist_validation, auto_advance, code_review, ui_phase all enabled.
-**Models:** inherit (subagents use the active session model — required for non-Anthropic OpenCode runtimes).
+**Models:** inherit (subagents use the active session model — required for non-Anthropic Opencode runtimes).
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: 03-01, 03-02, 03-03, AND 03-04 complete (commits `8d8c0fb`, `2f17fdc`, `744e6cb` for 03-04). 197 tests pass (baseline 189 + 8 new: 6 component + 2 integration contract). `npm run typecheck` clean. Plan 03-04 closed the diagnosed UAT gaps **G-03-1** and **G-03-2** by exposing a Settings DropdownMenu in the Patient List header with Capture (every authenticated doctor) + Users (admin only) items. Next: `/gsd-verify-work` to reconcile the two gaps to `status: resolved` and run the 7 Windows-hardware-dependent UAT items now unblocked. Phase 4 (recording) is unblocked.
+Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: ALL 5 PLANS COMPLETE (commits `505ead8` and `51c28c7` and `2e4c2ad` for 03-05). 209 tests pass (197 baseline + 12 net new: 8 SettingsHub + 2 PatientRow + 1 reachability + 6 integration contract − 5 dropped 03-04 DropdownMenu assertions). `npm run typecheck` clean. Plan 03-05 closed the diagnosed UAT gaps **G-03-3** and **G-03-4** by shipping the SettingsHub page (right-side sidebar nav with Capture + Users) reachable from a single header Button on the Patient List, and a new `Open Procedure Room` DropdownMenuItem on every non-deleted PatientRow. App.tsx `patient-detail` placeholder removed (route variant preserved for backward-compat with persisted deep-links + audit payloads). Next: `/gsd-verify-work` to reconcile G-03-3 + G-03-4 to `status: resolved` and run the 8 Windows-hardware-dependent UAT items now unblocked. Phase 4 (recording) is unblocked.
 
 ## Project Reference
 
@@ -52,6 +52,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 03-02 | Renderer: useVideoPreview/useCaptureDeviceMap + Procedure Room + Settings Capture with reactive preview + no-device audit hook + previousRoute Finish | complete |
 | 03-03 | Validation: moved test files + security-baseline + scope guards + integration suite + Windows hardware smoke UAT | complete |
 | 03-04 | Gap closure: Settings → Capture entry from Patient List header (DropDownMenu, role-aware, G-03-1 + G-03-2) | complete |
+| 03-05 | Gap closure: Settings hub page (replaces DropDownMenu, G-03-3) + PatientRow Open Procedure Room entry (G-03-4) | complete |
 
 ## Open Questions / Decisions to Make in Planning
 
@@ -75,12 +76,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Requirements traceability (Phase 3)
 
-- **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts) + 03-04 (Patient List entry point for Settings → Capture dropdown)
+- **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts) + 03-04 (Patient List entry point for Settings → Capture dropdown) + 03-05 (SettingsHub page sidebar entry for Capture)
 - **CAPT-02**: 03-01 (presetRepo + IPC) + 03-02 (Settings → Capture UI)
-- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero) + 03-04 (Patient List entry point makes the existing D-09 live preview reachable)
+- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero) + 03-04 (Patient List entry point makes the existing D-09 live preview reachable) + 03-05 (SettingsHub page makes the existing Capture page reachable AND PatientRow Open Procedure Room entry makes Procedure Room reachable)
 - **CAPT-10**: 03-01 (canonicalizeName + 15 tests)
-- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker) + 03-04 (header DropdownMenu surfaces it for every doctor)
+- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker) + 03-04 (header DropDownMenu surfaces it for every doctor) + 03-05 (SettingsHub sidebar surfaces it as a Button instead of transient DropDownMenu)
 - **SET-02**: 03-01 (qualityPresetSchema + autoDetectPreset) + 03-02 (Settings → Capture preset UI)
+- **SET-04**: 03-02 (SettingsUsers admin gate) + 03-04 (header DropDownMenu admin gate on Users item) + 03-05 (SettingsHub sidebar Users admin gate)
 
 ## Workflow Notes
 
@@ -89,14 +91,14 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `744e6cb test(03-04): pin Patient List -> settings-capture contract`
+- Last commit: `2e4c2ad docs(03-05): complete settings hub + procedure room entry gap closure plan`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 
 ---
-*State last updated: 2026-08-02 after Plan 03-04 completion (G-03-1 / G-03-2 closed)*
+*State last updated: 2026-08-02 after Plan 03-05 completion (G-03-3 / G-03-4 closed)*
 
 ## Session
 
-**Last session:** 2026-08-02T17:06:22.735Z
-**Stopped at:** Phase 3 gap closure 03-04 complete - 197/197 tests pass - UAT gaps G-03-1, G-03-2 closed
-**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-04-SUMMARY.md
+**Last session:** 2026-08-02T21:36:00.000Z
+**Stopped at:** Phase 3 gap closure 03-05 complete - 209/197 baseline tests pass (+12) - UAT gaps G-03-3, G-03-4 closed
+**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-05-SUMMARY.md
