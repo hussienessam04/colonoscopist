@@ -1,25 +1,18 @@
 ---
-status: testing
+status: paused
 phase: 03-capture-enumeration-live-preview
 source:
   - .planning/phases/03-capture-enumeration-live-preview/03-01-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-02-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-03-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-02T19:50:00Z
-status: testing
+updated: 2026-08-02T19:55:00Z
+status: paused
 ---
 
 ## Current Test
 
-number: 1
-name: Real Windows DirectShow enumeration matches canonical names
-expected: |
-  On a Windows machine with an EasyCap SD or HDMI/DVI capture card plugged in,
-  the Settings → Capture device dropdown shows the actual USB DirectShow device
-  name (e.g. "USB Video Device", "EasyCap", "USB2.0 TV") AND the live preview
-  opens using the matching browser deviceId from mediaDevices.enumerateDevices().
-awaiting: user response
+[testing paused — Tests 2-9 blocked pending combined fix (G-03-3 + Procedure Room entry point)]
 
 ## Tests
 
@@ -137,7 +130,7 @@ expected: |
   - Names with non-ASCII chars / spaces / trailing whitespace display cleanly and consistently
   - EasyCap → first-use preset is SD analog 720×480
   - HDMI/DVI → first-use preset is HD digital 1920×1080
-result: [pending]
+result: pass
 
 ### 2. Procedure Room empty state with Open Settings CTA + capture.no_device audit row (P2-P1)
 expected: |
@@ -146,7 +139,9 @@ expected: |
   - "No device selected — go to Settings → Capture to pick one" message
   - "Open Settings" button visible, navigates without losing Procedure Room context
   - `capture.no_device` row written to audit_log with session userId
-result: [pending]
+result: blocked
+blocked_by: prior-issue
+reason: "Procedure Room is unreachable from any UI surface (no entry point from PatientRow or PatientDetail). Test 2 cannot be exercised until the navigation discovery gap is closed."
 
 ### 3. Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
@@ -219,11 +214,11 @@ reason: "Auto-detect surface is Settings → Capture; cannot test heuristic unti
 ## Summary
 
 total: 26
-passed: 17
-issues: 0
-pending: 2
+passed: 18
+issues: 1
+pending: 0
 skipped: 0
-blocked: 7
+blocked: 8
 
 ## Gaps
 
@@ -244,6 +239,20 @@ blocked: 7
   original_reason: "User reported: settings doesnt contain anything related to device you need to fix that first so we can work in the tests"
   severity: major
   test: 2
+
+- gap_id: G-03-3
+  truth: "Settings entry navigates to a dedicated Settings hub page with a right-side sidebar nav (Users + Capture), not a transient dropdown"
+  status: failed
+  reason: "User reported (after dropdown shipped in 03-04): prefers a Settings hub page with right-side navbar containing Users and Capture, instead of clicking Settings and seeing a dropdown menu"
+  severity: minor
+  test: 1
+  artifacts:
+    - path: "src/renderer/src/pages/PatientsList.tsx"
+      issue: "Settings is a DropdownMenu trigger; user wants a Settings page with sidebar"
+  missing:
+    - "Add a Settings hub page (e.g. /settings) with a right-side sidebar containing Users + Capture links"
+    - "Replace the PatientsList DropdownMenu trigger with a button that navigates to the Settings hub"
+    - "Re-test entry-point navigation: Patient List → Settings → (Users|Capture)"
 
 ## Deferred Follow-Ups
 
