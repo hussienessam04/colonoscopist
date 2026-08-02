@@ -1,18 +1,25 @@
 ---
-status: partial
+status: testing
 phase: 03-capture-enumeration-live-preview
 source:
   - .planning/phases/03-capture-enumeration-live-preview/03-01-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-02-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-03-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-02T19:32:00Z
-status: partial
+updated: 2026-08-02T19:50:00Z
+status: testing
 ---
 
 ## Current Test
 
-[testing paused — 7 hardware-dependent items outstanding, blocked by G-03-1/G-03-2]
+number: 1
+name: Real Windows DirectShow enumeration matches canonical names
+expected: |
+  On a Windows machine with an EasyCap SD or HDMI/DVI capture card plugged in,
+  the Settings → Capture device dropdown shows the actual USB DirectShow device
+  name (e.g. "USB Video Device", "EasyCap", "USB2.0 TV") AND the live preview
+  opens using the matching browser deviceId from mediaDevices.enumerateDevices().
+awaiting: user response
 
 ## Tests
 
@@ -130,9 +137,7 @@ expected: |
   - Names with non-ASCII chars / spaces / trailing whitespace display cleanly and consistently
   - EasyCap → first-use preset is SD analog 720×480
   - HDMI/DVI → first-use preset is HD digital 1920×1080
-result: issue
-reported: "thats not exist in settings Capture device dropdown"
-severity: major
+result: [pending]
 
 ### 2. Procedure Room empty state with Open Settings CTA + capture.no_device audit row (P2-P1)
 expected: |
@@ -141,9 +146,7 @@ expected: |
   - "No device selected — go to Settings → Capture to pick one" message
   - "Open Settings" button visible, navigates without losing Procedure Room context
   - `capture.no_device` row written to audit_log with session userId
-result: issue
-reported: "settings doesnt contain anything related to device you need to fix that first so we can work in the tests"
-severity: major
+result: [pending]
 
 ### 3. Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
@@ -217,8 +220,8 @@ reason: "Auto-detect surface is Settings → Capture; cannot test heuristic unti
 
 total: 26
 passed: 17
-issues: 2
-pending: 0
+issues: 0
+pending: 2
 skipped: 0
 blocked: 7
 
@@ -226,23 +229,21 @@ blocked: 7
 
 - gap_id: G-03-1
   truth: "Settings → Capture shows a device dropdown populated from DirectShow enumeration and the live preview opens with the matching browser deviceId"
-  status: failed
-  reason: "User reported: thats not exist in settings Capture device dropdown"
+  status: resolved
+  resolved_by: 03-04-PLAN.md (executed 2026-08-02)
+  resolved_at: 2026-08-02
+  original_reason: "User reported: thats not exist in settings Capture device dropdown"
   severity: major
   test: 1
-  artifacts: []
-  missing: []
-  debug_session: ""
 
 - gap_id: G-03-2
   truth: "Settings → Capture page exposes the device picker UI and all Phase 3 user-visible capture surfaces"
-  status: failed
-  reason: "User reported: settings doesnt contain anything related to device you need to fix that first so we can work in the tests"
+  status: resolved
+  resolved_by: 03-04-PLAN.md (executed 2026-08-02)
+  resolved_at: 2026-08-02
+  original_reason: "User reported: settings doesnt contain anything related to device you need to fix that first so we can work in the tests"
   severity: major
   test: 2
-  artifacts: []
-  missing: []
-  debug_session: ""
 
 ## Deferred Follow-Ups
 
