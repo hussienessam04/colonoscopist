@@ -108,13 +108,12 @@ export default function SettingsCapture(): JSX.Element {
     };
   }, [bridgeLoading, hydrated, pickBrowserId]);
 
-  const [previewing, setPreviewing] = useState(false);
   const canonicalName = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
   const previewPreset = useMemo(() => buildPreviewPreset(form), [form]);
-  const preview = useVideoPreview(previewing ? selectedBrowserId : null, previewPreset);
+  const preview = useVideoPreview(selectedBrowserId, previewPreset);
 
   function handleDeviceChange(browserId: string): void {
-    setPreviewing(false);
+    preview.stop();
     setSelectedBrowserId(browserId);
     setHydrated(false);
     const name = lookup(browserId);
@@ -130,7 +129,7 @@ export default function SettingsCapture(): JSX.Element {
   }
 
   function setKind(kind: PresetKind): void {
-    setPreviewing(false);
+    preview.stop();
     setForm((current) => {
       if (kind === 'sd') return { kind: 'sd', resolution: '720x480', framerate: 30 };
       if (kind === 'hd') return { kind: 'hd', resolution: '1920x1080', framerate: 30 };
@@ -139,12 +138,12 @@ export default function SettingsCapture(): JSX.Element {
   }
 
   function setResolution(value: string): void {
-    setPreviewing(false);
+    preview.stop();
     setForm((current) => ({ ...current, resolution: value }));
   }
 
   function setFramerate(value: number): void {
-    setPreviewing(false);
+    preview.stop();
     setForm((current) => ({ ...current, framerate: value }));
   }
 
@@ -329,21 +328,12 @@ export default function SettingsCapture(): JSX.Element {
 
             <div className="mt-auto flex flex-col gap-2">
               {isPreviewing ? (
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setPreviewing(false);
-                    preview.stop();
-                  }}
-                >
+                <Button variant="outline" onClick={preview.stop}>
                   Stop Preview
                 </Button>
               ) : (
                 <Button
-                  onClick={() => {
-                    setPreviewing(true);
-                    preview.start();
-                  }}
+                  onClick={preview.start}
                   disabled={!selectedBrowserId || !previewPreset}
                   data-testid="start-preview"
                 >
@@ -360,6 +350,7 @@ export default function SettingsCapture(): JSX.Element {
                 {saving ? 'Saving…' : 'Save'}
               </Button>
             </div>
+
           </aside>
         </div>
       </div>

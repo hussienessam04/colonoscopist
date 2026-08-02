@@ -84,10 +84,6 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   useEffect(() => {
     if (!startRequested || !browserDeviceId) return;
 
-    // ponytail: temporary diagnostic to confirm hook firing in test
-    // eslint-disable-next-line no-console
-    console.log('[useVideoPreview] opening stream', { browserDeviceId, startRequested });
-
     release();
     const request = requestRef.current;
     setStarting(true);

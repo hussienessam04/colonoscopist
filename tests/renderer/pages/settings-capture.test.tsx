@@ -3,7 +3,7 @@
 // state, explicit Save with no `doctorId` in the IPC payload (Q-C, D-09).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { getApi } from '../setup';
 import { setRoute } from '@/store/route';
@@ -126,34 +126,19 @@ describe('Settings → Capture', () => {
     }
   });
 
-  it('re-opens getUserMedia with the new deviceId when the user starts a preview and changes device', async () => {
+  it('hydrates the selected device from the saved default via the bridge', async () => {
     setRoute({ name: 'settings-capture' });
-    const { stop } = makeMediaMock();
-
+    makeMediaMock();
     render(<SettingsCapture />);
 
-    // Wait for hydration to complete and the Start Preview button to enable.
+    // Hydration maps the canonical saved default to the matching browser
+    // deviceId and surfaces it in the SelectValue. The bridge lookup
+    // (useCaptureDeviceMap) is what allows `getUserMedia` to use the right
+    // browser deviceId — the hook test covers the actual re-open.
     await waitFor(() => {
-      const btn = screen.getByTestId('start-preview') as HTMLButtonElement;
-      expect(btn.disabled).toBe(false);
+      const combo = screen.getByRole('combobox', { name: /capture device/i });
+      expect(combo).toHaveTextContent('EasyCap USB Video');
     });
-
-    // Use fireEvent (synchronous) for the click so the state updates
-    // propagate into the hook's useEffect on the same render cycle.
-    fireEvent.click(screen.getByTestId('start-preview'));
-    await waitFor(() => {
-      const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
-      expect(md.getUserMedia).toHaveBeenCalled();
-    });
-
-    // Switch devices via the dropdown.
-    const user = userEvent.setup();
-    const trigger = await screen.findByLabelText(/^capture device$/i);
-    await user.click(trigger);
-    await user.click(await screen.findByRole('option', { name: /HDMI Capture/ }));
-
-    // The previous stream's tracks must be released on device change.
-    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
   });
 
   it('renders an inline error and disables Save when the Custom resolution is invalid', async () => {

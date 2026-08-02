@@ -10,6 +10,14 @@ import { setRoute } from '@/store/route';
 import ProcedureRoom from '@/pages/ProcedureRoom';
 import type { CaptureDevice } from '@shared/ipc-contract';
 
+async function waitForStartButton(): Promise<HTMLButtonElement> {
+  await waitFor(() => {
+    const start = screen.getByRole('button', { name: /start preview/i });
+    expect((start as HTMLButtonElement).disabled).toBe(false);
+  });
+  return screen.getByRole('button', { name: /start preview/i }) as HTMLButtonElement;
+}
+
 const dshowList: CaptureDevice[] = [
   { deviceId: 'EasyCap USB Video', rawName: 'EasyCap USB Video', index: 0, type: 'dshow' },
   { deviceId: 'HDMI Capture', rawName: 'HDMI Capture', index: 1, type: 'dshow' },
@@ -93,14 +101,18 @@ describe('ProcedureRoom', () => {
     const { stop } = makeMediaMock();
 
     render(<ProcedureRoom />);
-    const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /start preview/i }));
+    // Wait for the Start Preview button to be enabled, then fire a
+    // synchronous click so the state update + getUserMedia call both
+    // settle in the same render cycle.
+    await waitForStartButton();
+    fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
     await waitFor(() => {
       const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
       expect(md.getUserMedia).toHaveBeenCalled();
     });
 
+    const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: /stop preview/i }));
 
     await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
@@ -111,11 +123,12 @@ describe('ProcedureRoom', () => {
     const { stop } = makeMediaMock();
 
     render(<ProcedureRoom />);
-    const user = userEvent.setup();
 
-    await user.click(await screen.findByRole('button', { name: /start preview/i }));
+    await waitForStartButton();
+    fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
     await screen.findByRole('button', { name: /stop preview/i });
 
+    const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: /^finish$/i }));
 
     await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
