@@ -151,3 +151,16 @@ The 7 UAT tests that were `blocked_by: prior-issue` (Settings UI gap) are now un
 *Phase: 03-capture-enumeration-live-preview*
 *Plan: 04*
 *Completed: 2026-08-02*
+
+## Self-Check: PASSED
+
+- 03-04-SUMMARY.md exists at `.planning/phases/03-capture-enumeration-live-preview/03-04-SUMMARY.md`
+- All four commits present in `git log`:
+  - `8d8c0fb` test(03-04): add failing Settings menu role-aware coverage
+  - `2f17fdc` feat(03-04): expose Settings Capture entry from Patient List header
+  - `744e6cb` test(03-04): pin Patient List -> settings-capture contract
+  - `d185d0e` docs(03-04): complete capture-settings gap closure plan
+- Full test suite: **197/197 green** (baseline 189 + 8 new)
+- Full typecheck (`npm run typecheck`): clean
+- Patient List now exposes a role-aware Settings DropdownMenu (Capture for every doctor, Users for first admin)
+- G-03-1 and G-03-2 entry-point gap closed; 7 previously-blocked UAT items unblocked for `/gsd-verify-work`
