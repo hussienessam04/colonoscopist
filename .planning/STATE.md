@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_3_plans_complete
-stopped_at: Phase 3 gap closure 03-05 complete - 209/197 baseline tests (+12) - UAT gaps G-03-3, G-03-4 closed
-last_updated: "2026-08-02T21:36:00.000Z"
+stopped_at: Phase 3 gap closure 03-05 complete - SettingsHub + Procedure Room entry from PatientRow - G-03-3 + G-03-4 closed
+last_updated: "2026-08-02T20:03:46.223Z"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -99,6 +99,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-02T21:36:00.000Z
-**Stopped at:** Phase 3 gap closure 03-05 complete - 209/197 baseline tests pass (+12) - UAT gaps G-03-3, G-03-4 closed
+**Last session:** 2026-08-02T20:03:46.203Z
+**Stopped at:** Phase 3 gap closure 03-05 complete - SettingsHub + Procedure Room entry from PatientRow - G-03-3 + G-03-4 closed
 **Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-05-SUMMARY.md
