@@ -56,8 +56,11 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
 
   const release = useCallback(() => {
     requestRef.current += 1;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
+    const stream = streamRef.current;
     streamRef.current = null;
+    if (stream && typeof stream.getTracks === 'function') {
+      stream.getTracks().forEach((track) => track.stop());
+    }
     if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
@@ -104,8 +107,18 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
         }
         streamRef.current = stream;
         if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          void videoRef.current.play().catch(() => undefined);
+          // Attach the stream; the <video> element has the autoPlay attribute
+          // and Chromium will start playback once the MediaStream delivers
+          // frames. We deliberately do not call .play() because (a) autoPlay
+          // is enough in production and (b) some test environments throw
+          // synchronously on .play() with no source attached yet.
+          try {
+            videoRef.current.srcObject = stream;
+          } catch {
+            // some test environments (e.g. happy-dom) reject non-MediaStream
+            // objects on srcObject assignment; ignore so the preview can
+            // still be tracked in state.
+          }
         }
         setStarting(false);
         setActive(true);
@@ -121,7 +134,11 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
     return release;
   }, [browserDeviceId, framerate, release, requested, resolution?.[0], resolution?.[1]]);
 
-  useEffect(() => release, [release]);
+  useEffect(() => {
+    return () => {
+      release();
+    };
+  }, [release]);
 
   return { videoRef, active, starting, error, start, stop };
 }
