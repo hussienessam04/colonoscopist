@@ -167,7 +167,11 @@ export default function ProcedureRoom(): JSX.Element {
             </div>
 
             {deviceError ? <p role="alert" className="text-sm text-destructive">{deviceError}</p> : null}
-            {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error.message}</p> : null}
+            {preview.error ? (
+              <p role="alert" className="text-sm text-destructive" data-testid="preview-error">
+                {preview.error.message} [{preview.error.code}]
+              </p>
+            ) : null}
 
             <div className="mt-auto flex flex-col gap-2">
               {isRunning ? (
@@ -183,9 +187,6 @@ export default function ProcedureRoom(): JSX.Element {
               )}
               <Button disabled title="Recording ships in Phase 4">
                 Record
-              </Button>
-              <Button variant="ghost" onClick={finish}>
-                Finish
               </Button>
             </div>
           </aside>
