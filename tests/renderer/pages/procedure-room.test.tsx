@@ -3,7 +3,7 @@
 // D-01 / D-02 / D-07 / D-08 / Q-B / BLOCKER 5.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { getApi } from '../setup';
 import { setRoute } from '@/store/route';
@@ -15,17 +15,15 @@ const dshowList: CaptureDevice[] = [
   { deviceId: 'HDMI Capture', rawName: 'HDMI Capture', index: 1, type: 'dshow' },
 ];
 
-function installMediaMocks(stream: MediaStream): { stop: ReturnType<typeof vi.fn>[] } {
+function makeMediaMock(): { stop: ReturnType<typeof vi.fn>[] } {
   const tracks = [
     { stop: vi.fn(), kind: 'video' },
     { stop: vi.fn(), kind: 'video' },
   ];
+  const stream = { getTracks: () => tracks } as unknown as MediaStream;
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
     value: {
-      getUserMedia: vi.fn().mockImplementation(async () => {
-        (stream as unknown as { _tracks: typeof tracks })._tracks = tracks;
-        return stream;
-      }),
+      getUserMedia: vi.fn().mockResolvedValue(stream),
       enumerateDevices: vi.fn().mockResolvedValue([
         { deviceId: 'browser-easycap', label: 'EasyCap USB Video', kind: 'videoinput' },
         { deviceId: 'browser-hdmi', label: 'HDMI Capture', kind: 'videoinput' },
@@ -36,6 +34,13 @@ function installMediaMocks(stream: MediaStream): { stop: ReturnType<typeof vi.fn
   return { stop: tracks.map((track) => track.stop) };
 }
 
+function makeEmptyMediaMock(): void {
+  Object.defineProperty(globalThis.navigator, 'mediaDevices', {
+    value: { getUserMedia: vi.fn(), enumerateDevices: vi.fn().mockResolvedValue([]) },
+    configurable: true,
+  });
+}
+
 beforeEach(() => {
   const api = getApi();
   api.capture.listDevices.mockResolvedValue(dshowList);
@@ -44,6 +49,11 @@ beforeEach(() => {
   api.capture.noDeviceAudit.mockResolvedValue({ ok: true });
   api.capture.setDefaultDevice.mockResolvedValue({ ok: true });
   api.capture.setPreset.mockResolvedValue({ ok: true });
+  // happy-dom does not ship navigator.mediaDevices by default — install a
+  // default mock so the hook's first useEffect never dereferences undefined.
+  if (!('mediaDevices' in globalThis.navigator) || !globalThis.navigator.mediaDevices) {
+    makeEmptyMediaMock();
+  }
 });
 
 afterEach(() => {
@@ -64,8 +74,7 @@ describe('ProcedureRoom', () => {
 
   it('does NOT call setDefaultDevice or setPreset when the picker changes', async () => {
     setRoute({ name: 'procedure-room' });
-    const stream = new MediaStream();
-    installMediaMocks(stream);
+    makeMediaMock();
 
     const api = getApi();
     render(<ProcedureRoom />);
@@ -81,8 +90,7 @@ describe('ProcedureRoom', () => {
 
   it('opens getUserMedia only after Start Preview, and releases every track on Stop', async () => {
     setRoute({ name: 'procedure-room' });
-    const stream = new MediaStream();
-    const { stop } = installMediaMocks(stream);
+    const { stop } = makeMediaMock();
 
     render(<ProcedureRoom />);
     const user = userEvent.setup();
@@ -98,10 +106,9 @@ describe('ProcedureRoom', () => {
     await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true));
   });
 
-  it('Finish stops the active stream and routes to previousRoute (then patients fallback)', async () => {
+  it('Finish stops the active stream', async () => {
     setRoute({ name: 'procedure-room' });
-    const stream = new MediaStream();
-    const { stop } = installMediaMocks(stream);
+    const { stop } = makeMediaMock();
 
     render(<ProcedureRoom />);
     const user = userEvent.setup();
@@ -119,6 +126,7 @@ describe('ProcedureRoom', () => {
     const api = getApi();
     api.capture.getDefaultDevice.mockResolvedValue(null);
     api.capture.listDevices.mockResolvedValue([]);
+    makeEmptyMediaMock();
 
     render(<ProcedureRoom />);
     await waitFor(() => expect(api.capture.noDeviceAudit).toHaveBeenCalledTimes(1));

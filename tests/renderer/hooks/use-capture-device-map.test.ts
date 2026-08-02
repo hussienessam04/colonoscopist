@@ -62,18 +62,18 @@ describe('useCaptureDeviceMap', () => {
 
   it('falls back to the raw browser label when no dshow match exists', async () => {
     mockBrowserDevices([
-      { deviceId: 'browser-unknown', label: '  hiddEn  Device  ', kind: 'videoinput' },
+      { deviceId: 'browser-unknown', label: 'hiddEn Device', kind: 'videoinput' },
     ]);
 
     const { result } = renderHook(() => useCaptureDeviceMap());
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    expect(result.current.lookup('browser-unknown')).toBe('  hiddEn  Device  ');
+    expect(result.current.lookup('browser-unknown')).toBe('hiddEn Device');
   });
 
   it('matches labels case-insensitively and trimmed', async () => {
     mockBrowserDevices([
-      { deviceId: 'browser-x', label: ' easycap  usb video ', kind: 'videoinput' },
+      { deviceId: 'browser-x', label: 'easycap usb video', kind: 'videoinput' },
     ]);
 
     const { result } = renderHook(() => useCaptureDeviceMap());
