@@ -11,19 +11,18 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T08:45:00Z
+updated: 2026-08-03T09:00:00.000Z
 ---
 
 ## Current Test
 
-number: 2
-name: Procedure Room empty state with Open Settings CTA + capture.no_device audit row (P2-P1)
+number: 3
+name: Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
-  With no saved device OR with saved device unplugged:
-  - Black inline preview box appears
-  - "No device selected — go to Settings → Capture to pick one" message
-  - "Open Settings" button visible, navigates without losing Procedure Room context
-  - `capture.no_device` row written to audit_log with session userId
+  - Click Start Preview → live preview opens with selected browser deviceId
+  - Click Stop Preview → stream tracks stopped, device released
+  - Click Finish → close room, return to previous route (or Patient List fallback)
+  - Navigate away while preview running → device indicator released (no leaked handle)
 awaiting: user response
 
 ## Tests
@@ -178,7 +177,7 @@ expected: |
   - "No device selected — go to Settings → Capture to pick one" message
   - "Open Settings" button visible, navigates without losing Procedure Room context
   - `capture.no_device` row written to audit_log with session userId
-result: pending
+result: pass
 
 ### 3. Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
@@ -237,9 +236,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 20
+passed: 21
 issues: 0
-pending: 9
+pending: 8
 skipped: 0
 blocked: 0
 
