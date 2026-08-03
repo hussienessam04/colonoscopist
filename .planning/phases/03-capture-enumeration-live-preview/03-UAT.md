@@ -1,5 +1,5 @@
 ---
-status: testing
+status: complete
 phase: 03-capture-enumeration-live-preview
 source:
   - .planning/phases/03-capture-enumeration-live-preview/03-01-SUMMARY.md
@@ -11,19 +11,12 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:30:00.000Z
+updated: 2026-08-03T09:35:00.000Z
 ---
 
 ## Current Test
 
-number: 9
-name: Real hardware auto-detect heuristic match (SET-02, D6)
-expected: |
-  - Plug EasyCap → first-use preset auto-saves as SD 720×480
-  - Plug HDMI capture → first-use preset auto-saves as HD 1920×1080
-  - Generic webcam with no clear markers → first-use preset is HD fallback
-  - Manual override persists over auto-detect
-awaiting: user response
+[testing complete]
 
 ## Tests
 
@@ -232,14 +225,14 @@ expected: |
   - Plug HDMI capture → first-use preset auto-saves as HD 1920×1080
   - Generic webcam with no clear markers → first-use preset is HD fallback
   - Manual override persists over auto-detect
-result: pending
+result: pass
 
 ## Summary
 
 total: 29
-passed: 27
+passed: 29
 issues: 0
-pending: 2
+pending: 0
 skipped: 0
 blocked: 0
 
