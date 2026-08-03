@@ -66,7 +66,7 @@ Plans:
 **Pitfalls addressed:** Pitfall 3 (device enumeration race — preview-only path; main-side ffmpeg open happens in Phase 4 with explicit sequencing).
 **Notes:** The choice of last-used device is stored per doctor. This phase does NOT spawn ffmpeg yet.
 
-**Plans:** 5/5 plans executed
+**Plans:** 6/6 plans executed
 
 Plans:
 

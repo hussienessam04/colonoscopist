@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_3_plans_complete
-stopped_at: Phase 3 gap closure 03-05 complete - SettingsHub + Procedure Room entry from PatientRow - G-03-3 + G-03-4 closed
-last_updated: "2026-08-02T20:03:46.223Z"
+stopped_at: Phase 3 gap closure 03-06 complete - presetHints defensive guard + shared SettingsSidebar on all Settings pages - G-03-5 + G-03-6 closed
+last_updated: "2026-08-03T05:55:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 3
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 13
+  completed_plans: 13
 ---
 
 # State: Colonoscopist
@@ -23,7 +23,7 @@ progress:
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: ALL 5 PLANS COMPLETE (commits `505ead8` and `51c28c7` and `2e4c2ad` for 03-05). 209 tests pass (197 baseline + 12 net new: 8 SettingsHub + 2 PatientRow + 1 reachability + 6 integration contract − 5 dropped 03-04 DropdownMenu assertions). `npm run typecheck` clean. Plan 03-05 closed the diagnosed UAT gaps **G-03-3** and **G-03-4** by shipping the SettingsHub page (right-side sidebar nav with Capture + Users) reachable from a single header Button on the Patient List, and a new `Open Procedure Room` DropdownMenuItem on every non-deleted PatientRow. App.tsx `patient-detail` placeholder removed (route variant preserved for backward-compat with persisted deep-links + audit payloads). Next: `/gsd-verify-work` to reconcile G-03-3 + G-03-4 to `status: resolved` and run the 8 Windows-hardware-dependent UAT items now unblocked. Phase 4 (recording) is unblocked.
+Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: ALL 6 PLANS COMPLETE (commits `ade8e6a` (G-03-5), `b72c007` (G-03-6), and `f1085c5` for 03-06). 220 tests pass (197 baseline + 23 net new across 03-04..03-06: 12 from 03-05 + 11 from 03-06). `npm run typecheck` and `npm run typecheck:web` clean. Plan 03-06 closed the diagnosed UAT gaps **G-03-5** (ProcedureRoom crash on a stored custom preset with empty/missing resolution — defensive `?.trim()` guard in `useVideoPreview.presetHints()` + 2 regression tests + integration contract) and **G-03-6** (Settings sub-pages losing the sidebar nav — extracted shared `SettingsSidebar` component mounted on SettingsHub, SettingsCapture, SettingsUsers with `data-active` highlight + admin gate; 6 component tests + 3 page-test active-tab cases + integration contract). The 8 Windows-hardware-dependent UAT items are now reachable for human UAT. Phase 4 (recording) is unblocked.
 
 ## Project Reference
 
@@ -37,7 +37,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 |---|-------|--------------|--------|
 | 1 | Scaffold (electron-vite + security baseline + native rebuild) | 4 | complete |
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
-| 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | in-progress (1/3 plans) |
+| 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | in-progress (3/3 gap-closure plans complete; awaiting verifier) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | pending |
 | 5 | Screenshots + Procedure Review + Trim | 6 | pending |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
@@ -53,6 +53,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 03-03 | Validation: moved test files + security-baseline + scope guards + integration suite + Windows hardware smoke UAT | complete |
 | 03-04 | Gap closure: Settings → Capture entry from Patient List header (DropDownMenu, role-aware, G-03-1 + G-03-2) | complete |
 | 03-05 | Gap closure: Settings hub page (replaces DropDownMenu, G-03-3) + PatientRow Open Procedure Room entry (G-03-4) | complete |
+| 03-06 | Gap closure: presetHints() defensive guard for malformed custom preset (G-03-5) + shared SettingsSidebar mounted on all three Settings pages with active-tab highlight (G-03-6) | complete |
 
 ## Open Questions / Decisions to Make in Planning
 
@@ -78,11 +79,11 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 - **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts) + 03-04 (Patient List entry point for Settings → Capture dropdown) + 03-05 (SettingsHub page sidebar entry for Capture)
 - **CAPT-02**: 03-01 (presetRepo + IPC) + 03-02 (Settings → Capture UI)
-- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero) + 03-04 (Patient List entry point makes the existing D-09 live preview reachable) + 03-05 (SettingsHub page makes the existing Capture page reachable AND PatientRow Open Procedure Room entry makes Procedure Room reachable)
+- **CAPT-03**: 03-02 (useVideoPreview hook + Settings preview pane + Procedure Room hero) + 03-04 (Patient List entry point makes the existing D-09 live preview reachable) + 03-05 (SettingsHub page makes the existing Capture page reachable AND PatientRow Open Procedure Room entry makes Procedure Room reachable) + 03-06 (presetHints defensive guard unblocks ProcedureRoom open on corrupt preset rows)
 - **CAPT-10**: 03-01 (canonicalizeName + 15 tests)
-- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker) + 03-04 (header DropDownMenu surfaces it for every doctor) + 03-05 (SettingsHub sidebar surfaces it as a Button instead of transient DropDownMenu)
+- **SET-01**: 03-01 (REP) + 03-02 (Settings → Capture device picker) + 03-04 (header DropDownMenu surfaces it for every doctor) + 03-05 (SettingsHub sidebar surfaces it as a Button instead of transient DropDownMenu) + 03-06 (shared SettingsSidebar keeps the Capture entry visible on every Settings sub-page)
 - **SET-02**: 03-01 (qualityPresetSchema + autoDetectPreset) + 03-02 (Settings → Capture preset UI)
-- **SET-04**: 03-02 (SettingsUsers admin gate) + 03-04 (header DropDownMenu admin gate on Users item) + 03-05 (SettingsHub sidebar Users admin gate)
+- **SET-04**: 03-02 (SettingsUsers admin gate) + 03-04 (header DropDownMenu admin gate on Users item) + 03-05 (SettingsHub sidebar Users admin gate) + 03-06 (SettingsSidebar Users admin gate inherited by all three Settings pages)
 
 ## Workflow Notes
 
@@ -91,14 +92,14 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `2e4c2ad docs(03-05): complete settings hub + procedure room entry gap closure plan`
+- Last commit: `f1085c5 docs(03-06): complete SettingsSidebar + presetHints gap closure plan`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 
 ---
-*State last updated: 2026-08-02 after Plan 03-05 completion (G-03-3 / G-03-4 closed)*
+*State last updated: 2026-08-03 after Plan 03-06 completion (G-03-5 / G-03-6 closed)*
 
 ## Session
 
-**Last session:** 2026-08-02T20:03:46.203Z
-**Stopped at:** Phase 3 gap closure 03-05 complete - SettingsHub + Procedure Room entry from PatientRow - G-03-3 + G-03-4 closed
-**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-05-SUMMARY.md
+**Last session:** 2026-08-03T05:55:00.000Z
+**Stopped at:** Phase 3 gap closure 03-06 complete - presetHints defensive guard + shared SettingsSidebar on all Settings pages - G-03-5 + G-03-6 closed
+**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-06-SUMMARY.md
