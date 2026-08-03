@@ -11,18 +11,18 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:15:00.000Z
+updated: 2026-08-03T09:20:00.000Z
 ---
 
 ## Current Test
 
-number: 6
-name: Session-only override behavior in Procedure Room (D-01)
+number: 7
+name: useRoute() previous-route snapshot for Finish navigation (Q-B, P2-R1)
 expected: |
-  - Saved default is X
-  - Open Procedure Room → picker shows X
-  - Switch to Y in the room → preview uses Y
-  - Click Finish, re-enter Procedure Room → picker shows X again (not Y)
+  - Open Procedure Room from Patient Detail
+  - Click Finish → returns to Patient Detail (not patients list)
+  - Open Procedure Room directly via deep-link
+  - Click Finish → falls back to {name: 'patients'}
 awaiting: user response
 
 ## Tests
@@ -208,7 +208,7 @@ expected: |
   - Open Procedure Room → picker shows X
   - Switch to Y in the room → preview uses Y
   - Click Finish, re-enter Procedure Room → picker shows X again (not Y)
-result: pending
+result: pass
 
 ### 7. useRoute() previous-route snapshot for Finish navigation (Q-B, P2-R1)
 expected: |
@@ -236,9 +236,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 24
+passed: 25
 issues: 0
-pending: 5
+pending: 4
 skipped: 0
 blocked: 0
 
