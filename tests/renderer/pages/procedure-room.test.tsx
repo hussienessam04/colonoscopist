@@ -110,13 +110,14 @@ describe('ProcedureRoom', () => {
     // settle in the same render cycle.
     await waitForStartButton();
     fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
-    await waitFor(() => {
-      const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
-      expect(md.getUserMedia).toHaveBeenCalled();
-    });
-    // ponytail: wait for the .then to set active=true so the Stop
-    // Preview button is visible to fireEvent.click (otherwise the click
-    // lands on a stale Start Preview button and the test misroutes).
+    const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
+    await waitFor(() => expect(md.getUserMedia).toHaveBeenCalled());
+    // ponytail: await the resolved promise value so the .then microtask
+    // has fired and streamRef.current is set before the test clicks Stop
+    // (G-03-8 — under Electron-as-Node ABI, the microtask may not have
+    // resolved by the time the Stop Preview button is visible, so the
+    // first release() runs against a null streamRef).
+    await md.getUserMedia.mock.results[0].value;
     await screen.findByRole('button', { name: /stop preview/i });
 
     fireEvent.click(screen.getByRole('button', { name: /stop preview/i }));
@@ -134,12 +135,11 @@ describe('ProcedureRoom', () => {
 
     await waitForStartButton();
     fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
-    await waitFor(() => {
-      const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
-      expect(md.getUserMedia).toHaveBeenCalled();
-    });
-    // ponytail: same gate as above — wait for the Stop Preview button
-    // so Finish's release() runs against a populated streamRef.
+    const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
+    await waitFor(() => expect(md.getUserMedia).toHaveBeenCalled());
+    // ponytail: same gate as above — await the resolved promise so the
+    // .then has set streamRef.current before Finish runs (G-03-8).
+    await md.getUserMedia.mock.results[0].value;
     await screen.findByRole('button', { name: /stop preview/i });
 
     fireEvent.click(screen.getByRole('button', { name: /^finish$/i }));

@@ -59,6 +59,14 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   const [starting, setStarting] = useState(false);
   const [error, setError] = useState<PreviewError | null>(null);
 
+  // ponytail: deterministic release ordering — requestRef.current += 1
+  // FIRST (cancels in-flight .then), THEN capture streamRef.current,
+  // THEN null streamRef.current, THEN stop tracks. The .then's
+  // cancellation branch stops tracks when request !== requestRef.current,
+  // so tracks are always stopped exactly once even if release() runs
+  // before the .then resolves (e.g. when the test clicks Stop/Finish
+  // before the getUserMedia promise settles). Pinned by G-03-8
+  // integration-contract regex in tests/integration/renderer-main-capture-contract.test.ts.
   const release = useCallback(() => {
     requestRef.current += 1;
     const stream = streamRef.current;
