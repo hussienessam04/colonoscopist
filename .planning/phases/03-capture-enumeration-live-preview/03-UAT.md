@@ -1,18 +1,17 @@
 ---
-status: paused
+status: diagnosed
 phase: 03-capture-enumeration-live-preview
 source:
   - .planning/phases/03-capture-enumeration-live-preview/03-01-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-02-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-03-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-02T19:55:00Z
-status: paused
+updated: 2026-08-02T21:50:00Z
 ---
 
 ## Current Test
 
-[testing paused — Tests 2-9 blocked pending combined fix (G-03-3 + Procedure Room entry point)]
+[testing paused — waiting on gap closure for G-03-5 (ProcedureRoom crash) and G-03-6 (SettingsHub sidebar)]
 
 ## Tests
 
@@ -139,9 +138,9 @@ expected: |
   - "No device selected — go to Settings → Capture to pick one" message
   - "Open Settings" button visible, navigates without losing Procedure Room context
   - `capture.no_device` row written to audit_log with session userId
-result: blocked
-blocked_by: prior-issue
-reason: "Procedure Room is unreachable from any UI surface (no entry point from PatientRow or PatientDetail). Test 2 cannot be exercised until the navigation discovery gap is closed."
+result: issue
+reported: "Cannot reach empty state — ProcedureRoom crashes on open. useVideoPreview.ts:35 TypeError: Cannot read properties of undefined (reading 'split') at presetHints. The page never renders the preview box, message, or Open Settings button."
+severity: blocker
 
 ### 3. Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
@@ -149,9 +148,7 @@ expected: |
   - Click Stop Preview → stream tracks stopped, device released
   - Click Finish → close room, return to previous route (or Patient List fallback)
   - Navigate away while preview running → device indicator released (no leaked handle)
-result: blocked
-blocked_by: prior-issue
-reason: "Cannot test Start/Stop/Finish lifecycle until Settings → Capture device dropdown is fixed (Test 1, Test 2)."
+result: pending
 
 ### 4. Settings preview pane reacts to preset change without manual re-start (BLOCKER 6 — Q-C; covered by P2-S2 but worth end-to-end visual confirmation)
 expected: |
@@ -159,9 +156,7 @@ expected: |
   - Change preset radio → preview re-opens with new constraints
   - Click Save → only then is setDefaultDevice + setPreset called
   - Leave page without Save → no settings mutation
-result: blocked
-blocked_by: prior-issue
-reason: "Settings → Capture device picker is the entry point; cannot test reactive preview until it renders."
+result: pending
 
 ### 5. Disabled Record button remains disabled; no video file created (Phase 4 boundary)
 expected: |
@@ -170,7 +165,7 @@ expected: |
   - No ffmpeg recording child process spawned
 result: blocked
 blocked_by: prior-issue
-reason: "Procedure Room depends on Settings → Capture device selection to test the recording-disabled boundary."
+reason: "ProcedureRoom crashes on open (G-03-5) — Record button never renders."
 
 ### 6. Session-only override behavior in Procedure Room (D-01)
 expected: |
@@ -180,7 +175,7 @@ expected: |
   - Click Finish, re-enter Procedure Room → picker shows X again (not Y)
 result: blocked
 blocked_by: prior-issue
-reason: "Session-only override dropdown in Procedure Room requires Settings → Capture to set the default first."
+reason: "ProcedureRoom crashes on open (G-03-5) — override picker never renders."
 
 ### 7. useRoute() previous-route snapshot for Finish navigation (Q-B, P2-R1)
 expected: |
@@ -190,7 +185,7 @@ expected: |
   - Click Finish → falls back to {name: 'patients'}
 result: blocked
 blocked_by: prior-issue
-reason: "Procedure Room entry point depends on Settings → Capture device flow being reachable."
+reason: "ProcedureRoom crashes on open (G-03-5) — Finish button never renders."
 
 ### 8. Permission flow on Windows — camera permission prompt + indicator (BLOCKER 3 — D5)
 expected: |
@@ -199,7 +194,7 @@ expected: |
   - WebPreferences has all five flags intact (verified via test, but worth human confirmation)
 result: blocked
 blocked_by: prior-issue
-reason: "Permission flow only triggers when preview actually starts; depends on Settings → Capture device UI being reachable."
+reason: "Permission prompt triggers when preview starts in ProcedureRoom — page crashes (G-03-5) before preview can begin."
 
 ### 9. Real hardware auto-detect heuristic match (SET-02, D6)
 expected: |
@@ -207,18 +202,16 @@ expected: |
   - Plug HDMI capture → first-use preset auto-saves as HD 1920×1080
   - Generic webcam with no clear markers → first-use preset is HD fallback
   - Manual override persists over auto-detect
-result: blocked
-blocked_by: prior-issue
-reason: "Auto-detect surface is Settings → Capture; cannot test heuristic until device picker renders."
+result: pending
 
 ## Summary
 
 total: 26
 passed: 18
 issues: 1
-pending: 0
+pending: 2
 skipped: 0
-blocked: 8
+blocked: 5
 
 ## Gaps
 
@@ -242,33 +235,61 @@ blocked: 8
 
 - gap_id: G-03-3
   truth: "Settings entry navigates to a dedicated Settings hub page with a right-side sidebar nav (Users + Capture), not a transient dropdown"
-  status: failed
-  reason: "User reported (after dropdown shipped in 03-04): prefers a Settings hub page with right-side navbar containing Users and Capture, instead of clicking Settings and seeing a dropdown menu"
+  status: resolved
+  resolved_by: 03-05-PLAN.md
+  resolved_at: 2026-08-02
+  original_reason: "User reported (after dropdown shipped in 03-04): prefers a Settings hub page with right-side navbar containing Users and Capture, instead of clicking Settings and seeing a dropdown menu"
   severity: minor
   test: 1
-  artifacts:
-    - path: "src/renderer/src/pages/PatientsList.tsx"
-      issue: "Settings is a DropdownMenu trigger; user wants a Settings page with sidebar"
-  missing:
-    - "Add a Settings hub page (e.g. /settings) with a right-side sidebar containing Users + Capture links"
-    - "Replace the PatientsList DropdownMenu trigger with a button that navigates to the Settings hub"
-    - "Re-test entry-point navigation: Patient List → Settings → (Users|Capture)"
 
 - gap_id: G-03-4
   truth: "Procedure Room is reachable from a patient row in the Patient List"
-  status: failed
-  reason: "User reported: cannot reach Procedure Room from anywhere. PatientRow has only Edit/Delete/Restore actions; patient-detail route renders a Phase 1 placeholder. Phase 3 shipped the Procedure Room page but no UI navigation to it."
+  status: resolved
+  resolved_by: 03-05-PLAN.md
+  resolved_at: 2026-08-02
+  original_reason: "User reported: cannot reach Procedure Room from anywhere. PatientRow has only Edit/Delete/Restore actions; patient-detail route renders a Phase 1 placeholder. Phase 3 shipped the Procedure Room page but no UI navigation to it."
   severity: blocker
   test: 2
+
+- gap_id: G-03-5
+  truth: "ProcedureRoom renders without crashing when opened; presetHints() handles malformed custom presets without throwing"
+  status: failed
+  reason: "User reported: useVideoPreview.ts:35 Uncaught TypeError: Cannot read properties of undefined (reading 'split') at presetHints. ProcedureRoom never renders — crash blocks all empty-state, Start/Stop/Finish, and override behavior."
+  severity: blocker
+  test: 2
+  root_cause: "useVideoPreview.presetHints() at line 35 calls preset.resolution.split(/[x×]/) unconditionally for any preset whose preset field is not 'sd' or 'hd'. When getPreset IPC returns a custom preset whose resolution field is undefined/empty (TypeScript types say string, but the stored row or the validator allow missing/empty resolution for custom presets), the throw propagates through useEffect on every render. The TS type discards null at compile time but the runtime payload isn't validated on read."
   artifacts:
-    - path: "src/renderer/src/components/PatientRow.tsx"
-      issue: "No 'Open Procedure Room' or 'View Details' navigation"
-    - path: "src/renderer/src/App.tsx"
-      issue: "patient-detail route still shows 'Patient detail (Phase 4) — id: ...' placeholder"
+    - path: "src/renderer/src/hooks/useVideoPreview.ts"
+      issue: "presetHints() line 35 — unguarded .split() on preset.resolution"
+    - path: "src/shared/validators.ts"
+      issue: "Need to verify qualityPresetSchema rejects custom presets with empty/missing resolution; if it doesn't, add a min(1) constraint"
   missing:
-    - "Add an 'Open Procedure Room' action to PatientRow (or row-click → procedure-room) for non-deleted patients"
-    - "Either remove the patient-detail placeholder route or alias it to procedure-room"
-    - "Procedure Room entry must preserve previousRoute so Finish returns to Patient List (Q-B)"
+    - "Add a defensive guard in presetHints(): if preset.preset === 'custom' && (!preset.resolution || preset.resolution.trim() === '') → return { framerate: preset.framerate } (skip width/height)"
+    - "If the custom preset schema does not enforce a non-empty resolution string, tighten it so corrupt rows cannot be saved in the first place"
+    - "Add a unit test for useVideoPreview that mounts the hook with `{ preset: 'custom', resolution: '', framerate: 30 }` and asserts no throw"
+  debug_session: "inline (root cause read directly from source — no debug session needed)"
+
+- gap_id: G-03-6
+  truth: "Settings hub sidebar nav stays visible on the Settings sub-pages (Users, Capture) with the active tab highlighted"
+  status: failed
+  reason: "User reported: settings navbar needs to be always present with colored highlight for the selected tab (Users or Capture)"
+  severity: minor
+  test: 4
+  root_cause: "SettingsHub is a separate route case in App.tsx; navigating to settings-capture or settings-users mounts SettingsCapture/SettingsUsers pages directly without the SettingsHub sidebar wrapper. The sidebar lives only on the settings-hub route, so once you drill into a sub-page the nav disappears and there's no way to tell which tab you're on."
+  artifacts:
+    - path: "src/renderer/src/pages/SettingsHub.tsx"
+      issue: "Sidebar nav only renders on settings-hub route; not shared with sub-routes"
+    - path: "src/renderer/src/pages/SettingsCapture.tsx"
+      issue: "Does not render the sidebar wrapper; no active-tab indicator"
+    - path: "src/renderer/src/pages/SettingsUsers.tsx"
+      issue: "Does not render the sidebar wrapper; no active-tab indicator"
+    - path: "src/renderer/src/App.tsx"
+      issue: "Routes settings-capture and settings-users directly without the shared SettingsHub layout"
+  missing:
+    - "Extract the sidebar into a shared <SettingsSidebar activeTab='capture'|'users' /> component (or pass currentRoute through useRoute() to compute activeTab)"
+    - "Mount SettingsSidebar on SettingsCapture and SettingsUsers in addition to SettingsHub"
+    - "Highlight the active tab with a colored background (e.g. bg-accent or ring-2 ring-primary) and inactive items with hover:bg-muted"
+    - "Add a SettingsHub layout test that asserts the sidebar is present on all three routes and the active tab carries a data-active=true attribute"
 
 ## Deferred Follow-Ups
 
