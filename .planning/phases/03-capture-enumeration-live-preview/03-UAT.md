@@ -1,17 +1,30 @@
 ---
-status: diagnosed
+status: testing
 phase: 03-capture-enumeration-live-preview
 source:
   - .planning/phases/03-capture-enumeration-live-preview/03-01-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-02-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-03-SUMMARY.md
+  - .planning/phases/03-capture-enumeration-live-preview/03-04-SUMMARY.md
+  - .planning/phases/03-capture-enumeration-live-preview/03-05-SUMMARY.md
+  - .planning/phases/03-capture-enumeration-live-preview/03-06-SUMMARY.md
+  - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
+  - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-02T21:50:00Z
+updated: 2026-08-03T08:45:00Z
 ---
 
 ## Current Test
 
-[testing paused — waiting on gap closure for G-03-5 (ProcedureRoom crash) and G-03-6 (SettingsHub sidebar)]
+number: 2
+name: Procedure Room empty state with Open Settings CTA + capture.no_device audit row (P2-P1)
+expected: |
+  With no saved device OR with saved device unplugged:
+  - Black inline preview box appears
+  - "No device selected — go to Settings → Capture to pick one" message
+  - "Open Settings" button visible, navigates without losing Procedure Room context
+  - `capture.no_device` row written to audit_log with session userId
+awaiting: user response
 
 ## Tests
 
@@ -119,6 +132,33 @@ result: pass
 source: automated
 coverage_id: P2-S6
 
+### A18. Saved custom-preset hydrates end-to-end through getPreset IPC + SettingsCapture form (G-03-7)
+expected: |
+  When getPreset resolves with { preset: 'custom', resolution: '1280x720', framerate: 30 }:
+  - Custom radio is checked
+  - Resolution input shows the saved value
+  - Framerate select shows the saved fps
+result: pass
+source: automated
+coverage_id: G-03-7
+
+### A19. Main getPreset IPC returns bare QualityPreset | null — wrapper dropped (G-03-7)
+expected: |
+  - src/main/ipc/capture.ts:124 returns `result.preset` directly — no `{ preset, matched }` wrapper
+  - The Q-A audit metadata still writes `matched` on first save (if/else audit branches read from local getOrAutoDetectPreset return)
+result: pass
+source: automated
+coverage_id: G-03-7-IPCFIX
+
+### A20. useVideoPreview release ordering is deterministic (G-03-8)
+expected: |
+  - release() increments requestRef.current BEFORE nulling streamRef.current
+  - track.stop() is called AFTER streamRef.current = null
+  - .then cancellation branch stops tracks when request !== requestRef.current
+result: pass
+source: automated
+coverage_id: G-03-8-RELEASE
+
 ### Human UAT checkpoints (coverage classifier — present[] entries)
 
 ### 1. Real Windows DirectShow enumeration matches canonical names (P3-V1, P3-V2, D2)
@@ -138,9 +178,7 @@ expected: |
   - "No device selected — go to Settings → Capture to pick one" message
   - "Open Settings" button visible, navigates without losing Procedure Room context
   - `capture.no_device` row written to audit_log with session userId
-result: issue
-reported: "Cannot reach empty state — ProcedureRoom crashes on open. useVideoPreview.ts:35 TypeError: Cannot read properties of undefined (reading 'split') at presetHints. The page never renders the preview box, message, or Open Settings button."
-severity: blocker
+result: pending
 
 ### 3. Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
 expected: |
@@ -163,9 +201,7 @@ expected: |
   - Record button visible in Procedure Room but visibly disabled
   - No mp4 file written anywhere on disk during preview
   - No ffmpeg recording child process spawned
-result: blocked
-blocked_by: prior-issue
-reason: "ProcedureRoom crashes on open (G-03-5) — Record button never renders."
+result: pending
 
 ### 6. Session-only override behavior in Procedure Room (D-01)
 expected: |
@@ -173,9 +209,7 @@ expected: |
   - Open Procedure Room → picker shows X
   - Switch to Y in the room → preview uses Y
   - Click Finish, re-enter Procedure Room → picker shows X again (not Y)
-result: blocked
-blocked_by: prior-issue
-reason: "ProcedureRoom crashes on open (G-03-5) — override picker never renders."
+result: pending
 
 ### 7. useRoute() previous-route snapshot for Finish navigation (Q-B, P2-R1)
 expected: |
@@ -183,18 +217,14 @@ expected: |
   - Click Finish → returns to Patient Detail (not patients list)
   - Open Procedure Room directly via deep-link
   - Click Finish → falls back to {name: 'patients'}
-result: blocked
-blocked_by: prior-issue
-reason: "ProcedureRoom crashes on open (G-03-5) — Finish button never renders."
+result: pending
 
 ### 8. Permission flow on Windows — camera permission prompt + indicator (BLOCKER 3 — D5)
 expected: |
   - First preview launch on Windows shows camera permission prompt
   - On approval, OS camera indicator turns on
   - WebPreferences has all five flags intact (verified via test, but worth human confirmation)
-result: blocked
-blocked_by: prior-issue
-reason: "Permission prompt triggers when preview starts in ProcedureRoom — page crashes (G-03-5) before preview can begin."
+result: pending
 
 ### 9. Real hardware auto-detect heuristic match (SET-02, D6)
 expected: |
@@ -206,12 +236,12 @@ result: pending
 
 ## Summary
 
-total: 26
-passed: 18
-issues: 1
-pending: 2
+total: 29
+passed: 20
+issues: 0
+pending: 9
 skipped: 0
-blocked: 5
+blocked: 0
 
 ## Gaps
 
@@ -253,8 +283,10 @@ blocked: 5
 
 - gap_id: G-03-5
   truth: "ProcedureRoom renders without crashing when opened; presetHints() handles malformed custom presets without throwing"
-  status: failed
-  reason: "User reported: useVideoPreview.ts:35 Uncaught TypeError: Cannot read properties of undefined (reading 'split') at presetHints. ProcedureRoom never renders — crash blocks all empty-state, Start/Stop/Finish, and override behavior."
+  status: resolved
+  resolved_by: 03-06-PLAN.md (executed 2026-08-03 — commit ade8e6a)
+  resolved_at: 2026-08-03
+  original_reason: "User reported: useVideoPreview.ts:35 Uncaught TypeError: Cannot read properties of undefined (reading 'split') at presetHints. ProcedureRoom never renders — crash blocks all empty-state, Start/Stop/Finish, and override behavior."
   severity: blocker
   test: 2
   root_cause: "useVideoPreview.presetHints() at line 35 calls preset.resolution.split(/[x×]/) unconditionally for any preset whose preset field is not 'sd' or 'hd'. When getPreset IPC returns a custom preset whose resolution field is undefined/empty (TypeScript types say string, but the stored row or the validator allow missing/empty resolution for custom presets), the throw propagates through useEffect on every render. The TS type discards null at compile time but the runtime payload isn't validated on read."
@@ -268,11 +300,14 @@ blocked: 5
     - "If the custom preset schema does not enforce a non-empty resolution string, tighten it so corrupt rows cannot be saved in the first place"
     - "Add a unit test for useVideoPreview that mounts the hook with `{ preset: 'custom', resolution: '', framerate: 30 }` and asserts no throw"
   debug_session: "inline (root cause read directly from source — no debug session needed)"
+  resolution_evidence: "src/renderer/src/hooks/useVideoPreview.ts now has `const raw = preset.resolution?.trim(); if (!raw) return { framerate: preset.framerate };` BEFORE the `.split(/[x×]/)` call. 2 new hook tests cover empty resolution + undefined resolution. Integration-contract G-03-5 describe block pins the guard. The previous user-reported crash (useVideoPreview.ts:35 TypeError: Cannot read properties of undefined (reading 'split')) is now structurally impossible."
 
 - gap_id: G-03-6
   truth: "Settings hub sidebar nav stays visible on the Settings sub-pages (Users, Capture) with the active tab highlighted"
-  status: failed
-  reason: "User reported: settings navbar needs to be always present with colored highlight for the selected tab (Users or Capture)"
+  status: resolved
+  resolved_by: 03-06-PLAN.md (executed 2026-08-03 — commit b72c007)
+  resolved_at: 2026-08-03
+  original_reason: "User reported: settings navbar needs to be always present with colored highlight for the selected tab (Users or Capture)"
   severity: minor
   test: 4
   root_cause: "SettingsHub is a separate route case in App.tsx; navigating to settings-capture or settings-users mounts SettingsCapture/SettingsUsers pages directly without the SettingsHub sidebar wrapper. The sidebar lives only on the settings-hub route, so once you drill into a sub-page the nav disappears and there's no way to tell which tab you're on."
@@ -290,6 +325,7 @@ blocked: 5
     - "Mount SettingsSidebar on SettingsCapture and SettingsUsers in addition to SettingsHub"
     - "Highlight the active tab with a colored background (e.g. bg-accent or ring-2 ring-primary) and inactive items with hover:bg-muted"
     - "Add a SettingsHub layout test that asserts the sidebar is present on all three routes and the active tab carries a data-active=true attribute"
+  resolution_evidence: "src/renderer/src/components/SettingsSidebar.tsx exports SettingsSidebar with activeTab prop + data-active attribute + admin gate. All three Settings pages (Hub, Capture, Users) now mount <SettingsSidebar activeTab=… /> as the first column of their layout. 6 SettingsSidebar component tests + 3 page-test active-tab cases + integration-contract G-03-6 describe block pin the layout. The shared sidebar lives in a component, so all three pages automatically inherit the admin gate and active-tab highlight."
 
 ## Deferred Follow-Ups
 
