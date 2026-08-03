@@ -96,7 +96,7 @@ export function setDefaultDevice(input: unknown): { ok: true } {
   return { ok: true };
 }
 
-export function getPreset(input: unknown): { preset: QualityPreset; matched: MatchedPattern | null } {
+export function getPreset(input: unknown): QualityPreset | null {
   const { deviceId } = capturePresetQueryInput.parse(input);
   const doctorId = requireSession();
   const result = getOrAutoDetectPreset(doctorId, deviceId);
@@ -121,7 +121,10 @@ export function getPreset(input: unknown): { preset: QualityPreset; matched: Mat
       metadata: { deviceName: deviceId, preset: result.preset.preset },
     });
   }
-  return { preset: result.preset, matched: result.matched ?? null };
+  // ponytail: drop the matched wrapper — Q-A audit metadata already lives in
+  // the audit_log via the if/else branches above; only the IPC response shape
+  // needed to match the declared `Promise<QualityPreset | null>` contract.
+  return result.preset;
 }
 
 export function setPreset(input: unknown): { ok: true } {

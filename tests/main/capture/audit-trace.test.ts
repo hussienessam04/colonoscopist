@@ -87,8 +87,9 @@ describe('capture IPC audit trace', () => {
     // 3. getPreset — reads the matrix row (subsequent read, NO matched metadata)
     const presetRead = getPreset({ deviceId: 'EasyCap USB Video' });
     expect(presetRead).toEqual({
-      preset: { preset: 'custom', resolution: '720x480', framerate: 30 },
-      matched: null,
+      preset: 'custom',
+      resolution: '720x480',
+      framerate: 30,
     });
     // 4. noDeviceAudit — empty-state marker
     noDeviceAudit({});
