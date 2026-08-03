@@ -3,12 +3,12 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_3_plans_complete
-stopped_at: Phase 3 gap closure 03-06 complete - presetHints defensive guard + shared SettingsSidebar on all Settings pages - G-03-5 + G-03-6 closed
-last_updated: "2026-08-03T05:55:00.000Z"
+stopped_at: Phase 3 gap-closure planning complete - 03-07 (G-03-7 getPreset shape) + 03-08 (G-03-8 cleanup test flake) ready for execution
+last_updated: "2026-08-03T07:30:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 3
-  total_plans: 13
+  total_plans: 15
   completed_plans: 13
 ---
 
@@ -54,6 +54,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 03-04 | Gap closure: Settings → Capture entry from Patient List header (DropDownMenu, role-aware, G-03-1 + G-03-2) | complete |
 | 03-05 | Gap closure: Settings hub page (replaces DropDownMenu, G-03-3) + PatientRow Open Procedure Room entry (G-03-4) | complete |
 | 03-06 | Gap closure: presetHints() defensive guard for malformed custom preset (G-03-5) + shared SettingsSidebar mounted on all three Settings pages with active-tab highlight (G-03-6) | complete |
+| 03-07 | Gap closure: drop getPreset() wrapper at main boundary to match declared `Promise<QualityPreset \| null>` contract (G-03-7) + saved custom-preset renderer hydration regression test | planned |
+| 03-08 | Gap closure: make ProcedureRoom Stop/Finish cleanup tests deterministic under `npm run test:unit` (Electron-as-Node ABI) by awaiting getUserMedia `.then` (G-03-8) + integration contract pins hook release ordering | planned |
 
 ## Open Questions / Decisions to Make in Planning
 
@@ -92,14 +94,14 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `a74206e docs(phase-03): verify phase 3 goal achievement (gaps_found: 2 latent issues outside gap-closure scope)`
+- Last commit: `1e472d6 docs(03): plan gap closure for G-03-7 (getPreset IPC response shape) + G-03-8 (ProcedureRoom cleanup test flake)`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 
 ---
-*State last updated: 2026-08-03 after Plan 03-06 completion (G-03-5 / G-03-6 closed)*
+*State last updated: 2026-08-03 after gap-closure plans 03-07 + 03-08 added*
 
 ## Session
 
-**Last session:** 2026-08-03T05:55:00.000Z
-**Stopped at:** Phase 3 gap-closure execution complete (03-04 + 03-05 + 03-06 closed G-03-1..G-03-6). Verifier found 2 latent issues outside gap-closure scope.
-**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-VERIFICATION.md
+**Last session:** 2026-08-03T07:30:00.000Z
+**Stopped at:** Phase 3 gap-closure planning complete - 03-07 (G-03-7 getPreset shape) + 03-08 (G-03-8 cleanup test flake) ready for execution
+**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-08-PLAN.md
