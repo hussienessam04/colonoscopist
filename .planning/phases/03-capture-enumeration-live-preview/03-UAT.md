@@ -11,17 +11,18 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:10:00.000Z
+updated: 2026-08-03T09:15:00.000Z
 ---
 
 ## Current Test
 
-number: 5
-name: Disabled Record button remains disabled; no video file created (Phase 4 boundary)
+number: 6
+name: Session-only override behavior in Procedure Room (D-01)
 expected: |
-  - Record button visible in Procedure Room but visibly disabled
-  - No mp4 file written anywhere on disk during preview
-  - No ffmpeg recording child process spawned
+  - Saved default is X
+  - Open Procedure Room → picker shows X
+  - Switch to Y in the room → preview uses Y
+  - Click Finish, re-enter Procedure Room → picker shows X again (not Y)
 awaiting: user response
 
 ## Tests
@@ -199,7 +200,7 @@ expected: |
   - Record button visible in Procedure Room but visibly disabled
   - No mp4 file written anywhere on disk during preview
   - No ffmpeg recording child process spawned
-result: pending
+result: pass
 
 ### 6. Session-only override behavior in Procedure Room (D-01)
 expected: |
@@ -235,9 +236,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 23
+passed: 24
 issues: 0
-pending: 6
+pending: 5
 skipped: 0
 blocked: 0
 
