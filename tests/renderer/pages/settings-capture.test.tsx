@@ -174,4 +174,17 @@ describe('Settings → Capture', () => {
 
     expect(api.capture.listDevices).toHaveBeenCalledTimes(initialListCalls);
   });
+
+  it('sidebar mount: Capture is active and Users is not (G-03-6)', async () => {
+    // The shared SettingsSidebar must mark the Capture button active on
+    // SettingsCapture and the Users button inactive, so the doctor can
+    // see which section they're on and switch back via the sidebar.
+    setRoute({ name: 'settings-capture' });
+    makeMediaMock();
+    render(<SettingsCapture />);
+    const capture = await screen.findByTestId('settings-hub-capture');
+    const users = await screen.findByTestId('settings-hub-users');
+    expect(capture.getAttribute('data-active')).toBe('true');
+    expect(users.getAttribute('data-active')).toBe('false');
+  });
 });

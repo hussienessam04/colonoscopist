@@ -145,4 +145,17 @@ describe('Settings → Users', () => {
     const removeItem = await screen.findByRole('menuitem', { name: /^remove$/i });
     expect(removeItem).toHaveAttribute('data-disabled', '');
   });
+
+  it('sidebar mount: Users is active and Capture is not (G-03-6, admin)', async () => {
+    // On the dedicated Users page the shared SettingsSidebar must
+    // mark Users active and Capture inactive. Admin session so both
+    // buttons render enabled (the admin gate is asserted elsewhere).
+    setAdminSession();
+    await session.refresh();
+    render(<SettingsUsers />);
+    const capture = await screen.findByTestId('settings-hub-capture');
+    const users = await screen.findByTestId('settings-hub-users');
+    expect(capture.getAttribute('data-active')).toBe('false');
+    expect(users.getAttribute('data-active')).toBe('true');
+  });
 });

@@ -33,6 +33,8 @@ const PRELOAD_SRC = read('src/preload/index.ts');
 const PROCEDURE_ROOM_SRC = read('src/renderer/src/pages/ProcedureRoom.tsx');
 const SETTINGS_CAPTURE_SRC = read('src/renderer/src/pages/SettingsCapture.tsx');
 const SETTINGS_HUB_SRC = read('src/renderer/src/pages/SettingsHub.tsx');
+const SETTINGS_USERS_SRC = read('src/renderer/src/pages/SettingsUsers.tsx');
+const SETTINGS_SIDEBAR_SRC = read('src/renderer/src/components/SettingsSidebar.tsx');
 const PATIENTS_LIST_SRC = read('src/renderer/src/pages/PatientsList.tsx');
 const PATIENT_ROW_SRC = read('src/renderer/src/components/PatientRow.tsx');
 const APP_SRC = read('src/renderer/src/App.tsx');
@@ -199,22 +201,27 @@ describe('Plan 03-05 — Settings hub page (G-03-3)', () => {
     expect(PATIENTS_LIST_SRC).not.toMatch(/DropdownMenuContent/);
   });
 
-  it('SettingsHub.tsx contains a navigation call to settings-users (admin-gated)', () => {
-    // The Users sidebar entry must call navigate({ name: 'settings-users' })
-    // so the static-analysis contract pins the admin destination.
-    expect(SETTINGS_HUB_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-users['"]\s*\}/);
+  it('SettingsSidebar (the shared sidebar) contains a navigation call to settings-users (admin-gated)', () => {
+    // Per Plan 03-06 (G-03-6): the Users sidebar entry moved out of
+    // SettingsHub and into the shared SettingsSidebar component, so the
+    // literal `navigate({ name: 'settings-users' })` now lives there.
+    // SettingsHub just mounts the sidebar with no activeTab.
+    expect(SETTINGS_SIDEBAR_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-users['"]\s*\}/);
   });
 
-  it('SettingsHub.tsx contains a navigation call to settings-capture (every doctor)', () => {
-    // The Capture sidebar entry must call navigate({ name: 'settings-capture' })
-    // so the static-analysis contract pins the existing device picker.
-    expect(SETTINGS_HUB_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
+  it('SettingsSidebar (the shared sidebar) contains a navigation call to settings-capture (every doctor)', () => {
+    // Per Plan 03-06 (G-03-6): the Capture sidebar entry also moved into
+    // the shared SettingsSidebar component so every Settings page (Hub,
+    // Capture, Users) inherits the same navigation surface.
+    expect(SETTINGS_SIDEBAR_SRC).toMatch(/navigate\(\s*\{\s*name:\s*['"]settings-capture['"]\s*\}/);
   });
 
-  it('SettingsHub.tsx imports useSession and gates Users on isFirstAdmin', () => {
+  it('SettingsSidebar imports useSession and gates Users on isFirstAdmin', () => {
     // T-3-16 — admin gate binds the Users button to currentUser.isFirstAdmin.
-    expect(SETTINGS_HUB_SRC).toMatch(/useSession/);
-    expect(SETTINGS_HUB_SRC).toMatch(/isFirstAdmin/);
+    // Per Plan 03-06 the gate moved with the Users button into the
+    // shared SettingsSidebar component, so the literal lives there.
+    expect(SETTINGS_SIDEBAR_SRC).toMatch(/useSession/);
+    expect(SETTINGS_SIDEBAR_SRC).toMatch(/isFirstAdmin/);
   });
 
   it('App.tsx renders the settings-hub case', () => {
@@ -266,6 +273,45 @@ describe('G-03-5 — useVideoPreview guards malformed custom preset', () => {
     // check rather than a regex literal so the multiplication sign is not
     // lost in regex-string round-tripping by the test renderer.
     expect(USE_VIDEO_PREVIEW_SRC).toContain('.split(/[x×]/)');
+  });
+});
+
+describe('G-03-6 — SettingsSidebar is mounted on every Settings page', () => {
+  // ponytail: the shared SettingsSidebar component is the ONLY sidebar on
+  // all three Settings pages. The static-analysis contract pins (a) the
+  // exported function, (b) the data-active attribute that drives the
+  // active-tab highlight, and (c) the per-page import + render site so a
+  // future refactor cannot silently drop the sidebar from any of the
+  // three pages.
+  it('SettingsSidebar exports the SettingsSidebar function', () => {
+    expect(SETTINGS_SIDEBAR_SRC.length).toBeGreaterThan(0);
+    expect(SETTINGS_SIDEBAR_SRC).toMatch(/export\s+function\s+SettingsSidebar/);
+  });
+
+  it('SettingsSidebar carries the data-active attribute contract', () => {
+    // The data-active attribute is how the active-tab highlight is
+    // asserted in tests AND how any future CSS hook can target the
+    // active row. The literal must appear on both buttons.
+    expect(SETTINGS_SIDEBAR_SRC).toContain('data-active');
+  });
+
+  it('SettingsHub imports and renders <SettingsSidebar />', () => {
+    expect(SETTINGS_HUB_SRC).toMatch(/import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/);
+    expect(SETTINGS_HUB_SRC).toMatch(/<SettingsSidebar\b/);
+  });
+
+  it('SettingsCapture imports and renders <SettingsSidebar activeTab="capture" />', () => {
+    expect(SETTINGS_CAPTURE_SRC).toMatch(
+      /import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/,
+    );
+    expect(SETTINGS_CAPTURE_SRC).toMatch(/<SettingsSidebar[^>]*activeTab\s*=\s*['"]capture['"]/);
+  });
+
+  it('SettingsUsers imports and renders <SettingsSidebar activeTab="users" />', () => {
+    expect(SETTINGS_USERS_SRC).toMatch(
+      /import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/,
+    );
+    expect(SETTINGS_USERS_SRC).toMatch(/<SettingsSidebar[^>]*activeTab\s*=\s*['"]users['"]/);
   });
 });
 

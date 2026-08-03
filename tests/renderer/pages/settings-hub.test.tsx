@@ -140,4 +140,18 @@ describe('SettingsHub', () => {
     await user.click(await screen.findByRole('button', { name: /^back$/i }));
     await waitFor(() => expect(getRoute().name).toBe('patients'));
   });
+
+  it('neither sidebar button is active on the Hub (G-03-6)', async () => {
+    // The Hub is a router, not a destination — both sidebar entries stay
+    // outline-only and carry data-active="false" so neither looks
+    // selected. Mounting <SettingsSidebar /> (no activeTab) is the
+    // contract that makes this case work.
+    setAdminSession();
+    await session.refresh();
+    render(<SettingsHub />);
+    const capture = await screen.findByTestId('settings-hub-capture');
+    const users = await screen.findByTestId('settings-hub-users');
+    expect(capture.getAttribute('data-active')).toBe('false');
+    expect(users.getAttribute('data-active')).toBe('false');
+  });
 });

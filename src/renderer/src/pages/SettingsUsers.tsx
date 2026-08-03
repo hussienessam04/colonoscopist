@@ -27,6 +27,7 @@ import { z } from 'zod';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
+import { SettingsSidebar } from '@/components/SettingsSidebar';
 import { relativeTime } from '@/lib/format';
 import { toast } from 'sonner';
 import { IpcErrorException } from '@shared/errors';
@@ -146,7 +147,7 @@ export default function SettingsUsers(): JSX.Element {
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-3xl flex flex-col gap-4">
+      <div className="mx-auto max-w-6xl flex flex-col gap-4">
         <header className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-semibold">Settings · Users</h1>
@@ -169,70 +170,74 @@ export default function SettingsUsers(): JSX.Element {
           </div>
         </header>
 
-        <div className="rounded-md border bg-card">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                <th className="px-3 py-2">Name</th>
-                <th className="px-3 py-2">Last login</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                    Loading…
-                  </td>
+        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
+          <SettingsSidebar activeTab="users" />
+
+          <div className="rounded-md border bg-card">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                  <th className="px-3 py-2">Name</th>
+                  <th className="px-3 py-2">Last login</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                    No users yet.
-                  </td>
-                </tr>
-              ) : (
-                users.map((u) => {
-                  const isSelf = currentUser?.id === u.id;
-                  return (
-                    <tr key={u.id} className="border-b last:border-b-0">
-                      <td className="px-3 py-2 text-sm font-medium">
-                        {u.fullName}
-                        <span className="ml-2 text-xs text-muted-foreground">
-                          {u.isFirstAdmin ? 'Admin' : 'Staff'}
-                        </span>
-                      </td>
-                      <td className="px-3 py-2 text-sm text-muted-foreground">
-                        {relativeTime(u.lastLoginAt)}
-                      </td>
-                      <td className="px-3 py-2 text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
-                              <MoreHorizontal className="size-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => setResetTarget(u)}>
-                              Reset PIN
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onSelect={() => setRemoveTarget(u)}
-                              disabled={isSelf}
-                              title={isSelf ? 'You cannot remove yourself' : undefined}
-                              data-testid={`remove-${u.id}`}
-                            >
-                              Remove
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {loading ? (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                      Loading…
+                    </td>
+                  </tr>
+                ) : users.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                      No users yet.
+                    </td>
+                  </tr>
+                ) : (
+                  users.map((u) => {
+                    const isSelf = currentUser?.id === u.id;
+                    return (
+                      <tr key={u.id} className="border-b last:border-b-0">
+                        <td className="px-3 py-2 text-sm font-medium">
+                          {u.fullName}
+                          <span className="ml-2 text-xs text-muted-foreground">
+                            {u.isFirstAdmin ? 'Admin' : 'Staff'}
+                          </span>
+                        </td>
+                        <td className="px-3 py-2 text-sm text-muted-foreground">
+                          {relativeTime(u.lastLoginAt)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onSelect={() => setResetTarget(u)}>
+                                Reset PIN
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onSelect={() => setRemoveTarget(u)}
+                                disabled={isSelf}
+                                title={isSelf ? 'You cannot remove yourself' : undefined}
+                                data-testid={`remove-${u.id}`}
+                              >
+                                Remove
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 

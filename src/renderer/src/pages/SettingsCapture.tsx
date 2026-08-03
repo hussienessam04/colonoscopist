@@ -14,6 +14,7 @@ import {
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
+import { SettingsSidebar } from '@/components/SettingsSidebar';
 import { qualityPresetSchema } from '@shared/validators';
 import { toast } from 'sonner';
 import type { QualityPreset } from '@shared/ipc-contract';
@@ -188,7 +189,9 @@ export default function SettingsCapture(): JSX.Element {
           </Button>
         </header>
 
-        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="grid gap-5 lg:grid-cols-[16rem_minmax(0,1fr)_20rem]">
+          <SettingsSidebar activeTab="capture" />
+
           <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
             <div className="relative aspect-video">
               <video
