@@ -11,18 +11,17 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:05:00.000Z
+updated: 2026-08-03T09:10:00.000Z
 ---
 
 ## Current Test
 
-number: 4
-name: Settings preview pane reacts to preset change without manual re-start (BLOCKER 6 — Q-C; covered by P2-S2 but worth end-to-end visual confirmation)
+number: 5
+name: Disabled Record button remains disabled; no video file created (Phase 4 boundary)
 expected: |
-  - Change device dropdown → preview re-opens with new device constraints
-  - Change preset radio → preview re-opens with new constraints
-  - Click Save → only then is setDefaultDevice + setPreset called
-  - Leave page without Save → no settings mutation
+  - Record button visible in Procedure Room but visibly disabled
+  - No mp4 file written anywhere on disk during preview
+  - No ffmpeg recording child process spawned
 awaiting: user response
 
 ## Tests
@@ -193,7 +192,7 @@ expected: |
   - Change preset radio → preview re-opens with new constraints
   - Click Save → only then is setDefaultDevice + setPreset called
   - Leave page without Save → no settings mutation
-result: pending
+result: pass
 
 ### 5. Disabled Record button remains disabled; no video file created (Phase 4 boundary)
 expected: |
@@ -236,9 +235,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 22
+passed: 23
 issues: 0
-pending: 7
+pending: 6
 skipped: 0
 blocked: 0
 
