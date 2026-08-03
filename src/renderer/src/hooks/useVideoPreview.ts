@@ -32,7 +32,11 @@ function presetHints(preset?: QualityPreset): {
   if (!preset) return {};
   if (preset.preset === 'sd') return { resolution: [720, 480], framerate: 30 };
   if (preset.preset === 'hd') return { resolution: [1920, 1080], framerate: 30 };
-  const [width, height] = preset.resolution.split(/[x×]/).map(Number);
+  // ponytail: defensive guard — corrupt row may carry empty/missing resolution;
+  // skip the WxH hint and let the device constrain by framerate alone.
+  const raw = preset.resolution?.trim();
+  if (!raw) return { framerate: preset.framerate };
+  const [width, height] = raw.split(/[x×]/).map(Number);
   return width && height
     ? { resolution: [width, height], framerate: preset.framerate }
     : { framerate: preset.framerate };

@@ -242,6 +242,33 @@ describe('Plan 03-05 — PatientRow Open Procedure Room entry (G-03-4)', () => {
   });
 });
 
+describe('G-03-5 — useVideoPreview guards malformed custom preset', () => {
+  // ponytail: defensive guard for corrupt custom presets returned from
+  // presetRepo. The TS contract says `resolution: string` for `{ preset:
+  // 'custom' }` but a corrupt JSON row can carry `""` or `undefined`. The
+  // hook must return `{ framerate }` instead of throwing on the `.split`
+  // call. The static-analysis contract pins the guard by reading the
+  // source between `preset.resolution` and `.split(/[x×]/)` and asserting
+  // that a `?.trim()` guard + a falsy short-circuit return are present.
+  it('useVideoPreview.ts defensive guard wraps the .split(/[x×]/) call', () => {
+    expect(
+      /preset\.resolution[\s\S]{0,80}\?\.trim\([\s\S]{0,200}return\s*\{\s*framerate\s*:\s*preset\.framerate\s*\}/.test(
+        USE_VIDEO_PREVIEW_SRC,
+      ),
+      'useVideoPreview.ts presetHints() must guard empty/missing custom resolution before .split',
+    ).toBe(true);
+  });
+
+  it('useVideoPreview.ts still parses resolution with the .split(/[x×]/) literal (no regression)', () => {
+    // ponytail: the literal `/\[[x×]\]/` character class must remain in
+    // the source after the defensive guard is added — split on the literal
+    // 'x' OR the multiplication sign '×'. Use a plain string contains
+    // check rather than a regex literal so the multiplication sign is not
+    // lost in regex-string round-tripping by the test renderer.
+    expect(USE_VIDEO_PREVIEW_SRC).toContain('.split(/[x×]/)');
+  });
+});
+
 describe('BLOCKER 1 — useCaptureDeviceMap is the single mediaDevices.enumerateDevices consumer', () => {
   it('useCaptureDeviceMap is the ONLY consumer of navigator.mediaDevices.enumerateDevices', () => {
     const rendererDir = path.join(ROOT, 'src/renderer/src');

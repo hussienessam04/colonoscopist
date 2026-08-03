@@ -42,6 +42,33 @@ afterEach(() => {
 });
 
 describe('useVideoPreview', () => {
+  // G-03-5 — defensive guard for malformed stored custom presets. The preset
+  // repository can return a `{ preset: 'custom', resolution: '', framerate: 30 }`
+  // or `{ preset: 'custom', resolution: undefined, framerate: 30 }` row on a
+  // corrupt payload (TS contract says `resolution: string` but runtime is
+  // untyped); `presetHints()` MUST NOT throw on either shape. The hook only
+  // requests `getUserMedia` after `start()` is called, so these assertions
+  // intentionally do not call start() — the bug is a render-time crash.
+  it('mounts without throwing for an empty custom resolution (G-03-5)', () => {
+    expect(() =>
+      renderHook(() =>
+        useVideoPreview('browser-1', { preset: 'custom', resolution: '', framerate: 30 }),
+      ),
+    ).not.toThrow();
+  });
+
+  it('mounts without throwing when custom resolution is undefined at runtime (G-03-5)', () => {
+    expect(() =>
+      renderHook(() =>
+        useVideoPreview('browser-1', {
+          preset: 'custom',
+          resolution: undefined as unknown as string,
+          framerate: 30,
+        }),
+      ),
+    ).not.toThrow();
+  });
+
   it('does not request a stream until start() is called', () => {
     const { result } = renderHook(() => useVideoPreview('browser-1'));
     expect(mockGetUserMedia).not.toHaveBeenCalled();
