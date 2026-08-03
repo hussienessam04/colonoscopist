@@ -358,6 +358,36 @@ describe('BLOCKER 1 — useCaptureDeviceMap is the single mediaDevices.enumerate
   });
 });
 
+describe('G-03-7 — getPreset IPC response matches contract', () => {
+  // ponytail: G-03-7 closes the latent main/preload/renderer shape mismatch
+  // for `IpcContract.capture.getPreset`. The contract declares
+  // `Promise<QualityPreset | null>` but main was returning
+  // `{ preset, matched }`. Static-analysis contract pins the bare shape.
+  it('IpcContract.capture.getPreset declares Promise<QualityPreset | null>', () => {
+    expect(IPC_CONTRACT_SRC).toMatch(
+      /getPreset:\s*\([^)]*\)\s*=>\s*Promise<QualityPreset \| null>/,
+    );
+  });
+
+  it('src/main/ipc/capture.ts getPreset returns bare QualityPreset (or null) — no matched wrapper', () => {
+    // The sync function declares return type `QualityPreset | null`; the IPC
+    // handler at `ipcMain.handle` wraps it in a Promise per Electron convention.
+    expect(CAPTURE_IPC_SRC).toMatch(
+      /export function getPreset[\s\S]{0,500}QualityPreset \| null/m,
+    );
+    // The wrapper literal must be absent — `return result.preset;` is bare.
+    expect(CAPTURE_IPC_SRC).not.toMatch(
+      /\{\s*preset:\s*result\.preset,\s*matched:\s*result\.matched/,
+    );
+  });
+
+  it('preload getPreset forwarder unchanged — still invokes IPC.CAPTURE_GET_PRESET', () => {
+    expect(PRELOAD_SRC).toMatch(
+      /getPreset:\s*\([^)]*\)\s*=>\s*ipcRenderer\.invoke\(IPC\.CAPTURE_GET_PRESET,\s*input\)/,
+    );
+  });
+});
+
 describe('Phase 3 scope guards — no recording primitives leak in', () => {
   // D-08, D-10, D-11; BLOCKER 1, 3, 4, 5; Q-A.
   const phase3SrcFiles: string[] = [];
@@ -417,5 +447,41 @@ describe('Phase 3 scope guards — no recording primitives leak in', () => {
     // (`-list_devices true -f dshow -i dummy`). A `-i video=` argument
     // would be a Phase 4 recording invocation.
     expect(CAPTURE_IPC_SRC).not.toMatch(/-i\s+video=/);
+  });
+});
+
+describe('G-03-8 — useVideoPreview release ordering is deterministic', () => {
+  // ponytail: G-03-8 closes the test-side flake where ProcedureRoom Stop /
+  // Finish cleanup tests race against the in-flight getUserMedia `.then`.
+  // The hook's release ordering is correct (requestRef.current += 1 FIRST,
+  // then capture stream, then null stream, then stop tracks; the .then
+  // cancellation branch stops tracks when request !== requestRef.current).
+  // Static-analysis contract pins the ordering so a future refactor cannot
+  // silently re-introduce the race.
+  it('release() declares requestRef.current += 1 BEFORE streamRef.current = null', () => {
+    expect(
+      /requestRef\.current\s*\+=\s*1[\s\S]{0,200}streamRef\.current\s*=\s*null/.test(
+        USE_VIDEO_PREVIEW_SRC,
+      ),
+      'useVideoPreview release() must increment requestRef.current before nulling streamRef.current',
+    ).toBe(true);
+  });
+
+  it('release() calls track.stop() AFTER streamRef.current = null', () => {
+    expect(
+      /streamRef\.current\s*=\s*null[\s\S]{0,200}track\.stop\(/.test(
+        USE_VIDEO_PREVIEW_SRC,
+      ),
+      'useVideoPreview release() must stop tracks after nulling streamRef.current',
+    ).toBe(true);
+  });
+
+  it('the .then cancellation branch stops tracks when request !== requestRef.current', () => {
+    expect(
+      /request\s*!==\s*requestRef\.current[\s\S]{0,200}track\.stop\(/.test(
+        USE_VIDEO_PREVIEW_SRC,
+      ),
+      'useVideoPreview .then must stop tracks in the cancellation branch (request !== requestRef.current)',
+    ).toBe(true);
   });
 });
