@@ -11,18 +11,17 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:20:00.000Z
+updated: 2026-08-03T09:25:00.000Z
 ---
 
 ## Current Test
 
-number: 7
-name: useRoute() previous-route snapshot for Finish navigation (Q-B, P2-R1)
+number: 8
+name: Permission flow on Windows — camera permission prompt + indicator (BLOCKER 3 — D5)
 expected: |
-  - Open Procedure Room from Patient Detail
-  - Click Finish → returns to Patient Detail (not patients list)
-  - Open Procedure Room directly via deep-link
-  - Click Finish → falls back to {name: 'patients'}
+  - First preview launch on Windows shows camera permission prompt
+  - On approval, OS camera indicator turns on
+  - WebPreferences has all five flags intact (verified via test, but worth human confirmation)
 awaiting: user response
 
 ## Tests
@@ -216,7 +215,8 @@ expected: |
   - Click Finish → returns to Patient Detail (not patients list)
   - Open Procedure Room directly via deep-link
   - Click Finish → falls back to {name: 'patients'}
-result: pending
+result: pass
+note: "Scenario B (deep-link fallback to patients list) confirmed. Scenario A is N/A — plan 03-05 explicitly removed the patient-detail placeholder route, so the only entry point to Procedure Room is PatientsList → PatientRow → 'Open Procedure Room' menu item. The previousRoute snapshot is still captured (verified by code inspection at src/renderer/src/pages/ProcedureRoom.tsx:91-94) but the patient-detail entry path no longer exists in the current UI."
 
 ### 8. Permission flow on Windows — camera permission prompt + indicator (BLOCKER 3 — D5)
 expected: |
@@ -236,9 +236,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 25
+passed: 26
 issues: 0
-pending: 4
+pending: 3
 skipped: 0
 blocked: 0
 
