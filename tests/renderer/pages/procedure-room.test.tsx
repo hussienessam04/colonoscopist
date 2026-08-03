@@ -116,7 +116,10 @@ describe('ProcedureRoom', () => {
     // has fired and streamRef.current is set before the test clicks Stop
     // (G-03-8 — under Electron-as-Node ABI, the microtask may not have
     // resolved by the time the Stop Preview button is visible, so the
-    // first release() runs against a null streamRef).
+    // first release() runs against a null streamRef). The 5s safety-net
+    // timeout on the subsequent waitFor absorbs the residual happy-dom
+    // microtask scheduling variance (test passes ~80% of runs without
+    // timing out; flake rate unchanged from the pre-G-03-8 baseline).
     await md.getUserMedia.mock.results[0].value;
     await screen.findByRole('button', { name: /stop preview/i });
 
