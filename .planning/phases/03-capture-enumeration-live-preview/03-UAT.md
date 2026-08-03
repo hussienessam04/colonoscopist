@@ -11,17 +11,18 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:25:00.000Z
+updated: 2026-08-03T09:30:00.000Z
 ---
 
 ## Current Test
 
-number: 8
-name: Permission flow on Windows — camera permission prompt + indicator (BLOCKER 3 — D5)
+number: 9
+name: Real hardware auto-detect heuristic match (SET-02, D6)
 expected: |
-  - First preview launch on Windows shows camera permission prompt
-  - On approval, OS camera indicator turns on
-  - WebPreferences has all five flags intact (verified via test, but worth human confirmation)
+  - Plug EasyCap → first-use preset auto-saves as SD 720×480
+  - Plug HDMI capture → first-use preset auto-saves as HD 1920×1080
+  - Generic webcam with no clear markers → first-use preset is HD fallback
+  - Manual override persists over auto-detect
 awaiting: user response
 
 ## Tests
@@ -223,7 +224,7 @@ expected: |
   - First preview launch on Windows shows camera permission prompt
   - On approval, OS camera indicator turns on
   - WebPreferences has all five flags intact (verified via test, but worth human confirmation)
-result: pending
+result: pass
 
 ### 9. Real hardware auto-detect heuristic match (SET-02, D6)
 expected: |
@@ -236,9 +237,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 26
+passed: 27
 issues: 0
-pending: 3
+pending: 2
 skipped: 0
 blocked: 0
 
