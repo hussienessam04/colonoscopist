@@ -175,6 +175,30 @@ describe('Settings → Capture', () => {
     expect(api.capture.listDevices).toHaveBeenCalledTimes(initialListCalls);
   });
 
+  it('hydrates a saved custom preset from getPreset (G-03-7)', async () => {
+    setRoute({ name: 'settings-capture' });
+    makeMediaMock();
+    const api = getApi();
+    api.capture.getPreset.mockResolvedValue({
+      preset: 'custom',
+      resolution: '1280x720',
+      framerate: 30,
+    });
+    render(<SettingsCapture />);
+
+    // ponytail: wait for hydration to set form.kind='custom' before asserting
+    // the radio's checked state — the initial render shows the default
+    // ('hd') form until the getPreset promise resolves.
+    const customRadio = await screen.findByTestId('preset-custom');
+    await waitFor(() => expect(customRadio).toBeChecked());
+
+    const resolutionInput = (await screen.findByTestId('custom-resolution')) as HTMLInputElement;
+    expect(resolutionInput.value).toBe('1280x720');
+
+    const framerateTrigger = await screen.findByLabelText(/^framerate$/i);
+    expect(framerateTrigger.textContent).toContain('30 fps');
+  });
+
   it('sidebar mount: Capture is active and Users is not (G-03-6)', async () => {
     // The shared SettingsSidebar must mark the Capture button active on
     // SettingsCapture and the Users button inactive, so the doctor can
