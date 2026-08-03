@@ -11,18 +11,18 @@ source:
   - .planning/phases/03-capture-enumeration-live-preview/03-07-SUMMARY.md
   - .planning/phases/03-capture-enumeration-live-preview/03-08-SUMMARY.md
 started: 2026-08-02T19:30:00Z
-updated: 2026-08-03T09:00:00.000Z
+updated: 2026-08-03T09:05:00.000Z
 ---
 
 ## Current Test
 
-number: 3
-name: Procedure Room Start / Stop / Finish lifecycle releases hardware handles (P2-P3)
+number: 4
+name: Settings preview pane reacts to preset change without manual re-start (BLOCKER 6 — Q-C; covered by P2-S2 but worth end-to-end visual confirmation)
 expected: |
-  - Click Start Preview → live preview opens with selected browser deviceId
-  - Click Stop Preview → stream tracks stopped, device released
-  - Click Finish → close room, return to previous route (or Patient List fallback)
-  - Navigate away while preview running → device indicator released (no leaked handle)
+  - Change device dropdown → preview re-opens with new device constraints
+  - Change preset radio → preview re-opens with new constraints
+  - Click Save → only then is setDefaultDevice + setPreset called
+  - Leave page without Save → no settings mutation
 awaiting: user response
 
 ## Tests
@@ -185,7 +185,7 @@ expected: |
   - Click Stop Preview → stream tracks stopped, device released
   - Click Finish → close room, return to previous route (or Patient List fallback)
   - Navigate away while preview running → device indicator released (no leaked handle)
-result: pending
+result: pass
 
 ### 4. Settings preview pane reacts to preset change without manual re-start (BLOCKER 6 — Q-C; covered by P2-S2 but worth end-to-end visual confirmation)
 expected: |
@@ -236,9 +236,9 @@ result: pending
 ## Summary
 
 total: 29
-passed: 21
+passed: 22
 issues: 0
-pending: 8
+pending: 7
 skipped: 0
 blocked: 0
 
