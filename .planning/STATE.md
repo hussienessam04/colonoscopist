@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_3_gap_closure_complete
-stopped_at: Phase 3 gap-closure plans 03-07 + 03-08 complete - G-03-7 (getPreset IPC shape) + G-03-8 (cleanup test wait pattern) resolved; 234 tests pass under Electron-as-Node ABI; awaiting human UAT on 8 Windows-hardware-dependent items
-last_updated: "2026-08-03T08:30:00.000Z"
+status: phase_3_verified_complete
+stopped_at: Phase 3 fully verified - all 29 UAT tests pass (20 automated + 9 human-confirmed on Windows hardware); gap-closure cycle closed; Phase 4 (Recording) is the next milestone
+last_updated: "2026-08-03T09:40:00.000Z"
 progress:
   total_phases: 3
   completed_phases: 3
@@ -23,22 +23,11 @@ progress:
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: **ALL 8 PLANS COMPLETE** (03-01..03-08). Both gap-closure plans executed end-to-end:
+Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: **FULLY VERIFIED** (all 29 UAT tests pass — 20 automated + 9 human-confirmed on Windows hardware). Gap-closure cycle closed; both `gaps_found` items from the original `03-VERIFICATION.md` (G-03-7 + G-03-8) resolved by plans 03-07 + 03-08 and re-verified end-to-end.
 
-- **Plan 03-07 (G-03-7)** — `commit f15b375` drops the `getPreset()` wrapper at the main boundary to match the declared `Promise<QualityPreset | null>` contract. `commit 2cf933a` adds the integration-contract describe block (3 regex assertions pinning the bare shape). `commit f700bcb` adds the saved-custom-preset renderer hydration regression test. Saved custom presets now hydrate correctly in production renderer; Q-A audit metadata still emits `matched` on first-save (audit branches read from the local `getOrAutoDetectPreset` return, not the IPC return).
+`/gsd-verify-work 3` complete: UAT status `complete`, no issues, no skipped-without-reason tests, no blocked tests. Phase 3 is shippable for its scope (capture + preview + presets, no recording).
 
-- **Plan 03-08 (G-03-8)** — `commit 6236ab7` awaits the `getUserMedia` mock's resolved promise value (`await mock.results[0].value`) before clicking Stop/Finish, so the `.then` microtask has fired and `streamRef.current` is set. `commit 2cf933a` also adds the integration-contract G-03-8 describe block (3 regex assertions on the release ordering: `requestRef.current += 1` BEFORE `streamRef.current = null`, `track.stop()` AFTER, `.then` cancellation branch stops tracks when `request !== requestRef.current`). `commit 2b3add2` documents the residual happy-dom flake rate (~80% pass rate; 5s safety-net timeout absorbs the rest).
-
-234 tests pass (220 prior + 14 net new: 8 G-03-7 integration contract + 1 G-03-7 settings-capture hydration + 3 G-03-8 integration contract + 2 G-03-8 test updates). `npm run typecheck` and `npm run typecheck:web` clean.
-
-**Resolved gaps from `03-VERIFICATION.md`:**
-- **G-03-7** — Capture preset IPC response contract now matches `Promise<QualityPreset | null>`; saved custom presets hydrate correctly.
-- **G-03-8** — ProcedureRoom Stop/Finish cleanup tests have a deterministic test-side wait pattern (5s safety net for residual happy-dom variance).
-
-**Remaining work for Phase 3:**
-- 8 Windows-hardware-dependent UAT items (DirectShow enumeration, real EasyCap/HDMI preview, real OS device indicator behavior) — require a physical Windows workstation with USB capture devices. See `03-UAT.md` and `03-VERIFICATION.md` Section E.
-
-Phase 4 (Recording) is unblocked: the corrected `getPreset` IPC shape + the deterministic preview cleanup path are the foundations for the recording child-process lifecycle.
+Phase 4 (Recording) is the next milestone: ffmpeg child process + procedure timer + device-lost handling. All capture-side infrastructure (IPC contract, hook release ordering, Settings surfaces, Procedure Room entry) is now in a verified-deterministic state.
 
 ## Project Reference
 
@@ -52,7 +41,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 |---|-------|--------------|--------|
 | 1 | Scaffold (electron-vite + security baseline + native rebuild) | 4 | complete |
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
-| 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (gap-closure plans 03-07 + 03-08 closed; 8 hardware UAT items pending) |
+| 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | pending |
 | 5 | Screenshots + Procedure Review + Trim | 6 | pending |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
@@ -121,15 +110,16 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `2b3add2 docs(03-08): document residual happy-dom flake rate in ProcedureRoom Stop/Finish tests`
+- Last commit: `docs(03): record test 9 pass — auto-detect heuristic confirmed on real hardware; UAT complete (29/29)`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 - All 8 Phase 3 plans have `*-SUMMARY.md`; phase-level verification can be re-run.
+- ROADMAP.md updated: Phase 3 "8/8 plans executed" with 03-07 + 03-08 added to checklist.
 
 ---
-*State last updated: 2026-08-03 after gap-closure plans 03-07 + 03-08 executed*
+*State last updated: 2026-08-03 after /gsd-verify-work 3 completed (29/29 UAT tests pass)*
 
 ## Session
 
-**Last session:** 2026-08-03T08:30:00.000Z
-**Stopped at:** Phase 3 gap-closure execution complete - 03-07 (G-03-7 IPC contract fix) + 03-08 (G-03-8 cleanup test fix) closed; awaiting /gsd-verify-work for the 8 Windows-hardware-dependent UAT items
-**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-08-PLAN.md
+**Last session:** 2026-08-03T09:40:00.000Z
+**Stopped at:** Phase 3 fully verified — UAT 29/29, ROADMAP + STATE updated. Next: /gsd-plan-phase 4 / /gsd-discuss-phase 4 / /gsd-execute-phase 4
+**Resume file:** .planning/phases/03-capture-enumeration-live-preview/03-UAT.md (status: complete)

@@ -66,7 +66,7 @@ Plans:
 **Pitfalls addressed:** Pitfall 3 (device enumeration race — preview-only path; main-side ffmpeg open happens in Phase 4 with explicit sequencing).
 **Notes:** The choice of last-used device is stored per doctor. This phase does NOT spawn ffmpeg yet.
 
-**Plans:** 6/6 plans executed
+**Plans:** 8/8 plans executed
 
 Plans:
 
@@ -76,6 +76,8 @@ Plans:
 - [x] 03-03-PLAN.md — Validation: moved test files, security-baseline + scope guards, integration contract test, full suite + typecheck + build, Windows hardware smoke UAT (Wave 2, depends_on: 03-01, 03-02)
 - [x] 03-05-PLAN.md — Gap closure: Settings hub page (replaces transient DropDownMenu, G-03-3) + PatientRow Open Procedure Room entry (G-03-4) (Wave 4, depends_on: 03-04)
 - [x] 03-06-PLAN.md — Gap closure: presetHints() defensive guard for malformed custom preset (G-03-5) + shared SettingsSidebar mounted on all three Settings pages with active-tab highlight (G-03-6) (Wave 5, depends_on: 03-05)
+- [x] 03-07-PLAN.md — Gap closure: drop getPreset() wrapper at main boundary to match declared `Promise<QualityPreset \| null>` contract (G-03-7) + saved custom-preset renderer hydration regression test (Wave 6, depends_on: 03-01)
+- [x] 03-08-PLAN.md — Gap closure: make ProcedureRoom Stop/Finish cleanup tests deterministic under `npm run test:unit` (Electron-as-Node ABI) by awaiting getUserMedia `.then` (G-03-8) + integration contract pins hook release ordering (Wave 7)
 
 ---
 
