@@ -16,7 +16,8 @@ import { canonicalizeOrThrow } from '../capture/canonicalize';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
 import { Recorder, type RecorderDeps } from '../recorder/recorder';
-import { recordingStartInput } from '@shared/validators';
+import { recorderRegistry } from '../recorder/registry';
+import { recordingStartInput, procedureIdInput } from '@shared/validators';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -149,15 +150,25 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     }
   });
 
-  ipcMain.handle(IPC.RECORDING_STOP, async () => {
+  // Stop / Pause / Resume all look up the ACTIVE recorder from
+  // recorderRegistry by procedureId rather than calling buildRecorder()
+  // (which would return a brand-new Recorder in 'idle' state, making stop()
+  // a no-op via its `state === 'idle'` early return).
+  ipcMain.handle(IPC.RECORDING_STOP, async (_e, raw) => {
     try {
       const doctorId = requireSession();
-      const recorder = deps.buildRecorder();
+      const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
+      const recorder = recorderRegistry.get(procedureId);
+      if (!recorder) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', `No active recorder for procedure ${procedureId}`),
+        );
+      }
       await recorder.stop();
       audit({
         action: 'recording.stop',
         entityType: 'procedure',
-        entityId: null,
+        entityId: procedureId,
         userId: doctorId,
       });
     } catch (err) {
@@ -165,23 +176,32 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     }
   });
 
-  // Pause/Resume — Plan 04-03 (D-11). Both take no input body. The registry
-  // owns the active procedureId so the renderer cannot pass a cross-patient
-  // id (T-04-12).
-  ipcMain.handle(IPC.RECORDING_PAUSE, async () => {
+  ipcMain.handle(IPC.RECORDING_PAUSE, async (_e, raw) => {
     try {
       requireSession();
-      const recorder = deps.buildRecorder();
+      const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
+      const recorder = recorderRegistry.get(procedureId);
+      if (!recorder) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', `No active recorder for procedure ${procedureId}`),
+        );
+      }
       await recorder.pause();
     } catch (err) {
       throw asIpcError(err);
     }
   });
 
-  ipcMain.handle(IPC.RECORDING_RESUME, async () => {
+  ipcMain.handle(IPC.RECORDING_RESUME, async (_e, raw) => {
     try {
       requireSession();
-      const recorder = deps.buildRecorder();
+      const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
+      const recorder = recorderRegistry.get(procedureId);
+      if (!recorder) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', `No active recorder for procedure ${procedureId}`),
+        );
+      }
       await recorder.resume();
     } catch (err) {
       throw asIpcError(err);

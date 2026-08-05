@@ -288,9 +288,9 @@ export interface IpcContract {
   // in Plan 03; lost + scanForOrphans land in Plan 04.
   recording: {
     start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
-    stop: () => Promise<void>;
-    pause: () => Promise<void>;
-    resume: () => Promise<void>;
+    stop: (input: { procedureId: string }) => Promise<void>;
+    pause: (input: { procedureId: string }) => Promise<void>;
+    resume: (input: { procedureId: string }) => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
   };
 }

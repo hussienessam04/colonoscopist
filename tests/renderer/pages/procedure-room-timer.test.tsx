@@ -160,9 +160,17 @@ describe('ProcedureRoom Pause/Resume button', () => {
   it('Pause click calls window.api.recording.pause exactly once', async () => {
     const api = getApi();
     api.recording.pause.mockResolvedValue(undefined);
-    setRoute({ name: 'procedure-room' });
+    setRoute({ name: 'procedure-room', patientId: 'pat-1' });
     render(<ProcedureRoom />);
 
+    // Wait for procedures.create (called on mount) to be invoked and for
+    // the resolved procedureId to propagate into the component state before
+    // the recording status lands. The handler now needs procedureId to
+    // look up the active recorder in the registry.
+    await waitFor(() => expect(api.procedures.create).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
     await waitFor(() =>
       expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe('function'),
     );
@@ -181,9 +189,13 @@ describe('ProcedureRoom Pause/Resume button', () => {
   it('Resume click calls window.api.recording.resume exactly once', async () => {
     const api = getApi();
     api.recording.resume.mockResolvedValue(undefined);
-    setRoute({ name: 'procedure-room' });
+    setRoute({ name: 'procedure-room', patientId: 'pat-1' });
     render(<ProcedureRoom />);
 
+    await waitFor(() => expect(api.procedures.create).toHaveBeenCalled());
+    await act(async () => {
+      await Promise.resolve();
+    });
     await waitFor(() =>
       expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe('function'),
     );

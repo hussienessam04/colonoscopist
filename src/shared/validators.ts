@@ -166,6 +166,10 @@ export const procedureNoteListInput = z.object({
   procedureId: z.string().uuid(),
 });
 
+export const procedureIdInput = z.object({
+  procedureId: z.string().uuid(),
+});
+
 export const recordingStartInput = z.object({
   patientId: z.string().uuid(),
   procedureId: z.string().uuid().optional(),

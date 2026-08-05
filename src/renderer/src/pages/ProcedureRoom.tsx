@@ -196,7 +196,8 @@ export default function ProcedureRoom(): JSX.Element {
   function handleRecordToggle(): void {
     if (!selectedCanonical || !preset) return;
     if (isRecording) {
-      void window.api.recording.stop().catch(() => undefined);
+      if (!procedureId) return;
+      void window.api.recording.stop({ procedureId }).catch(() => undefined);
     } else {
       void window.api.recording
         .start({
@@ -212,10 +213,11 @@ export default function ProcedureRoom(): JSX.Element {
   // Pause/Resume click handler. The button itself is disabled outside the
   // allowed states (see render); this only runs when enabled.
   function handlePauseResumeToggle(): void {
+    if (!procedureId) return;
     if (recordingState.status === 'recording') {
-      void window.api.recording.pause().catch(() => undefined);
+      void window.api.recording.pause({ procedureId }).catch(() => undefined);
     } else if (recordingState.status === 'paused') {
-      void window.api.recording.resume().catch(() => undefined);
+      void window.api.recording.resume({ procedureId }).catch(() => undefined);
     }
   }
 
