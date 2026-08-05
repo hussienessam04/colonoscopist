@@ -20,6 +20,7 @@ export function canonicalizeName(raw: string): string {
   return raw
     .normalize('NFC')
     .replace(/[\u200B-\u200D\uFEFF]/g, '') // strip zero-width
+    .replace(/\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i, '') // strip USB vendor:product ID suffix (browser label, not dshow)
     .replace(/\s+/g, ' ') // collapse internal whitespace
     .trim();
 }

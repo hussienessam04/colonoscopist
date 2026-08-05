@@ -44,10 +44,18 @@ export function useCaptureDeviceMap(): {
   const namesByBrowserId = useMemo(() => {
     const names = new Map<string, string>();
     for (const browserDevice of browser) {
-      const match = dshow.find(
-        (dshowDevice) => comparable(dshowDevice.rawName) === comparable(browserDevice.label),
+      // ponytail: Windows browser labels often append "(0408:30c3)" USB
+      // vendor:product IDs that dshow listings do NOT carry. Strip the suffix
+      // before matching so the lookup falls back to the clean dshow name
+      // (or, on miss, the stripped label).
+      const stripped = browserDevice.label.replace(
+        /\s*\([0-9a-f]{4}:[0-9a-f]{4}\)\s*$/i,
+        '',
       );
-      names.set(browserDevice.deviceId, match?.deviceId ?? browserDevice.label);
+      const match = dshow.find(
+        (dshowDevice) => comparable(dshowDevice.rawName) === comparable(stripped),
+      );
+      names.set(browserDevice.deviceId, match?.deviceId ?? stripped);
     }
     return names;
   }, [browser, dshow]);
