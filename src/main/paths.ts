@@ -20,3 +20,12 @@ export function mediaDir(): string {
   mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+// Per D-03 + Anti-Pattern 2 — every procedure gets its own directory under
+// <userData>/data/media/patients/<patientId>/<procedureId> so partial mp4s
+// can be quarantined without colliding with active recordings.
+export function procedureMediaDir(patientId: string, procedureId: string): string {
+  const dir = path.join(mediaDir(), 'patients', patientId, procedureId);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}

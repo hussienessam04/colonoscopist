@@ -34,3 +34,21 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
       return { code, message };
   }
 }
+
+// ponytail: Recorder supervisor errors are separate from IPC errors — they
+// never cross the contextBridge boundary (they're internal to main process).
+export class RecorderBusyError extends Error {
+  readonly procedureId: string;
+  constructor(procedureId: string) {
+    super(`Recorder already active for procedure ${procedureId}`);
+    this.name = 'RecorderBusyError';
+    this.procedureId = procedureId;
+  }
+}
+
+export class EmptyFfmpegArgsError extends Error {
+  constructor(message = 'Empty ffmpeg args after canonicalization') {
+    super(message);
+    this.name = 'EmptyFfmpegArgsError';
+  }
+}

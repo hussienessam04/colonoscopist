@@ -4,6 +4,7 @@
 
 import type Database from 'better-sqlite3';
 import initSql from './migrations/0001_init.sql?raw';
+import proceduresSql from './migrations/0002_procedures.sql?raw';
 
 type Migration = {
   id: number;
@@ -12,7 +13,10 @@ type Migration = {
 };
 
 // SQL is embedded by Vite's ?raw import — no filesystem read at runtime.
-const MIGRATIONS: Migration[] = [{ id: 1, name: 'init', up: initSql }];
+const MIGRATIONS: Migration[] = [
+  { id: 1, name: 'init', up: initSql },
+  { id: 2, name: 'procedures', up: proceduresSql },
+];
 
 function loadMigrations(): typeof MIGRATIONS {
   return MIGRATIONS;

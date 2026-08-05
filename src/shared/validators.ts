@@ -120,6 +120,61 @@ export type CapturePresetInput = z.infer<typeof capturePresetInput>;
 export type CapturePresetQueryInput = z.infer<typeof capturePresetQueryInput>;
 export type NoDeviceAuditInput = z.infer<typeof noDeviceAuditInput>;
 
+// Plan 04-01 — procedures + procedure-notes + recording schemas (CAPT-04/05/06/07).
+// Per BLOCKER 4 + D-01: payloads do NOT include a doctorId field. Main derives
+// the doctorId from `requireSession()` exclusively.
+export const proceduresCreateInput = z.object({
+  patientId: z.string().uuid(),
+});
+
+export const proceduresGetInput = z.object({
+  id: z.string().uuid(),
+});
+
+export const proceduresListQueryInput = z
+  .object({
+    patientId: z.string().uuid().optional(),
+    status: z.enum(['recording', 'completed', 'partial', 'crashed']).optional(),
+    page: z.number().int().positive().max(200).optional(),
+    pageSize: z.number().int().positive().max(200).optional(),
+  })
+  .strict();
+
+export const proceduresFinalizeInput = z
+  .object({
+    id: z.string().uuid(),
+    status: z.enum(['completed', 'partial']),
+    endedAt: z.number().int().nonnegative(),
+    durationSeconds: z.number().int().nonnegative(),
+    videoPath: z.string().min(1).max(2000),
+    partialJson: z
+      .object({
+        lastKnownTimestampMs: z.number().int().nonnegative(),
+        deviceLostAt: z.number().int().nonnegative(),
+        deviceName: z.string().min(1).max(500),
+      })
+      .optional(),
+  })
+  .strict();
+
+export const procedureNoteCreateInput = z.object({
+  procedureId: z.string().uuid(),
+  body: z.string().min(1).max(1000),
+});
+
+export const recordingStartInput = z.object({
+  patientId: z.string().uuid(),
+  deviceId: z.string().min(1).max(500),
+  preset: qualityPresetSchema,
+});
+
+export type ProceduresCreateInput = z.infer<typeof proceduresCreateInput>;
+export type ProceduresGetInput = z.infer<typeof proceduresGetInput>;
+export type ProceduresListQueryInput = z.infer<typeof proceduresListQueryInput>;
+export type ProceduresFinalizeInput = z.infer<typeof proceduresFinalizeInput>;
+export type ProcedureNoteCreateInput = z.infer<typeof procedureNoteCreateInput>;
+export type RecordingStartInput = z.infer<typeof recordingStartInput>;
+
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);
 }

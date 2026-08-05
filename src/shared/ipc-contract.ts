@@ -34,6 +34,19 @@ export const IPC = {
   CAPTURE_GET_PRESET: 'capture:get-preset',
   CAPTURE_SET_PRESET: 'capture:set-preset',
   CAPTURE_NO_DEVICE_AUDIT: 'capture:no-device-audit',
+  // Procedures (Plan 04-01)
+  PROCEDURES_CREATE: 'procedures:create',
+  PROCEDURES_GET: 'procedures:get',
+  PROCEDURES_LIST: 'procedures:list',
+  PROCEDURES_FINALIZE: 'procedures:finalize',
+  // Procedure notes (declared here; Plan 02-of-phase-04 wires the handler)
+  PROCEDURE_NOTES_CREATE: 'procedure-notes:create',
+  PROCEDURE_NOTES_LIST: 'procedure-notes:list',
+  // Recording (Plan 04-01)
+  RECORDING_START: 'recording:start',
+  RECORDING_STOP: 'recording:stop',
+  // Push event channel — value is the channel string the renderer subscribes to.
+  RECORDING_STATUS: 'recording:status',
 } as const;
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
@@ -127,6 +140,66 @@ export type WizardSubmitResult = {
   clinicName: string;
 };
 
+// Phase 4 — Procedure + related domain types (CAPT-04/05/06/07).
+
+// Snapshot of the recording-time preset for the procedure row.
+export type PresetSummary = {
+  kind: 'sd' | 'hd' | 'custom';
+  resolution: string;
+  framerate: number;
+  bitrate: string;
+};
+
+export type ProcedureStatus = 'recording' | 'completed' | 'partial' | 'crashed';
+
+export type Procedure = {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  startedAt: number;
+  endedAt: number | null;
+  durationSeconds: number;
+  status: ProcedureStatus;
+  videoPath: string;
+  presetSummary: PresetSummary;
+  audioDeviceName: string | null;
+  createdAt: number;
+};
+
+export type ProcedureNote = {
+  id: number;
+  procedureId: string;
+  body: string;
+  createdAt: number;
+};
+
+export type ProcedureSegment = {
+  id: number;
+  procedureId: string;
+  segmentIndex: number;
+  filePath: string;
+  startedAt: number;
+  endedAt: number;
+};
+
+// Discriminated union for the recording:status push event.
+// Plan 04-01 only emits `started` and `stopped`; paused/resumed are Plan 03,
+// lost is Plan 04. The shape is fixed now so the renderer's store is final.
+export type RecordingStatus =
+  | { status: 'started'; startedAt: number; currentSegmentIndex: number }
+  | { status: 'paused'; startedAt: number; currentSegmentIndex: number }
+  | { status: 'resumed'; startedAt: number; currentSegmentIndex: number }
+  | { status: 'stopped'; startedAt: number; procedureId: string }
+  | { status: 'lost'; startedAt: number; lastKnownTimestampMs: number; deviceName: string };
+
+// Partial metadata stored when a recording terminates with status='partial'
+// (device lost). Plan 04 fills this; declared here so the IPC contract is final.
+export type ProcedurePartialJson = {
+  lastKnownTimestampMs: number;
+  deviceLostAt: number;
+  deviceName: string;
+};
+
 // What `contextBridge.exposeInMainWorld('api', api)` exposes to the renderer.
 export interface IpcContract {
   auth: {
@@ -180,6 +253,39 @@ export interface IpcContract {
     getPreset: (input: { deviceId: string }) => Promise<QualityPreset | null>;
     setPreset: (input: { deviceId: string; preset: QualityPreset }) => Promise<{ ok: true }>;
     noDeviceAudit: () => Promise<{ ok: true }>;
+  };
+  // Per BLOCKER 4 + D-01: procedure payloads do NOT include a doctorId field.
+  // Main derives the doctorId from `requireSession()` exclusively.
+  procedures: {
+    create: (input: { patientId: string }) => Promise<Procedure>;
+    get: (input: { id: string }) => Promise<Procedure | null>;
+    list: (input: {
+      patientId?: string;
+      status?: ProcedureStatus;
+      page?: number;
+      pageSize?: number;
+    }) => Promise<{ rows: Procedure[]; total: number }>;
+    finalize: (input: {
+      id: string;
+      status: 'completed' | 'partial';
+      endedAt: number;
+      durationSeconds: number;
+      videoPath: string;
+      partialJson?: ProcedurePartialJson;
+    }) => Promise<Procedure>;
+  };
+  // Plan 02-of-phase-04 fills the main handlers. Preload bridge is final here
+  // so the renderer contract never needs to change shape in Plan 02.
+  procedureNotes: {
+    create: (input: { procedureId: string; body: string }) => Promise<ProcedureNote>;
+    list: (input: { procedureId: string }) => Promise<ProcedureNote[]>;
+  };
+  // Plan 04-01 ships start + stop + onStatus (push event). pause/resume land
+  // in Plan 03; lost + scanForOrphans land in Plan 04.
+  recording: {
+    start: (input: { patientId: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
+    stop: () => Promise<void>;
+    onStatus: (cb: (status: RecordingStatus) => void) => () => void;
   };
 }
 

@@ -7,6 +7,9 @@
   "license": "UNLICENSED",
   "private": true,
   "productName": "Colonoscopist",
+  "build": {
+    "asarUnpack": ["**/node_modules/ffmpeg-static/**"]
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

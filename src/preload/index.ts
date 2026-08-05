@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron';
-import { IPC, type IpcContract } from '@shared/ipc-contract';
+import { contextBridge, ipcRenderer, type IpcRenderer } from 'electron';
+import { IPC, type IpcContract, type RecordingStatus } from '@shared/ipc-contract';
 
 // IpcContract bridge exposed via contextBridge.exposeInMainWorld('api', api).
 // Renderer is sandboxed; every method is ipcRenderer.invoke(IPC.X, ...args) against the
@@ -41,6 +41,34 @@ const api: IpcContract = {
     getPreset: (input) => ipcRenderer.invoke(IPC.CAPTURE_GET_PRESET, input),
     setPreset: (input) => ipcRenderer.invoke(IPC.CAPTURE_SET_PRESET, input),
     noDeviceAudit: () => ipcRenderer.invoke(IPC.CAPTURE_NO_DEVICE_AUDIT),
+  },
+  procedures: {
+    create: (input) => ipcRenderer.invoke(IPC.PROCEDURES_CREATE, input),
+    get: (input) => ipcRenderer.invoke(IPC.PROCEDURES_GET, input),
+    list: (input) => ipcRenderer.invoke(IPC.PROCEDURES_LIST, input),
+    finalize: (input) => ipcRenderer.invoke(IPC.PROCEDURES_FINALIZE, input),
+  },
+  // Plan 02-of-phase-04 fills the main handlers; preload bridge is final here
+  // so the renderer contract never needs to change shape.
+  procedureNotes: {
+    create: (input) => ipcRenderer.invoke(IPC.PROCEDURE_NOTES_CREATE, input),
+    list: (input) => ipcRenderer.invoke(IPC.PROCEDURE_NOTES_LIST, input),
+  },
+  recording: {
+    start: (input) => ipcRenderer.invoke(IPC.RECORDING_START, input),
+    stop: () => ipcRenderer.invoke(IPC.RECORDING_STOP),
+    onStatus(cb: (status: RecordingStatus) => void): () => void {
+      // The renderer is a single-window app; a single global listener is fine
+      // for now. Returns an unsubscribe closure.
+      const listener = (_event: unknown, status: RecordingStatus): void => cb(status);
+      (ipcRenderer as IpcRenderer).on(IPC.RECORDING_STATUS, listener);
+      return () => {
+        (ipcRenderer as unknown as { removeListener: (ch: string, l: unknown) => void }).removeListener(
+          IPC.RECORDING_STATUS,
+          listener,
+        );
+      };
+    },
   },
 };
 
