@@ -4,6 +4,12 @@
 // State machine:
 //   idle → starting → recording ⇄ paused → stopping → idle
 //
+// Plan 04 (device-lost) adds the stderr regex branch that transitions
+// recording → stopping → partial-finalize (per D-03). The doctor can click
+// Stop after device-lost; that runs the existing stop() with
+// finalizeStatusOnStop === 'partial', which rewrites video_path to the
+// `.partial.mp4` relative form.
+//
 // All dependencies are injectable (RecorderDeps) so unit tests can replace
 // spawn, clock, procFs, proceduresRepo, audit, ffmpegPath, canonicalDevice,
 // emit, and concatSpawn without booting Electron or ffmpeg.
@@ -14,6 +20,7 @@ import { procedureMediaDir } from '../paths';
 import { recorderRegistry } from './registry';
 import { buildFfmpegArgs } from './ffmpeg-args';
 import { buildConcatArgs, writeConcatList } from './concat';
+import { DEVICE_LOST_RE, parseLastKnownTimestampMs, rewritePartial } from './device-lost';
 import type { PresetSummary, QualityPreset, RecordingStatus } from '@shared/ipc-contract';
 
 export type ProceduresSubRepo = {
@@ -90,6 +97,7 @@ export type ProcFs = {
   renameSync: (oldPath: string, newPath: string) => void;
   unlinkSync: (path: string) => void;
   existsSync: (path: string) => boolean;
+  writeFileSync: (path: string, content: string) => void;
 };
 
 export type RecorderDeps = {
@@ -152,6 +160,20 @@ export class Recorder {
   // file is the canonical mp4 — no concat subprocess runs.
   private closedSegments: Array<{ segmentIndex: number; relPath: string; startedAt: number; endedAt: number }> = [];
   private presetSummary: PresetSummary | null = null;
+  // Plan 04 (device-lost): flag the device-lost branch so onExit takes the
+  // rename + sidecar JSON + audit + 'lost' path instead of the normal
+  // stop/pause finalize.
+  private deviceLostInProgress = false;
+  // Track the device-lost wall-clock time so the subsequent stop() can
+  // finalize as 'partial' with the right endedAt timestamp.
+  private lostAt: number | null = null;
+  // stop() finalize flag — flips to 'partial' after device-lost so the
+  // pending stop() rewrites video_path to <segment>.partial.mp4.
+  private finalizeStatusOnStop: 'completed' | 'partial' = 'completed';
+  // Shared stopPromise so a stop() call mid-device-lost awaits the rename +
+  // sidecar before doing its own finalize (no race).
+  private stopPromise: Promise<void> | null = null;
+  private resolveStopPromiseFn: (() => void) | null = null;
 
   constructor(private readonly deps: RecorderDeps) {}
 
@@ -227,6 +249,56 @@ export class Recorder {
   }
 
   async stop(): Promise<void> {
+    // ponytail: device-lost path may be mid-flight (5s grace + sigterm/sigkill
+    // before onExit's rename + sidecar + emit 'lost' runs). Await it so the
+    // stop()'s own finalize runs AFTER device-lost's finalize — no race.
+    if (this.stopPromise) {
+      await this.stopPromise;
+    }
+    // Idempotent: a "double-click" Stop after a successful finalize returns
+    // silently — never throws, never calls updateFinalized twice.
+    if (this.state === 'idle') return;
+    if (
+      this.state === 'stopping' &&
+      this.finalizeStatusOnStop === 'partial' &&
+      this.procedureId
+    ) {
+      // Device-lost path: the supervisor is mid-stop with the partial file
+      // already on disk; finalize the row with status='partial' + the
+      // <segment>.partial.mp4 video path.
+      const partialVideoRelPath = this.currentSegmentRelPath
+        ? `${this.currentSegmentRelPath}.partial.mp4`
+        : this.outputRelPath ?? '';
+      const endedAt = this.lostAt ?? this.deps.clock.now();
+      const startedAt = this.startedAt ?? endedAt;
+      const durationSeconds = Math.max(0, Math.floor((endedAt - startedAt) / 1000));
+      this.deps.procedures.updateFinalized(this.procedureId, {
+        endedAt,
+        durationSeconds,
+        status: 'partial',
+        videoPath: partialVideoRelPath,
+      });
+      this.deps.audit({
+        action: 'recording.stopped',
+        entityType: 'procedure',
+        entityId: this.procedureId,
+        metadata: {
+          deviceName: this.deviceName,
+          preset: this.presetSummaryForAudit(),
+          durationSeconds,
+          partial: true,
+        },
+      });
+      this.deps.emit({
+        status: 'stopped',
+        startedAt,
+        procedureId: this.procedureId,
+      });
+      recorderRegistry.delete(this.procedureId);
+      this.resetInternalState();
+      this.state = 'idle';
+      return;
+    }
     if (this.state !== 'recording' && this.state !== 'paused') {
       throw new Error(`Cannot stop recorder in state=${this.state}`);
     }
@@ -354,6 +426,14 @@ export class Recorder {
 
   private onStderr(chunk: string): void {
     this.stderrBuffer += chunk;
+    // ponytail: device-lost takes precedence over frame-detection — when
+    // ffmpeg emits an I/O error or DeviceLost we MUST drop the segment to
+    // disk before any further frame accounting. The regex is case-insensitive
+    // and covers the six substrings from RESEARCH §3 verbatim. State guard
+    // ensures only ONE device-lost event fires per recording.
+    if (this.state === 'recording' && !this.deviceLostInProgress && DEVICE_LOST_RE.test(chunk)) {
+      this.enterDeviceLost();
+    }
     if (this.frameSeen) return;
     if (!this.stderrBuffer.includes('frame=')) return;
     this.frameSeen = true;
@@ -396,8 +476,140 @@ export class Recorder {
     }
   }
 
+  // ponytail: device-lost branch — mirrors stop()'s q\n + grace + sigkill
+  // pattern. On 'exit' the onExit handler takes the rename + sidecar JSON +
+  // audit + 'lost' path. State stays 'stopping' so a subsequent stop() call
+  // finalizes as 'partial' (D-03 + Plan 04).
+  private enterDeviceLost(): void {
+    this.deviceLostInProgress = true;
+    this.finalizeStatusOnStop = 'partial';
+    this.state = 'stopping';
+    const child = this.child;
+    if (!child) {
+      // No live child — invoke the stopPromise resolver immediately so a
+      // concurrent stop() call doesn't deadlock.
+      this.stopPromise = Promise.resolve();
+      return;
+    }
+    // Set up the shared stopPromise BEFORE writing q\n so a stop() call mid-
+    // grace observes a non-null promise and awaits the rename + sidecar.
+    this.stopPromise = new Promise<void>((resolve) => {
+      this.resolveStopPromiseFn = resolve;
+    });
+    try {
+      child.proc.stdin.write('q\n');
+    } catch {
+      // ignore — child may already be torn down
+    }
+    this.sigtermTimer = setTimeout(() => {
+      try {
+        child.proc.kill('SIGTERM');
+      } catch {
+        // already exited
+      }
+    }, SIGTERM_GRACE_MS);
+    this.sigkillTimer = setTimeout(() => {
+      try {
+        child.proc.kill('SIGKILL');
+      } catch {
+        // already exited
+      }
+    }, SIGKILL_FALLBACK_MS);
+  }
+
+  // Called by onExit when deviceLostInProgress is true. Reads the segment
+  // file size, computes lastKnownTimestampMs, renames to .partial.mp4, writes
+  // the sidecar JSON, writes the audit row, emits the 'lost' status.
+  private handleDeviceLostExit(): void {
+    const procedureId = this.procedureId;
+    const outputPath = this.outputPath;
+    const segmentRelPath = this.currentSegmentRelPath;
+    const startedAt = this.startedAt ?? this.deps.clock.now();
+    const deviceLostAt = this.deps.clock.now();
+    this.lostAt = deviceLostAt;
+    if (!procedureId || !outputPath || !segmentRelPath) {
+      this.deviceLostInProgress = false;
+      if (this.resolveStopPromiseFn) {
+        this.resolveStopPromiseFn();
+        this.resolveStopPromiseFn = null;
+      }
+      this.stopPromise = null;
+      return;
+    }
+    let statSize = 0;
+    try {
+      statSize = this.deps.procFs.statSync(outputPath).size;
+    } catch {
+      // Segment file missing — ffmpeg died before opening it. Use 0; the
+      // parseLastKnownTimestampMs will throw, so guard it.
+    }
+    let lastKnownTimestampMs = 0;
+    try {
+      lastKnownTimestampMs = parseLastKnownTimestampMs(statSize, this.presetSummaryForAudit().bitrate);
+    } catch {
+      lastKnownTimestampMs = 0;
+    }
+    const partialJsonRelPath = `${segmentRelPath}.partial.mp4.json`;
+    try {
+      rewritePartial(
+        outputPath,
+        segmentRelPath,
+        {
+          procedureId,
+          lastKnownTimestampMs,
+          deviceLostAt,
+          deviceName: this.deviceName,
+        },
+        { procFs: this.deps.procFs },
+      );
+    } catch (err) {
+      this.deps.audit({
+        action: 'recording.lost_rename_failed',
+        entityType: 'procedure',
+        entityId: procedureId,
+        metadata: { error: (err as Error).message },
+        outcome: 'failed',
+      });
+    }
+    this.deps.audit({
+      action: 'recording.lost',
+      entityType: 'procedure',
+      entityId: procedureId,
+      metadata: {
+        segmentIndex: this.currentSegmentIndex,
+        lastKnownTimestampMs,
+        deviceName: this.deviceName,
+        partialJsonPath: partialJsonRelPath,
+      },
+      outcome: 'failed',
+    });
+    this.deps.emit({
+      status: 'lost',
+      startedAt,
+      lastKnownTimestampMs,
+      deviceName: this.deviceName,
+    });
+    // Resolve the shared stopPromise so any awaiting stop() runs its
+    // partial-finalize branch in order (no race).
+    if (this.resolveStopPromiseFn) {
+      this.resolveStopPromiseFn();
+      this.resolveStopPromiseFn = null;
+    }
+    this.stopPromise = null;
+    this.deviceLostInProgress = false;
+    // state stays 'stopping' — the doctor's subsequent stop() call will
+    // finalize as 'partial' and reset to 'idle'.
+  }
+
   private onExit(code: number | null, signal: NodeJS.Signals | null): void {
     this.clearTimers();
+    // ponytail: device-lost exit — run the rename + sidecar + audit + 'lost'
+    // branch. State stays 'stopping' so the doctor can still click Stop to
+    // finalize as 'partial'.
+    if (this.deviceLostInProgress) {
+      this.handleDeviceLostExit();
+      return;
+    }
     const procedureId = this.procedureId;
     const outputPath = this.outputPath;
     // ponytail: if we never saw a 'frame=' line, the encoder died before it
@@ -724,6 +936,11 @@ export class Recorder {
     this.currentSegmentRelPath = null;
     this.closedSegments = [];
     this.presetSummary = null;
+    this.deviceLostInProgress = false;
+    this.lostAt = null;
+    this.finalizeStatusOnStop = 'completed';
+    this.stopPromise = null;
+    this.resolveStopPromiseFn = null;
   }
 }
 
@@ -801,6 +1018,7 @@ export function defaultProcFs(): ProcFs {
     renameSync: fs.renameSync,
     unlinkSync: fs.unlinkSync,
     existsSync: fs.existsSync,
+    writeFileSync: (p, c) => fs.writeFileSync(p, c),
   };
   return cachedProcFs;
 }

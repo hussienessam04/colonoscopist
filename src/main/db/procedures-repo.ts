@@ -237,6 +237,16 @@ export const proceduresRepo = {
     return rowToProcedure(row);
   },
 
+  // Find a procedure whose stored `video_path` matches the given partial-mp4
+  // path (Plan 04 — used by Phase 5 review's "open partial" flow). The
+  // partial path is `video_path.replace(/\.mp4$/, '.partial.mp4')`; callers
+  // can either derive the path or look it up via this helper.
+  findByPartialPath(partialVideoPath: string): Procedure | undefined {
+    const row = stmts()
+      .getIncludingDeleted.get(partialVideoPath) as ProcedureRow | undefined;
+    return row ? rowToProcedure(row) : undefined;
+  },
+
   list(filter: ProceduresListFilter): { rows: Procedure[]; total: number } {
     const page = filter.page && filter.page > 0 ? filter.page : 1;
     const pageSize = filter.pageSize && filter.pageSize > 0 ? filter.pageSize : 25;

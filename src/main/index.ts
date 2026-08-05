@@ -72,11 +72,7 @@ app.whenReady().then(() => {
       logStartup(`capture-devices-enumeration-failed:${(err as Error).message ?? 'unknown'}`);
     });
 
-  void scanForOrphans()
-    .then(() => logStartup('recorder-scan-orphans-ok'))
-    .catch((err: unknown) =>
-      logStartup(`recorder-scan-orphans-failed:${(err as Error).message ?? 'unknown'}`),
-    );
+  void scanForOrphans();
 
   createMainWindow();
   logStartup('app-ready');

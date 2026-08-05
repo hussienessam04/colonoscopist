@@ -4,6 +4,7 @@
 import { BrowserWindow } from 'electron';
 import { Recorder, buildDefaultDeps, type RecorderDeps } from './recorder';
 import type { RecordingStatus } from '@shared/ipc-contract';
+import { scanForOrphans as realScanForOrphans } from './orphans';
 
 export function initRecorder(): {
   newRecorder: (depsOverrides?: Partial<RecorderDeps>) => Recorder;
@@ -23,7 +24,6 @@ export function initRecorder(): {
   };
 }
 
-// ponytail: Plan 04 fills the body. Stub keeps the call sites stable.
-export async function scanForOrphans(): Promise<void> {
-  /* implemented in plan 04 */
-}
+// ponytail: re-export the real implementation from orphans.ts. main/index.ts
+// already calls scanForOrphans() at boot — no call-site change required.
+export const scanForOrphans = realScanForOrphans;

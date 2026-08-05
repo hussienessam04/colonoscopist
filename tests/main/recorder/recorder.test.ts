@@ -149,6 +149,7 @@ function makeFakeProcFs(): {
       unlinks.push(p);
     },
     existsSync: () => true,
+    writeFileSync: () => undefined,
   };
 }
 
