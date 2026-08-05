@@ -7,15 +7,15 @@ source:
   - 04-03-SUMMARY.md
   - 04-04-SUMMARY.md
 started: 2026-08-05T15:00:00.000Z
-updated: 2026-08-05T15:25:00.000Z
+updated: 2026-08-05T15:26:00.000Z
 ---
 
 ## Current Test
 
-number: 2
-name: Procedure Room: Record button enabled
+number: 3
+name: Clicking Record spawns ffmpeg
 expected: |
-  Cold start the app, log in, open a patient, click "Open Procedure Room". The Record button is visible in the side-rail, enabled (not greyed out) when a capture device is selected in Settings → Capture.
+  In the Procedure Room, click Record. ffmpeg-static child process spawns, the procedure row is created with status='recording', a recording.start audit row is written. Live preview continues in the corner.
 awaiting: user response
 
 ## Tests
@@ -26,7 +26,7 @@ result: pass
 
 ### 2. Procedure Room: Record button enabled
 expected: With a session active and a capture device selected in Settings → Capture, the Procedure Room shows an enabled Record button (not greyed out).
-result: [pending]
+result: pass
 
 ### 3. Clicking Record spawns ffmpeg
 expected: Click Record. ffmpeg-static child process spawns, the procedure row is created with `status='recording'`, a `recording.start` audit row is written. Live preview continues in the corner.
@@ -103,9 +103,9 @@ result: [pending]
 ## Summary
 
 total: 20
-passed: 1
+passed: 2
 issues: 0
-pending: 19
+pending: 18
 skipped: 0
 
 ## Gaps
