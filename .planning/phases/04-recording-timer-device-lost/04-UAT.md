@@ -7,7 +7,7 @@ source:
   - 04-03-SUMMARY.md
   - 04-04-SUMMARY.md
 started: 2026-08-05T15:00:00.000Z
-updated: 2026-08-05T15:05:00.000Z
+updated: 2026-08-05T15:25:00.000Z
 ---
 
 ## Current Test
@@ -22,9 +22,7 @@ awaiting: user response
 
 ### 1. Cold Start Smoke Test
 expected: App boots; `_migrations` table contains row `0002_procedures`; no console errors at startup; `window.api.procedures.list` and `window.api.procedureNotes.list` are exposed.
-result: issue
-reported: "npm run dev fails at runtime: Error: Cannot find module '../db/procedures-repo' in out/main/index.js:2938 buildDefaultDeps → initRecorder → throws unhandled promise rejection. App does not boot."
-severity: blocker
+result: pass
 
 ### 2. Procedure Room: Record button enabled
 expected: With a session active and a capture device selected in Settings → Capture, the Procedure Room shows an enabled Record button (not greyed out).
@@ -105,8 +103,8 @@ result: [pending]
 ## Summary
 
 total: 20
-passed: 0
-issues: 1
+passed: 1
+issues: 0
 pending: 19
 skipped: 0
 
@@ -115,7 +113,9 @@ skipped: 0
 ```yaml
 - gap_id: G-04-1
   truth: "App boots from a cold start; out/main/index.js resolves '../db/procedures-repo' inside buildDefaultDeps; main window opens without unhandled promise rejection; procedures.get + procedureNotes.list IPC channels respond."
-  status: failed
+  status: resolved
+  resolved_by: 8d31e94
+  resolved_at: 2026-08-05
   reason: "User reported: npm run dev fails at runtime with `Error: Cannot find module '../db/procedures-repo'` originating from buildDefaultDeps in out/main/index.js:2938, called by initRecorder at line 3059. Electron main process throws unhandled promise rejection and the app does not boot."
   severity: blocker
   test: 1
