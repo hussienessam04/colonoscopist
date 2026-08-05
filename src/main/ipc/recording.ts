@@ -164,6 +164,29 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
       throw asIpcError(err);
     }
   });
+
+  // Pause/Resume — Plan 04-03 (D-11). Both take no input body. The registry
+  // owns the active procedureId so the renderer cannot pass a cross-patient
+  // id (T-04-12).
+  ipcMain.handle(IPC.RECORDING_PAUSE, async () => {
+    try {
+      requireSession();
+      const recorder = deps.buildRecorder();
+      await recorder.pause();
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.RECORDING_RESUME, async () => {
+    try {
+      requireSession();
+      const recorder = deps.buildRecorder();
+      await recorder.resume();
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
 }
 
 export const __test = {

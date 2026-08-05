@@ -57,6 +57,8 @@ const api: IpcContract = {
   recording: {
     start: (input) => ipcRenderer.invoke(IPC.RECORDING_START, input),
     stop: () => ipcRenderer.invoke(IPC.RECORDING_STOP),
+    pause: () => ipcRenderer.invoke(IPC.RECORDING_PAUSE),
+    resume: () => ipcRenderer.invoke(IPC.RECORDING_RESUME),
     onStatus(cb: (status: RecordingStatus) => void): () => void {
       // The renderer is a single-window app; a single global listener is fine
       // for now. Returns an unsubscribe closure.

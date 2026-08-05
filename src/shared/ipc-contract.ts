@@ -45,6 +45,10 @@ export const IPC = {
   // Recording (Plan 04-01)
   RECORDING_START: 'recording:start',
   RECORDING_STOP: 'recording:stop',
+  // Plan 04-03 — Pause/Resume handlers. `recording.onStatus` push event already
+  // carries the `paused` + `resumed` arms.
+  RECORDING_PAUSE: 'recording:pause',
+  RECORDING_RESUME: 'recording:resume',
   // Push event channel — value is the channel string the renderer subscribes to.
   RECORDING_STATUS: 'recording:status',
 } as const;
@@ -285,6 +289,8 @@ export interface IpcContract {
   recording: {
     start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
     stop: () => Promise<void>;
+    pause: () => Promise<void>;
+    resume: () => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
   };
 }
