@@ -21,6 +21,9 @@ import { recorderRegistry } from './registry';
 import { buildFfmpegArgs } from './ffmpeg-args';
 import { buildConcatArgs, writeConcatList } from './concat';
 import { DEVICE_LOST_RE, parseLastKnownTimestampMs, rewritePartial } from './device-lost';
+import { defaultFfmpegPath } from './ffmpeg-path';
+import { proceduresRepo } from '../db/procedures-repo';
+import { audit } from '../db/audit';
 import type { PresetSummary, QualityPreset, RecordingStatus } from '@shared/ipc-contract';
 
 export type ProceduresSubRepo = {
@@ -1024,8 +1027,6 @@ export function defaultProcFs(): ProcFs {
 }
 
 export function buildDefaultDeps(overrides: Partial<RecorderDeps> = {}): RecorderDeps {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const { proceduresRepo } = require('../db/procedures-repo') as typeof import('../db/procedures-repo');
   return {
     spawn: defaultSpawn(),
     spawnConcat: defaultConcatSpawn(),
@@ -1033,8 +1034,6 @@ export function buildDefaultDeps(overrides: Partial<RecorderDeps> = {}): Recorde
     procFs: defaultProcFs(),
     procedures: proceduresRepo as unknown as ProceduresSubRepo,
     audit: (opts) => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { audit } = require('../db/audit') as typeof import('../db/audit');
       audit({
         action: opts.action,
         entityType: opts.entityType ?? null,
@@ -1043,11 +1042,7 @@ export function buildDefaultDeps(overrides: Partial<RecorderDeps> = {}): Recorde
         outcome: opts.outcome ?? 'ok',
       });
     },
-    ffmpegPath: () => {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const { defaultFfmpegPath } = require('./ffmpeg-path') as typeof import('./ffmpeg-path');
-      return defaultFfmpegPath();
-    },
+    ffmpegPath: () => defaultFfmpegPath(),
     canonicalDevice: (deviceId) => canonicalizeOrThrow(deviceId),
     emit: () => {
       // Default emit is a no-op; main/index.ts wires the real push-event forwarder.

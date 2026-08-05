@@ -121,4 +121,7 @@ skipped: 0
   test: 1
   artifacts: []
   missing: []
+  root_cause: "Lazy `require('../db/procedures-repo')` (and two siblings) inside src/main/recorder/recorder.ts:buildDefaultDeps were preserved as runtime require calls in the bundled out/main/index.js. The relative paths are correct for the source layout but resolve incorrectly after bundling because the bundle is a single file at out/main/index.js — no out/main/db/ or out/main/recorder/ subdirs exist. No actual circular dep exists between recorder and the db modules; the lazy require was defensive code, not required."
+  debug_session: .planning/debug/cold-start-require-failure.md
+  fix: "Hoist proceduresRepo, audit, defaultFfmpegPath to top-level ES imports in src/main/recorder/recorder.ts; the bundler inlines them into the single output file, eliminating the runtime require."
 ```
