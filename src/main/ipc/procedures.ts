@@ -1,5 +1,5 @@
-// procedures:* IPC surface — create / get / list / finalize.
-// Per CAPT-04/05/06 + AUDIT-01 + Fix 6 + D-02 + BLOCKER 4.
+// procedures:* IPC surface — create / get / list / finalize + procedure-notes:*.
+// Per CAPT-04/05/06/08 + AUDIT-01 + Fix 6 + D-02/06/07 + BLOCKER 4.
 //
 // Every handler:
 //   1. re-validates input via zod (per Fix 5 + V5)
@@ -8,7 +8,7 @@
 
 import { ipcMain } from 'electron';
 import { z } from 'zod';
-import { IPC, type Procedure, type ProcedureStatus } from '@shared/ipc-contract';
+import { IPC, type Procedure, type ProcedureNote, type ProcedureStatus } from '@shared/ipc-contract';
 import { IpcErrorException, ipcError } from '@shared/errors';
 import { getDb } from '../db';
 import { proceduresRepo } from '../db/procedures-repo';
@@ -19,6 +19,8 @@ import {
   proceduresGetInput,
   proceduresListQueryInput,
   proceduresFinalizeInput,
+  procedureNoteCreateInput,
+  procedureNoteListInput,
 } from '@shared/validators';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
@@ -59,18 +61,9 @@ function asIpcError(err: unknown): Error {
 
 export type CreateProcedureInput = {
   patientId: string;
+  doctorId: string;
   presetSummary: import('@shared/ipc-contract').PresetSummary;
 };
-
-export function createProcedureStub(input: CreateProcedureInput, doctorId: string): Procedure {
-  // ponytail: a future plan will extend create() to accept presetSummary; for
-  // Plan 04-01, the IPC layer doesn't insert — recording.start does. This
-  // function is reserved for future plans and intentionally not exported
-  // through IpcContract.
-  void input;
-  void doctorId;
-  throw new Error('createProcedureStub is reserved; use recording.start to insert');
-}
 
 // IPC surface ───────────────────────────────────────────────────────────
 
@@ -84,9 +77,16 @@ export function registerProceduresIpc(opts: {
       const db = getDb();
       let created: Procedure = {} as Procedure;
       db.transaction(() => {
-        // presetSummary is a placeholder; recording.start rewrites the row
-        // with the canonical preset before ffmpeg spawns.
-        created = opts.createProcedure({ patientId, presetSummary: defaultPresetSummary() });
+        // presetSummary is a placeholder; recording.start does not rewrite
+        // this row — the row inserted here is the canonical procedure row
+        // for the entire session. The preset is updated via
+        // proceduresRepo.updateFinalized on stop, but for Plan 02 the
+        // initial preset is sufficient.
+        created = opts.createProcedure({
+          patientId,
+          doctorId,
+          presetSummary: defaultPresetSummary(),
+        });
         audit({
           action: 'procedure.create',
           entityType: 'procedure',
@@ -167,6 +167,63 @@ export function registerProceduresIpc(opts: {
       throw asIpcError(err);
     }
   });
+
+  // Procedure notes — append-only chronological log per D-06/D-07/D-09.
+  ipcMain.handle(IPC.PROCEDURE_NOTES_CREATE, (_e, raw) => {
+    try {
+      const { procedureId, body } = safeParse(procedureNoteCreateInput, raw);
+      const userId = requireSession();
+      const db = getDb();
+      let created: ProcedureNote = {} as ProcedureNote;
+      db.transaction(() => {
+        try {
+          created = proceduresRepo.insertNote({ procedureId, body });
+        } catch (err) {
+          if (
+            err instanceof Error &&
+            'code' in err &&
+            (err as { code: string }).code === 'SQLITE_CONSTRAINT_CHECK'
+          ) {
+            throw new IpcErrorException(
+              ipcError('IPC_VALIDATION', 'Note body must be 1..1000 characters', {
+                field: 'body',
+              }),
+            );
+          }
+          throw err;
+        }
+        // Per Fix 6 — audit metadata carries the LENGTH only, never the body content.
+        audit({
+          action: 'procedure.note_added',
+          entityType: 'procedure',
+          entityId: procedureId,
+          userId,
+          metadata: { bodyLength: body.length },
+        });
+      })();
+      return created;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.PROCEDURE_NOTES_LIST, (_e, raw) => {
+    try {
+      const { procedureId } = safeParse(procedureNoteListInput, raw);
+      const userId = requireSession();
+      const rows = proceduresRepo.listNotes(procedureId);
+      audit({
+        action: 'procedure.note_list',
+        entityType: 'procedure',
+        entityId: procedureId,
+        userId,
+        metadata: { procedureId, count: rows.length },
+      });
+      return rows;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
 }
 
 function defaultPresetSummary(): import('@shared/ipc-contract').PresetSummary {
@@ -182,4 +239,4 @@ export const __test = {
   defaultPresetSummary,
 };
 // Status union re-exported to keep zod's enum in sync with the IPC type.
-export type { ProcedureStatus };
+export type { ProcedureStatus, ProcedureNote };

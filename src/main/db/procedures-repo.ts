@@ -273,14 +273,19 @@ export const proceduresRepo = {
   },
 
   // Notes (Plan 02-of-phase-04 fills the IPC; the repo is final here).
-  insertNote(procedureId: string, body: string): ProcedureNote {
+  insertNote(input: { procedureId: string; body: string }): ProcedureNote {
     const now = Date.now();
     const info = stmts().insertNote.run({
-      procedure_id: procedureId,
-      body,
+      procedure_id: input.procedureId,
+      body: input.body,
       created_at: now,
     });
-    return { id: Number(info.lastInsertRowid), procedureId, body, createdAt: now };
+    return {
+      id: Number(info.lastInsertRowid),
+      procedureId: input.procedureId,
+      body: input.body,
+      createdAt: now,
+    };
   },
 
   listNotes(procedureId: string): ProcedureNote[] {

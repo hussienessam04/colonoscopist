@@ -9,6 +9,7 @@ import { registerProceduresIpc } from './ipc/procedures';
 import { registerRecordingIpc } from './ipc/recording';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
+import { proceduresRepo } from './db/procedures-repo';
 import { logStartup } from './startup-log';
 import { initRecorder, scanForOrphans } from './recorder/init';
 import { Recorder } from './recorder/recorder';
@@ -44,11 +45,14 @@ app.whenReady().then(() => {
   // We expose a thin wrapper that round-trips through recording.start IPC
   // surface so the renderer can prepare an empty procedure if needed.
   registerProceduresIpc({
-    createProcedure: () => {
-      throw new Error(
-        'procedures.create is reserved for future plans; recording.start inserts the active row',
-      );
-    },
+    createProcedure: ({ patientId, doctorId, presetSummary }) =>
+      proceduresRepo.insert({
+        patientId,
+        doctorId,
+        videoPath: '',
+        presetSummary,
+        audioDeviceName: null,
+      }),
   });
   registerRecordingIpc({
     buildRecorder: () => recorderModule.newRecorder(),

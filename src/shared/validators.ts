@@ -162,6 +162,10 @@ export const procedureNoteCreateInput = z.object({
   body: z.string().min(1).max(1000),
 });
 
+export const procedureNoteListInput = z.object({
+  procedureId: z.string().uuid(),
+});
+
 export const recordingStartInput = z.object({
   patientId: z.string().uuid(),
   deviceId: z.string().min(1).max(500),
@@ -173,6 +177,7 @@ export type ProceduresGetInput = z.infer<typeof proceduresGetInput>;
 export type ProceduresListQueryInput = z.infer<typeof proceduresListQueryInput>;
 export type ProceduresFinalizeInput = z.infer<typeof proceduresFinalizeInput>;
 export type ProcedureNoteCreateInput = z.infer<typeof procedureNoteCreateInput>;
+export type ProcedureNoteListInput = z.infer<typeof procedureNoteListInput>;
 export type RecordingStartInput = z.infer<typeof recordingStartInput>;
 
 export function assertNever(x: never): never {
