@@ -5,13 +5,21 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { useRoute } from '@/store/route';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { Procedure } from '@shared/ipc-contract';
+import type { Procedure, ProcedureStatus } from '@shared/ipc-contract';
 
 function formatTimestamp(ms: number | null): string {
   if (ms === null) return '—';
   return new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
+}
+
+function statusBadgeVariant(status: ProcedureStatus): 'default' | 'secondary' | 'destructive' {
+  if (status === 'completed') return 'default';
+  if (status === 'recording') return 'secondary';
+  // partial + crashed share the destructive variant per Plan 02.
+  return 'destructive';
 }
 
 export default function ProcedureReview({ procedureId: initialId }: { procedureId?: string } = {}): JSX.Element {
@@ -98,7 +106,9 @@ export default function ProcedureReview({ procedureId: initialId }: { procedureI
                       Partial — recording preserved up to last frame
                     </span>
                   ) : (
-                    <span className="capitalize">{procedure.status}</span>
+                    <Badge variant={statusBadgeVariant(procedure.status)} className="capitalize">
+                      {procedure.status}
+                    </Badge>
                   )}
                 </p>
                 <p className="text-xs text-muted-foreground">

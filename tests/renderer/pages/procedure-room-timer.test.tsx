@@ -30,6 +30,21 @@ beforeEach(() => {
   api.capture.noDeviceAudit.mockResolvedValue({ ok: true });
   api.recording.start.mockResolvedValue({ procedureId: 'proc-1', startedAt: Date.now() });
   api.recording.stop.mockResolvedValue(undefined);
+  // Plan 04-02 — ProcedureRoom creates the procedure row on mount.
+  api.procedures.create.mockResolvedValue({
+    id: '00000000-0000-4000-8000-000000000051',
+    patientId: 'pat-1',
+    doctorId: 'doc-1',
+    startedAt: Date.now(),
+    endedAt: null,
+    durationSeconds: 0,
+    status: 'recording',
+    videoPath: '',
+    presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+    audioDeviceName: null,
+    createdAt: Date.now(),
+  });
+  api.procedureNotes.list.mockResolvedValue([]);
   api.recording.onStatus.mockImplementation((cb: (status: RecordingStatus) => void) => {
     // ponytail: expose the cb so tests can push events through it directly.
     (window as unknown as { __pushRecordingStatus: typeof cb }).__pushRecordingStatus = cb;

@@ -92,17 +92,36 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
       let procedureId = '';
       let startedAt = 0;
       db.transaction(() => {
-        const inserted = proceduresRepo.insert({
-          patientId: parsed.patientId,
-          doctorId,
-          videoPath: '',
-          presetSummary,
-          audioDeviceName: null,
-        });
-        procedureId = inserted.id;
-        // ponytail: stamp started_at = 0 so the supervisor can rewrite on
-        // ffmpeg spawn success. updateStartedAt() in the supervisor will
-        // overwrite this value once the first 'frame=' line lands.
+        // Per Plan 02 — the renderer may have already created the procedure
+        // row via `procedures.create` so the notes panel has a stable id
+        // before Record is pressed (D-08). If so, reuse the existing row;
+        // otherwise create one on demand (legacy path).
+        if (parsed.procedureId) {
+          const existing = proceduresRepo.get(parsed.procedureId);
+          if (!existing) {
+            throw new IpcErrorException(
+              ipcError('IPC_NOT_FOUND', `Procedure ${parsed.procedureId} not found`),
+            );
+          }
+          if (existing.patientId !== parsed.patientId) {
+            throw new IpcErrorException(
+              ipcError('IPC_VALIDATION', 'Procedure does not belong to this patient'),
+            );
+          }
+          procedureId = existing.id;
+        } else {
+          const inserted = proceduresRepo.insert({
+            patientId: parsed.patientId,
+            doctorId,
+            videoPath: '',
+            presetSummary,
+            audioDeviceName: null,
+          });
+          procedureId = inserted.id;
+          // ponytail: stamp started_at = 0 so the supervisor can rewrite on
+          // ffmpeg spawn success. updateStartedAt() in the supervisor will
+          // overwrite this value once the first 'frame=' line lands.
+        }
       })();
       const recorder = deps.buildRecorder();
       const { startedAt: startedNow } = await recorder.start({

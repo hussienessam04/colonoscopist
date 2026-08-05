@@ -64,6 +64,22 @@ beforeEach(() => {
   api.recording.onStatus.mockImplementation(() => () => undefined);
   api.recording.start.mockResolvedValue({ procedureId: 'proc-1', startedAt: Date.now() });
   api.recording.stop.mockResolvedValue(undefined);
+  // Plan 04-02 — ProcedureRoom creates a procedure row on mount so the notes
+  // panel has a stable id. Surface a stable procedure id for tests.
+  api.procedures.create.mockResolvedValue({
+    id: '00000000-0000-4000-8000-000000000050',
+    patientId: 'pat-1',
+    doctorId: 'doc-1',
+    startedAt: Date.now(),
+    endedAt: null,
+    durationSeconds: 0,
+    status: 'recording',
+    videoPath: '',
+    presetSummary: { kind: 'hd', resolution: '1920x1080', framerate: 30, bitrate: '10M' },
+    audioDeviceName: null,
+    createdAt: Date.now(),
+  });
+  api.procedureNotes.list.mockResolvedValue([]);
   // happy-dom does not ship navigator.mediaDevices by default — install a
   // default mock so the hook's first useEffect never dereferences undefined.
   if (!('mediaDevices' in globalThis.navigator) || !globalThis.navigator.mediaDevices) {

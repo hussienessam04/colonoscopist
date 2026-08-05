@@ -283,7 +283,7 @@ export interface IpcContract {
   // Plan 04-01 ships start + stop + onStatus (push event). pause/resume land
   // in Plan 03; lost + scanForOrphans land in Plan 04.
   recording: {
-    start: (input: { patientId: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
+    start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
     stop: () => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
   };

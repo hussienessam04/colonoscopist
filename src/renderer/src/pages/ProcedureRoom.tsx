@@ -9,12 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { QualityPreset } from '@shared/ipc-contract';
+import type { Procedure, QualityPreset } from '@shared/ipc-contract';
 
 function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Element {
   useEffect(() => {
@@ -45,7 +46,9 @@ export default function ProcedureRoom(): JSX.Element {
   const [selectedBrowserId, setSelectedBrowserId] = useState<string | null>(null);
   const [preset, setPreset] = useState<QualityPreset>();
   const [defaultLoaded, setDefaultLoaded] = useState(false);
-  const initialized = useRef(false);
+  const [procedureId, setProcedureId] = useState<string | null>(null);
+  const procedureInitRef = useRef(false);
+  const deviceInitRef = useRef(false);
   const preview = useVideoPreview(selectedBrowserId, preset);
   const recordingState = useRecordingState();
   const [timerMs, setTimerMs] = useState(0);
@@ -102,9 +105,31 @@ export default function ProcedureRoom(): JSX.Element {
     };
   }, []);
 
+  // Per Plan 02 — create the procedure row once on mount so the notes panel
+  // has a stable id and the recording.start call can attach to it.
   useEffect(() => {
-    if (loading || !defaultLoaded || initialized.current) return;
-    initialized.current = true;
+    if (procedureInitRef.current) return;
+    if (!patientIdFromRoute) return;
+    procedureInitRef.current = true;
+    let cancelled = false;
+    void window.api.procedures
+      .create({ patientId: patientIdFromRoute })
+      .then((row: Procedure) => {
+        if (!cancelled) setProcedureId(row.id);
+      })
+      .catch(() => {
+        // ponytail: surface a non-fatal state by leaving procedureId null;
+        // the notes panel disables itself and Record is gated downstream.
+        if (!cancelled) procedureInitRef.current = false;
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [patientIdFromRoute]);
+
+  useEffect(() => {
+    if (loading || !defaultLoaded || deviceInitRef.current) return;
+    deviceInitRef.current = true;
     setSelectedBrowserId(savedDevice ? (pickBrowserId(savedDevice) ?? null) : null);
   }, [defaultLoaded, loading, pickBrowserId, savedDevice]);
 
@@ -153,7 +178,12 @@ export default function ProcedureRoom(): JSX.Element {
       void window.api.recording.stop().catch(() => undefined);
     } else {
       void window.api.recording
-        .start({ patientId: patientIdFromRoute, deviceId: selectedCanonical, preset })
+        .start({
+          patientId: patientIdFromRoute,
+          procedureId: procedureId ?? undefined,
+          deviceId: selectedCanonical,
+          preset,
+        })
         .catch(() => undefined);
     }
   }
@@ -245,7 +275,7 @@ export default function ProcedureRoom(): JSX.Element {
             {deviceError ? <p role="alert" className="text-sm text-destructive">{deviceError}</p> : null}
             {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error.message}</p> : null}
 
-            <div className="mt-auto flex flex-col gap-2">
+            <div className="flex flex-col gap-2">
               {isRunning ? (
                 <Button variant="outline" onClick={preview.stop}>
                   <CircleStop aria-hidden="true" />
@@ -272,6 +302,8 @@ export default function ProcedureRoom(): JSX.Element {
                 </Button>
               )}
             </div>
+
+            <ProcedureNotesPanel procedureId={procedureId} />
           </aside>
         </section>
       </div>

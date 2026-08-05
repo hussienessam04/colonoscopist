@@ -168,6 +168,7 @@ export const procedureNoteListInput = z.object({
 
 export const recordingStartInput = z.object({
   patientId: z.string().uuid(),
+  procedureId: z.string().uuid().optional(),
   deviceId: z.string().min(1).max(500),
   preset: qualityPresetSchema,
 });
