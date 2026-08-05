@@ -427,18 +427,31 @@ describe('Phase 3 scope guards — no recording primitives leak in', () => {
   }
 
   it('Phase 3 source contains no .mp4 output paths (recording is Phase 4)', () => {
+    // ponytail: Phase 4 ships recorder/ffmpeg-args.ts + procedures-repo.ts
+    // + paths.ts which legitimately reference the .mp4 output extension.
+    // Exempt Phase 4 sources; no other source may reference .mp4.
     for (const file of phase3SrcFiles) {
+      const rel = path.relative(ROOT, file);
+      if (rel.startsWith(path.join('src', 'main', 'recorder') + path.sep)) continue;
+      if (rel.startsWith(path.join('src', 'main', 'db', 'procedures-repo.ts'))) continue;
+      if (rel === path.join('src', 'main', 'paths.ts')) continue;
+      if (rel === path.join('src', 'main', 'ipc', 'recording.ts')) continue;
       const src = fs.readFileSync(file, 'utf8');
       // Match strings like '.mp4' or '.mp4"' or `'.mp4'` (the recording output extension).
-      expect(src, `${path.relative(ROOT, file)} references .mp4 output path`).not.toMatch(/['"`]\.mp4['"`]/);
+      expect(src, `${rel} references .mp4 output path`).not.toMatch(/['"`]\.mp4['"`]/);
     }
   });
 
   it('Phase 3 source contains no ffmpeg recording args (`-i video=`, `libx264`, `-crf`)', () => {
+    // ponytail: Phase 4 ships src/main/recorder/* which legitimately contains
+    // `libx264` and `-crf`. The Phase 3 scope guard exempts the recorder
+    // directory; no other Phase 3 source may leak a recording argument.
     for (const file of phase3SrcFiles) {
+      const rel = path.relative(ROOT, file);
+      if (rel.startsWith(path.join('src', 'main', 'recorder') + path.sep)) continue;
       const src = fs.readFileSync(file, 'utf8');
-      expect(src, `${path.relative(ROOT, file)} leaks a recording argument`).not.toMatch(/libx264/);
-      expect(src, `${path.relative(ROOT, file)} leaks a recording argument`).not.toMatch(/-crf\s+\d+/);
+      expect(src, `${rel} leaks a recording argument`).not.toMatch(/libx264/);
+      expect(src, `${rel} leaks a recording argument`).not.toMatch(/-crf\s+\d+/);
     }
   });
 

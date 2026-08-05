@@ -60,6 +60,10 @@ beforeEach(() => {
   api.capture.noDeviceAudit.mockResolvedValue({ ok: true });
   api.capture.setDefaultDevice.mockResolvedValue({ ok: true });
   api.capture.setPreset.mockResolvedValue({ ok: true });
+  // Plan 04-01 — ProcedureRoom subscribes to recording:status on mount.
+  api.recording.onStatus.mockImplementation(() => () => undefined);
+  api.recording.start.mockResolvedValue({ procedureId: 'proc-1', startedAt: Date.now() });
+  api.recording.stop.mockResolvedValue(undefined);
   // happy-dom does not ship navigator.mediaDevices by default — install a
   // default mock so the hook's first useEffect never dereferences undefined.
   if (!('mediaDevices' in globalThis.navigator) || !globalThis.navigator.mediaDevices) {

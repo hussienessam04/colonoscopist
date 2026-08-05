@@ -43,6 +43,21 @@ type MockApi = {
     setPreset: ReturnType<typeof vi.fn>;
     noDeviceAudit: ReturnType<typeof vi.fn>;
   };
+  procedures: {
+    create: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
+    finalize: ReturnType<typeof vi.fn>;
+  };
+  procedureNotes: {
+    create: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
+  };
+  recording: {
+    start: ReturnType<typeof vi.fn>;
+    stop: ReturnType<typeof vi.fn>;
+    onStatus: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -80,6 +95,21 @@ export function mockApi(): MockApi {
       getPreset: vi.fn(),
       setPreset: vi.fn(),
       noDeviceAudit: vi.fn(),
+    },
+    procedures: {
+      create: vi.fn(),
+      get: vi.fn(),
+      list: vi.fn(),
+      finalize: vi.fn(),
+    },
+    procedureNotes: {
+      create: vi.fn(),
+      list: vi.fn(),
+    },
+    recording: {
+      start: vi.fn(),
+      stop: vi.fn(),
+      onStatus: vi.fn(),
     },
   };
   (window as unknown as { api: MockApi }).api = api;

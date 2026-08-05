@@ -11,7 +11,8 @@ export type Route =
   | { name: 'settings-hub' }
   | { name: 'settings-users' }
   | { name: 'settings-capture' }
-  | { name: 'procedure-room'; patientId?: string };
+  | { name: 'procedure-room'; patientId?: string }
+  | { name: 'procedure-review'; procedureId: string };
 
 export const initialRoute: Route = { name: 'login' };
 

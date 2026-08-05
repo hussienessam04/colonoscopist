@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, CircleStop, Settings, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,8 @@ import {
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
+import { recordingStore, useRecordingState } from '@/store/recording';
+import { formatDurationHHMMSS } from '@/lib/format-duration';
 import type { QualityPreset } from '@shared/ipc-contract';
 
 function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Element {
@@ -34,7 +36,10 @@ function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Elem
 }
 
 export default function ProcedureRoom(): JSX.Element {
-  const { previous, navigate } = useRoute();
+  const routeState = useRoute();
+  const { previous, navigate } = routeState;
+  const route = routeState.current;
+  const patientIdFromRoute = route.name === 'procedure-room' ? route.patientId ?? '' : '';
   const { browser, loading, error: deviceError, lookup, pickBrowserId } = useCaptureDeviceMap();
   const [savedDevice, setSavedDevice] = useState<string | null>(null);
   const [selectedBrowserId, setSelectedBrowserId] = useState<string | null>(null);
@@ -42,6 +47,42 @@ export default function ProcedureRoom(): JSX.Element {
   const [defaultLoaded, setDefaultLoaded] = useState(false);
   const initialized = useRef(false);
   const preview = useVideoPreview(selectedBrowserId, preset);
+  const recordingState = useRecordingState();
+  const [timerMs, setTimerMs] = useState(0);
+
+  // Subscribe to recording:status once on mount (per D-02 + PITFALLS perf hint).
+  useEffect(() => {
+    const unsubscribe = window.api.recording.onStatus((status) => {
+      recordingStore.setStatus(status);
+    });
+    return () => {
+      unsubscribe();
+      recordingStore.reset();
+    };
+  }, []);
+
+  // Tick the timer once a second while recording.
+  useEffect(() => {
+    if (recordingState.status !== 'recording' && recordingState.status !== 'paused') {
+      setTimerMs(0);
+      return;
+    }
+    const tick = (): void => {
+      setTimerMs(recordingState.startedAt ? Date.now() - recordingState.startedAt : 0);
+    };
+    tick();
+    const handle = setInterval(tick, 1000);
+    return () => clearInterval(handle);
+  }, [recordingState.status, recordingState.startedAt]);
+
+  // Navigate to procedure-review on stopped (per D-05).
+  useEffect(() => {
+    if (recordingState.status === 'stopped' && recordingState.procedureId) {
+      const pid = recordingState.procedureId;
+      recordingStore.reset();
+      navigate({ name: 'procedure-review', procedureId: pid });
+    }
+  }, [recordingState.status, recordingState.procedureId, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,6 +137,26 @@ export default function ProcedureRoom(): JSX.Element {
   const ready = !loading && defaultLoaded;
   const hasSelection = selectedBrowserId !== null;
   const isRunning = preview.active || preview.starting;
+  const isRecording = recordingState.status === 'recording' || recordingState.status === 'paused';
+  const recordingBusy = recordingState.status === 'starting' || recordingState.status === 'stopping';
+
+  const timerLabel = useMemo(() => {
+    if (!recordingState.startedAt || (recordingState.status !== 'recording' && recordingState.status !== 'paused')) {
+      return '00:00:00';
+    }
+    return formatDurationHHMMSS(timerMs);
+  }, [recordingState.startedAt, recordingState.status, timerMs]);
+
+  function handleRecordToggle(): void {
+    if (!selectedCanonical || !preset) return;
+    if (isRecording) {
+      void window.api.recording.stop().catch(() => undefined);
+    } else {
+      void window.api.recording
+        .start({ patientId: patientIdFromRoute, deviceId: selectedCanonical, preset })
+        .catch(() => undefined);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-slate-100 p-6">
@@ -107,9 +168,11 @@ export default function ProcedureRoom(): JSX.Element {
             </p>
             <h1 className="text-3xl font-semibold tracking-tight">Procedure Room</h1>
           </div>
-          <Button variant="outline" onClick={finish}>
-            Finish
-          </Button>
+          {!isRecording ? (
+            <Button variant="outline" onClick={finish}>
+              Finish
+            </Button>
+          ) : null}
         </header>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
@@ -146,7 +209,7 @@ export default function ProcedureRoom(): JSX.Element {
                   preview.stop();
                   setSelectedBrowserId(value);
                 }}
-                disabled={loading || browser.length === 0}
+                disabled={loading || browser.length === 0 || isRecording}
               >
                 <SelectTrigger id="procedure-device" aria-label="Capture device">
                   <SelectValue placeholder="Select a device" />
@@ -166,6 +229,19 @@ export default function ProcedureRoom(): JSX.Element {
               </p>
             </div>
 
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Procedure duration
+              </p>
+              <p
+                aria-label="Procedure duration"
+                className="font-mono text-2xl tabular-nums text-foreground"
+                data-testid="procedure-duration"
+              >
+                {timerLabel}
+              </p>
+            </div>
+
             {deviceError ? <p role="alert" className="text-sm text-destructive">{deviceError}</p> : null}
             {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error.message}</p> : null}
 
@@ -181,9 +257,20 @@ export default function ProcedureRoom(): JSX.Element {
                   Start Preview
                 </Button>
               )}
-              <Button disabled title="Recording ships in Phase 4">
-                Record
-              </Button>
+              {isRecording ? (
+                <Button variant="destructive" onClick={handleRecordToggle} disabled={recordingBusy}>
+                  <CircleStop aria-hidden="true" />
+                  Stop
+                </Button>
+              ) : (
+                <Button
+                  onClick={handleRecordToggle}
+                  disabled={!hasSelection || !preset || recordingBusy}
+                >
+                  <CircleStop aria-hidden="true" />
+                  Record
+                </Button>
+              )}
             </div>
           </aside>
         </section>

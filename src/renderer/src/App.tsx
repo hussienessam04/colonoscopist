@@ -13,6 +13,7 @@ import SettingsUsers from './pages/SettingsUsers';
 import SettingsCapture from './pages/SettingsCapture';
 import SettingsHub from './pages/SettingsHub';
 import ProcedureRoom from './pages/ProcedureRoom';
+import ProcedureReview from './pages/ProcedureReview';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -77,6 +78,8 @@ export default function App(): JSX.Element {
       return <SettingsCapture />;
     case 'procedure-room':
       return <ProcedureRoom />;
+    case 'procedure-review':
+      return <ProcedureReview procedureId={route.procedureId} />;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit
