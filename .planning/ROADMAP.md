@@ -96,15 +96,15 @@ Plans:
 
 **Pitfalls addressed:** Pitfall 1 (corrupt mp4 at end of long procedure), Pitfall 2 (device-lost mid-recording), Pitfall 10 (Windows path quoting).
 **Notes:** This is the highest-leverage phase for risk concentration. The supervisor state machine lives in `src/main/recorder/` and is exercised at minimum with a 60-second recording + unplug-mock test.
-**Plans:** 4 plans
+**Plans:** 4/4 plans complete
 **Tracer-first decomposition:** Plan 01 ships the production-quality end-to-end recording slice (migration + injected Recorder + IPC + Record button + HH:MM:SS timer + `'procedure-review'` placeholder) covering CAPT-04..CAPT-07 + D-01/D-02/D-05/D-10/D-12; Plan 02 layers the mid-procedure notes feature covering CAPT-08 + D-06/D-07/D-08/D-09; Plan 03 layers Pause/Resume via segment-and-concat covering D-11; Plan 04 layers device-lost detection + crash-recovery covering CAPT-09 + D-03/D-04. Wave 1=Plan 01; Wave 2=Plan 02 (depends on 01); Wave 3=Plan 03 (depends on 01); Wave 4=Plan 04 (depends on 01).
 
 Plans:
 
-- [ ] 04-01-PLAN.md — Tracer + migration 0002_procedures.sql + injected `Recorder` supervisor + procedures/recording IPC (start/stop) + asarUnpack wiring + Record button + HH:MM:SS timer + post-finalize navigation to `'procedure-review'` placeholder (Wave 1)
-- [ ] 04-02-PLAN.md — Mid-procedure notes: `procedure_notes` IPC handlers + shadcn Textarea/ScrollArea/Badge/Alert additions + `<ProcedureNotesPanel>` mounted in ProcedureRoom side-rail (Wave 2, depends_on: 01)
-- [ ] 04-03-PLAN.md — Pause/Resume via segment files + finalize `ffmpeg -f concat -c copy` with re-encode fallback + renderer Pause/Resume button + `'Pause #N'` chip (Wave 3, depends_on: 01)
-- [ ] 04-04-PLAN.md — Device-lost detection (`DEVICE_LOST_RE` regex + `.partial.mp4` rename + sidecar JSON) + inline `<DeviceLostBanner>` + `scanForOrphans` launch-time audit walker + `ProcedureReview` Alert upgrade (Wave 4, depends_on: 01)
+- [x] 04-01-PLAN.md — Tracer + migration 0002_procedures.sql + injected `Recorder` supervisor + procedures/recording IPC (start/stop) + asarUnpack wiring + Record button + HH:MM:SS timer + post-finalize navigation to `'procedure-review'` placeholder (Wave 1)
+- [x] 04-02-PLAN.md — Mid-procedure notes: `procedure_notes` IPC handlers + shadcn Textarea/ScrollArea/Badge/Alert additions + `<ProcedureNotesPanel>` mounted in ProcedureRoom side-rail (Wave 2, depends_on: 01)
+- [x] 04-03-PLAN.md — Pause/Resume via segment files + finalize `ffmpeg -f concat -c copy` with re-encode fallback + renderer Pause/Resume button + `'Pause #N'` chip (Wave 3, depends_on: 01)
+- [x] 04-04-PLAN.md — Device-lost detection (`DEVICE_LOST_RE` regex + `.partial.mp4` rename + sidecar JSON) + inline `<DeviceLostBanner>` + `scanForOrphans` launch-time audit walker + `ProcedureReview` Alert upgrade (Wave 4, depends_on: 01)
 
 ---
 
