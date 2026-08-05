@@ -7,7 +7,7 @@ source:
   - 04-03-SUMMARY.md
   - 04-04-SUMMARY.md
 started: 2026-08-05T15:00:00.000Z
-updated: 2026-08-05T15:26:00.000Z
+updated: 2026-08-05T15:30:00.000Z
 ---
 
 ## Current Test
@@ -30,7 +30,9 @@ result: pass
 
 ### 3. Clicking Record spawns ffmpeg
 expected: Click Record. ffmpeg-static child process spawns, the procedure row is created with `status='recording'`, a `recording.start` audit row is written. Live preview continues in the corner.
-result: [pending]
+result: issue
+reported: "Clicking Record immediately finalizes as Partial recording with duration 00:00:00. ProcedureReview shows destructive Alert 'Recording stopped because the capture device disconnected. The mp4 was preserved up to 00:00:00.' Procedure started 12:25:41, ended 12:25:41. The DEVICE_LOST_RE is firing on a healthy device — recording flow is broken."
+severity: blocker
 
 ### 4. HH:MM:SS timer ticks
 expected: Timer in the Procedure Room starts at `00:00:00` on Record click, ticks up once per second, format is `HH:MM:SS`.
@@ -104,8 +106,8 @@ result: [pending]
 
 total: 20
 passed: 2
-issues: 0
-pending: 18
+issues: 1
+pending: 17
 skipped: 0
 
 ## Gaps
@@ -124,4 +126,12 @@ skipped: 0
   root_cause: "Lazy `require('../db/procedures-repo')` (and two siblings) inside src/main/recorder/recorder.ts:buildDefaultDeps were preserved as runtime require calls in the bundled out/main/index.js. The relative paths are correct for the source layout but resolve incorrectly after bundling because the bundle is a single file at out/main/index.js — no out/main/db/ or out/main/recorder/ subdirs exist. No actual circular dep exists between recorder and the db modules; the lazy require was defensive code, not required."
   debug_session: .planning/debug/cold-start-require-failure.md
   fix: "Hoist proceduresRepo, audit, defaultFfmpegPath to top-level ES imports in src/main/recorder/recorder.ts; the bundler inlines them into the single output file, eliminating the runtime require."
+- gap_id: G-04-2
+  truth: "Clicking Record in the Procedure Room spawns ffmpeg-static, creates a procedure row with status='recording', and the recording continues until the user clicks Stop. Live preview continues. Procedure does NOT immediately finalize as 'partial' with 00:00:00 duration unless the device is genuinely disconnected."
+  status: failed
+  reason: "User reported: clicking Record immediately navigates to ProcedureReview showing 'Partial recording' destructive Alert with 'Recording stopped because the capture device disconnected. The mp4 was preserved up to 00:00:00.' Started and ended timestamps are the same minute (12:25:41). The DEVICE_LOST_RE detection is firing on a healthy device, OR ffmpeg-static is failing to start and the supervisor is misclassifying the failure as device-lost."
+  severity: blocker
+  test: 3
+  artifacts: []
+  missing: []
 ```
