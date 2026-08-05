@@ -56,6 +56,8 @@ type MockApi = {
   recording: {
     start: ReturnType<typeof vi.fn>;
     stop: ReturnType<typeof vi.fn>;
+    pause: ReturnType<typeof vi.fn>;
+    resume: ReturnType<typeof vi.fn>;
     onStatus: ReturnType<typeof vi.fn>;
   };
 };
@@ -109,6 +111,8 @@ export function mockApi(): MockApi {
     recording: {
       start: vi.fn(),
       stop: vi.fn(),
+      pause: vi.fn(),
+      resume: vi.fn(),
       onStatus: vi.fn(),
     },
   };

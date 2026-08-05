@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Camera, CircleStop, Settings, Video } from 'lucide-react';
+import { Camera, CircleStop, Pause, Play, Settings, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -13,7 +13,7 @@ import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
-import { recordingStore, useRecordingState } from '@/store/recording';
+import { recordingStore, useRecordingState, useTimerSnapshot } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import type { Procedure, QualityPreset } from '@shared/ipc-contract';
 
@@ -51,6 +51,9 @@ export default function ProcedureRoom(): JSX.Element {
   const deviceInitRef = useRef(false);
   const preview = useVideoPreview(selectedBrowserId, preset);
   const recordingState = useRecordingState();
+  // ponytail: timer display is owned by the store via useTimerSnapshot() so
+  // the pause anchor freezes the visible HH:MM:SS (D-11).
+  const timer = useTimerSnapshot();
   const [timerMs, setTimerMs] = useState(0);
 
   // Subscribe to recording:status once on mount (per D-02 + PITFALLS perf hint).
@@ -64,19 +67,27 @@ export default function ProcedureRoom(): JSX.Element {
     };
   }, []);
 
-  // Tick the timer once a second while recording.
+  // ponytail: keep a local `timerMs` tick driver so non-paused displays
+  // continue to count every second. When paused, the snapshot freezes and
+  // the local timer also freezes (the useTimerSnapshot selector returns
+  // isFrozen=true; we skip the setState on frozen frames).
   useEffect(() => {
-    if (recordingState.status !== 'recording' && recordingState.status !== 'paused') {
-      setTimerMs(0);
+    if (timer.isFrozen) {
+      setTimerMs(timer.displayMs);
       return;
     }
-    const tick = (): void => {
-      setTimerMs(recordingState.startedAt ? Date.now() - recordingState.startedAt : 0);
-    };
-    tick();
-    const handle = setInterval(tick, 1000);
+    setTimerMs(timer.displayMs);
+    const handle = setInterval(() => {
+      const snap = recordingStore.__getState();
+      if (snap.pausedAt !== null) return;
+      if (snap.startedAt === null) {
+        setTimerMs(0);
+        return;
+      }
+      setTimerMs(Date.now() - snap.startedAt);
+    }, 1000);
     return () => clearInterval(handle);
-  }, [recordingState.status, recordingState.startedAt]);
+  }, [timer.isFrozen, timer.displayMs]);
 
   // Navigate to procedure-review on stopped (per D-05).
   useEffect(() => {
@@ -188,6 +199,16 @@ export default function ProcedureRoom(): JSX.Element {
     }
   }
 
+  // Pause/Resume click handler. The button itself is disabled outside the
+  // allowed states (see render); this only runs when enabled.
+  function handlePauseResumeToggle(): void {
+    if (recordingState.status === 'recording') {
+      void window.api.recording.pause().catch(() => undefined);
+    } else if (recordingState.status === 'paused') {
+      void window.api.recording.resume().catch(() => undefined);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-slate-100 p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
@@ -270,6 +291,14 @@ export default function ProcedureRoom(): JSX.Element {
               >
                 {timerLabel}
               </p>
+              {recordingState.currentSegmentIndex > 0 && recordingState.status !== 'idle' && recordingState.status !== 'stopped' && recordingState.status !== null ? (
+                <p
+                  className="text-xs text-muted-foreground"
+                  data-testid="pause-count"
+                >
+                  Pause #{recordingState.currentSegmentIndex}
+                </p>
+              ) : null}
             </div>
 
             {deviceError ? <p role="alert" className="text-sm text-destructive">{deviceError}</p> : null}
@@ -299,6 +328,32 @@ export default function ProcedureRoom(): JSX.Element {
                 >
                   <CircleStop aria-hidden="true" />
                   Record
+                </Button>
+              )}
+              {recordingState.status === 'recording' ? (
+                <Button
+                  variant="outline"
+                  onClick={handlePauseResumeToggle}
+                  disabled={recordingBusy}
+                  data-testid="pause-button"
+                >
+                  <Pause aria-hidden="true" />
+                  Pause
+                </Button>
+              ) : recordingState.status === 'paused' ? (
+                <Button
+                  variant="outline"
+                  onClick={handlePauseResumeToggle}
+                  disabled={recordingBusy}
+                  data-testid="resume-button"
+                >
+                  <Play aria-hidden="true" />
+                  Resume
+                </Button>
+              ) : (
+                <Button variant="outline" disabled aria-label="Pause or resume">
+                  <Pause aria-hidden="true" />
+                  Pause
                 </Button>
               )}
             </div>

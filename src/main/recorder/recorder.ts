@@ -466,9 +466,12 @@ export class Recorder {
         },
       });
       this.state = 'paused';
+      // ponytail: emit `startedAt` = wall-clock time at pause so the
+      // renderer-side `Date.now() - startedAt` derivation freezes when
+      // pausedAt is set (the renderer replaces Date.now() with pausedAt).
       this.deps.emit({
         status: 'paused',
-        startedAt,
+        startedAt: endedAt,
         currentSegmentIndex: this.currentSegmentIndex,
       });
       this.resolvePendingStop();

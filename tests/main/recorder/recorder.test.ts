@@ -446,9 +446,12 @@ describe('Recorder supervisor', () => {
         metadata: expect.objectContaining({ segmentIndex: 0 }),
       }),
     );
+    // ponytail: paused event carries the wall-clock time at pause so the
+    // renderer-side `pausedAt - originalStartedAt` derivation shows the
+    // elapsed time at the pause moment.
     expect(emits).toContainEqual({
       status: 'paused',
-      startedAt: 4_000,
+      startedAt: 5_000,
       currentSegmentIndex: 0,
     });
     // ponytail: registry still holds the recorder — pause does NOT release it.
