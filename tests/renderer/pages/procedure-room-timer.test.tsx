@@ -292,5 +292,169 @@ describe('formatDurationHHMMSS', () => {
   });
 });
 
+// Plan 04 — DeviceLostBanner surfaces the device-lost signal from the
+// supervisor (D-03). Inline Alert below the notes panel; Stop button stays
+// enabled in 'lost' state so the doctor can finalize as partial.
+describe('ProcedureRoom DeviceLostBanner', () => {
+  it('renders the banner with formatted duration after a `lost` recording:status push', async () => {
+    setRoute({ name: 'procedure-room' });
+    render(<ProcedureRoom />);
+
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe(
+        'function',
+      ),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'lost',
+        startedAt: Date.now() - 5_000,
+        lastKnownTimestampMs: 5_000,
+        deviceName: 'USB Video Device',
+      });
+    });
+
+    const banner = await screen.findByTestId('device-lost-banner');
+    expect(banner).toHaveTextContent(/Capture device disconnected/);
+    expect(banner).toHaveTextContent('00:00:05');
+    expect(banner).toHaveTextContent(/USB Video Device/);
+  });
+
+  it('does NOT render the banner when lastLost is null (idle)', async () => {
+    setRoute({ name: 'procedure-room' });
+    render(<ProcedureRoom />);
+    await screen.findByText(/procedure room/i);
+    expect(screen.queryByTestId('device-lost-banner')).not.toBeInTheDocument();
+  });
+
+  it('Dismiss button clears lastLost (banner disappears from DOM after click)', async () => {
+    setRoute({ name: 'procedure-room' });
+
+    render(<ProcedureRoom />);
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe(
+        'function',
+      ),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'lost',
+        startedAt: Date.now() - 5_000,
+        lastKnownTimestampMs: 5_000,
+        deviceName: 'USB Video Device',
+      });
+    });
+
+    const dismiss = await screen.findByTestId('device-lost-dismiss');
+    fireEvent.click(dismiss);
+    await waitFor(() =>
+      expect(screen.queryByTestId('device-lost-banner')).not.toBeInTheDocument(),
+    );
+  });
+
+  it('Stop button stays enabled in `lost` state so the doctor can finalize as partial', async () => {
+    setRoute({ name: 'procedure-room' });
+    render(<ProcedureRoom />);
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe(
+        'function',
+      ),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'started',
+        startedAt: Date.now(),
+        currentSegmentIndex: 0,
+      });
+    });
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'lost',
+        startedAt: Date.now() - 5_000,
+        lastKnownTimestampMs: 5_000,
+        deviceName: 'USB Video Device',
+      });
+    });
+    const stopBtn = await screen.findByRole('button', { name: /^stop$/i }) as HTMLButtonElement;
+    expect(stopBtn.disabled).toBe(false);
+  });
+
+  it('banner renders BELOW the notes panel in the side-rail (DOM order check)', async () => {
+    setRoute({ name: 'procedure-room' });
+    render(<ProcedureRoom />);
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe(
+        'function',
+      ),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'lost',
+        startedAt: Date.now() - 5_000,
+        lastKnownTimestampMs: 5_000,
+        deviceName: 'USB Video Device',
+      });
+    });
+    const notesPanel = await screen.findByLabelText(/procedure note input/i);
+    const banner = await screen.findByTestId('device-lost-banner');
+    // ponytail: compare via compareDocumentPosition — the banner should
+    // FOLLOW the notes panel in document order.
+    const pos = notesPanel.compareDocumentPosition(banner);
+    expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+});
+
+// Plan 04 — ProcedureReview Alert for partial status (D-03 wrap-up).
+describe('ProcedureReview partial-status Alert', () => {
+  it('renders the Alert when status=partial', async () => {
+    setRoute({ name: 'procedure-review', procedureId: 'proc-partial' });
+    const api = getApi();
+    api.procedures.get.mockResolvedValue({
+      id: 'proc-partial',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      startedAt: Date.now() - 10_000,
+      endedAt: Date.now(),
+      durationSeconds: 5,
+      status: 'partial',
+      videoPath: 'data/media/patients/pat-1/proc-partial/video-seg0.mp4.partial.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+      createdAt: Date.now(),
+    });
+    const { default: ProcedureReview } = await import('@/pages/ProcedureReview');
+    render(<ProcedureReview />);
+    const alert = await screen.findByTestId('procedure-review-partial-alert');
+    expect(alert).toHaveTextContent(/Partial recording/);
+    expect(alert).toHaveTextContent(/Recording stopped because the capture device disconnected/i);
+    // ponytail: lastLost is cleared on 'stopped' (per Plan 04 store contract),
+    // so the formatted duration shows the static fallback "00:00:00". The
+    // mp4 is still recoverable from the procedure row's video_path.
+    expect(alert).toHaveTextContent('00:00:00');
+  });
+
+  it('does NOT render the Alert when status=completed', async () => {
+    setRoute({ name: 'procedure-review', procedureId: 'proc-completed' });
+    const api = getApi();
+    api.procedures.get.mockResolvedValue({
+      id: 'proc-completed',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      startedAt: Date.now() - 10_000,
+      endedAt: Date.now(),
+      durationSeconds: 10,
+      status: 'completed',
+      videoPath: 'data/media/patients/pat-1/proc-completed/video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+      createdAt: Date.now(),
+    });
+    const { default: ProcedureReview } = await import('@/pages/ProcedureReview');
+    render(<ProcedureReview />);
+    await waitFor(() => expect(api.procedures.get).toHaveBeenCalled());
+    expect(screen.queryByTestId('procedure-review-partial-alert')).not.toBeInTheDocument();
+  });
+});
+
 // Used by the navigate-after-stop test.
 void session;

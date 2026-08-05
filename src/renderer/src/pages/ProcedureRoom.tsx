@@ -10,10 +10,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
+import DeviceLostBanner from '@/components/device-lost-banner';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
-import { recordingStore, useRecordingState, useTimerSnapshot } from '@/store/recording';
+import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import type { Procedure, QualityPreset } from '@shared/ipc-contract';
 
@@ -54,6 +55,9 @@ export default function ProcedureRoom(): JSX.Element {
   // ponytail: timer display is owned by the store via useTimerSnapshot() so
   // the pause anchor freezes the visible HH:MM:SS (D-11).
   const timer = useTimerSnapshot();
+  // Plan 04 — DeviceLostBanner data. Per-slice selector so only the banner
+  // re-renders when lastLost changes.
+  const lastLost = useLastLost();
   const [timerMs, setTimerMs] = useState(0);
 
   // Subscribe to recording:status once on mount (per D-02 + PITFALLS perf hint).
@@ -173,7 +177,13 @@ export default function ProcedureRoom(): JSX.Element {
   const ready = !loading && defaultLoaded;
   const hasSelection = selectedBrowserId !== null;
   const isRunning = preview.active || preview.starting;
-  const isRecording = recordingState.status === 'recording' || recordingState.status === 'paused';
+  // Plan 04 — keep Stop button enabled in 'lost' state so the doctor can
+  // finalize the partial mp4 (D-03). 'lost' is the device-disconnected state;
+  // finalize-as-partial is wired in the supervisor.
+  const isRecording =
+    recordingState.status === 'recording' ||
+    recordingState.status === 'paused' ||
+    recordingState.status === 'lost';
   const recordingBusy = recordingState.status === 'starting' || recordingState.status === 'stopping';
 
   const timerLabel = useMemo(() => {
@@ -359,6 +369,16 @@ export default function ProcedureRoom(): JSX.Element {
             </div>
 
             <ProcedureNotesPanel procedureId={procedureId} />
+
+            {/* Plan 04 — DeviceLostBanner mounts INLINE below the notes panel.
+                No modal, no overlay (per UX-Pitfalls: modal interruption during a
+                procedure is forbidden). The banner is purely informational; the
+                Stop button above stays enabled so the doctor can finalize as
+                partial. */}
+            <DeviceLostBanner
+              lastLost={lastLost}
+              onDismiss={() => recordingStore.clearLastLost()}
+            />
           </aside>
         </section>
       </div>

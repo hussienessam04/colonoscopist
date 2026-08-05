@@ -1,12 +1,16 @@
 // ProcedureReview — Phase 4 placeholder page (per D-05).
 // Phase 5 replaces this with the full review + trim UI.
+// Plan 04 wraps the partial status in a full shadcn Alert with the recovery
+// hint + formatted duration (per D-03).
 
 import { useEffect, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useRoute } from '@/store/route';
+import { useLastLost } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import type { Procedure, ProcedureStatus } from '@shared/ipc-contract';
 
@@ -29,6 +33,11 @@ export default function ProcedureReview({ procedureId: initialId }: { procedureI
   const procedureId = initialId ?? routeProcedureId ?? null;
   const [procedure, setProcedure] = useState<Procedure | null>(null);
   const [loading, setLoading] = useState(true);
+  // Plan 04 — read the lastLost slot from the recording store. If the
+  // partial-finalize happened in the same session, this carries the formatted
+  // duration; on a fresh session (or after reset), it's null and we fall back
+  // to "See Audit log for last-known timestamp".
+  const lastLost = useLastLost();
 
   useEffect(() => {
     if (!procedureId) return;
@@ -99,18 +108,32 @@ export default function ProcedureReview({ procedureId: initialId }: { procedureI
                   <span className="font-medium">Preset:</span> {procedure.presetSummary.kind} ·{' '}
                   {procedure.presetSummary.resolution} · {procedure.presetSummary.framerate}fps
                 </p>
-                <p>
-                  <span className="font-medium">Status:</span>{' '}
+                <div>
+                  <p>
+                    <span className="font-medium">Status:</span>{' '}
+                    {procedure.status === 'partial' ? null : (
+                      <Badge variant={statusBadgeVariant(procedure.status)} className="capitalize">
+                        {procedure.status}
+                      </Badge>
+                    )}
+                  </p>
                   {procedure.status === 'partial' ? (
-                    <span className="text-sm text-destructive">
-                      Partial — recording preserved up to last frame
-                    </span>
-                  ) : (
-                    <Badge variant={statusBadgeVariant(procedure.status)} className="capitalize">
-                      {procedure.status}
-                    </Badge>
-                  )}
-                </p>
+                    <Alert
+                      variant="destructive"
+                      data-testid="procedure-review-partial-alert"
+                      className="mt-2"
+                    >
+                      <AlertTitle>Partial recording</AlertTitle>
+                      <AlertDescription>
+                        Recording stopped because the capture device disconnected. The mp4 was preserved up to{' '}
+                        <span className="font-mono">
+                          {formatDurationHHMMSS(lastLost?.lastKnownTimestampMs ?? 0)}
+                        </span>
+                        .
+                      </AlertDescription>
+                    </Alert>
+                  ) : null}
+                </div>
                 <p className="text-xs text-muted-foreground">
                   Path: <code>{procedure.videoPath}</code>
                 </p>

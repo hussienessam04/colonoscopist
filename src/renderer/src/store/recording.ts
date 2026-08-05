@@ -1,12 +1,18 @@
 // Recording store — single hook for the renderer.
 // Per Plan 04-01 + CAPT-07 + PITFALLS `Per-page React re-render on every status update`.
 // Plan 04-03 fills paused/resumed arms + pausedAt anchor that freezes the timer;
-// Plan 04 fills lost arm.
+// Plan 04 fills lost arm + lastLost slot for the DeviceLostBanner.
 
 import { useSyncExternalStore } from 'react';
 import type { RecordingStatus } from '@shared/ipc-contract';
 
 export type RecordingStatusKind = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping' | 'stopped' | 'lost';
+
+export type LastLost = {
+  lastKnownTimestampMs: number;
+  deviceName: string;
+  lostAt: number;
+};
 
 type RecordingState = {
   status: RecordingStatusKind | null;
@@ -19,6 +25,10 @@ type RecordingState = {
   // Most recent `stopped` carries the procedureId; preserved for the
   // navigate-after-stop effect in ProcedureRoom.
   procedureId: string | null;
+  // Plan 04 — DeviceLostBanner data. Populated on 'lost' event; cleared on
+  // 'stopped' or reset(). Survives navigation within the same Procedure Room
+  // session so the banner stays visible while the doctor decides to Stop.
+  lastLost: LastLost | null;
 };
 
 let state: RecordingState = {
@@ -28,6 +38,7 @@ let state: RecordingState = {
   currentSegmentIndex: 0,
   lastError: null,
   procedureId: null,
+  lastLost: null,
 };
 
 const listeners = new Set<() => void>();
@@ -47,7 +58,15 @@ function getSnapshot(): RecordingState {
 
 function setStatus(status: RecordingStatus | null): void {
   if (status === null) {
-    state = { ...state, status: null, startedAt: null, pausedAt: null, currentSegmentIndex: 0, procedureId: null };
+    state = {
+      ...state,
+      status: null,
+      startedAt: null,
+      pausedAt: null,
+      currentSegmentIndex: 0,
+      procedureId: null,
+      lastLost: null,
+    };
     emit();
     return;
   }
@@ -60,6 +79,7 @@ function setStatus(status: RecordingStatus | null): void {
         pausedAt: null,
         currentSegmentIndex: status.currentSegmentIndex,
         procedureId: null,
+        lastLost: null,
       };
       break;
     case 'paused':
@@ -75,6 +95,7 @@ function setStatus(status: RecordingStatus | null): void {
         pausedAt: status.startedAt, // wall-clock at pause
         currentSegmentIndex: status.currentSegmentIndex,
         procedureId: null,
+        lastLost: null,
       };
       break;
     case 'resumed':
@@ -85,6 +106,7 @@ function setStatus(status: RecordingStatus | null): void {
         pausedAt: null,
         currentSegmentIndex: status.currentSegmentIndex,
         procedureId: null,
+        lastLost: null,
       };
       break;
     case 'stopped':
@@ -93,10 +115,24 @@ function setStatus(status: RecordingStatus | null): void {
         status: 'stopped',
         startedAt: status.startedAt,
         procedureId: status.procedureId,
+        lastLost: null,
       };
       break;
     case 'lost':
-      state = { ...state, status: 'lost', startedAt: status.startedAt };
+      // ponytail: persist deviceName + lastKnownTimestampMs so the banner
+      // can render the formatted duration + device name. Reset on the
+      // subsequent 'stopped' or reset() so a fresh ProcedureRoom entry
+      // doesn't carry stale state.
+      state = {
+        ...state,
+        status: 'lost',
+        startedAt: status.startedAt,
+        lastLost: {
+          lastKnownTimestampMs: status.lastKnownTimestampMs,
+          deviceName: status.deviceName,
+          lostAt: Date.now(),
+        },
+      };
       break;
   }
   emit();
@@ -110,13 +146,25 @@ function reset(): void {
     currentSegmentIndex: 0,
     lastError: null,
     procedureId: null,
+    lastLost: null,
   };
+  emit();
+}
+
+// ponytail: explicit clear for the banner dismiss action (D-03 + Plan 04).
+// Dismissing the banner does NOT cancel the partial mp4 — the renderer still
+// lets the doctor Stop and finalize; the banner is just visual confirmation
+// that the device is gone.
+function clearLastLost(): void {
+  if (state.lastLost === null) return;
+  state = { ...state, lastLost: null };
   emit();
 }
 
 export const recordingStore = {
   setStatus,
   reset,
+  clearLastLost,
   // test hook
   __getState(): RecordingState {
     return state;
@@ -125,6 +173,21 @@ export const recordingStore = {
 
 export function useRecordingState(): RecordingState {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+// ponytail: per-slice selector via useSyncExternalStore so only the banner
+// re-renders when lastLost changes (PITFALLS `Per-page React re-render on
+// every status update`). Returns a stable reference until lastLost flips.
+let cachedLastLostRef: LastLost | null | undefined = undefined;
+function getLastLostSnapshot(): LastLost | null {
+  if (cachedLastLostRef === state.lastLost) {
+    return cachedLastLostRef === undefined ? null : (cachedLastLostRef as LastLost | null);
+  }
+  cachedLastLostRef = state.lastLost;
+  return state.lastLost;
+}
+export function useLastLost(): LastLost | null {
+  return useSyncExternalStore(subscribe, getLastLostSnapshot, getLastLostSnapshot);
 }
 
 export type TimerSnapshot = {
