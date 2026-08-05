@@ -13,7 +13,7 @@ describe('buildFfmpegArgs', () => {
     expect(args).toEqual([
       '-f', 'dshow',
       '-rtbufsize', '100M',
-      '-i', 'video=USB Cam,',
+      '-i', 'video=USB Cam',
       '-c:v', 'libx264',
       '-preset', 'veryfast',
       '-crf', '23',
@@ -49,13 +49,13 @@ describe('buildFfmpegArgs', () => {
     expect(args[args.indexOf('-b:v') + 1]).toBe('5M');
   });
 
-  it('preserves spaces and trailing comma on the device name (dshow audio-off form)', () => {
+  it('preserves spaces in the device name (dshow video-only form)', () => {
     const args = buildFfmpegArgs({
       deviceName: ' USB  Cam ',
       preset: { preset: 'sd' },
       outputPath: 'C:\\Users\\demo\\video.mp4',
     });
-    expect(args[args.indexOf('-i') + 1]).toBe('video= USB  Cam ,');
+    expect(args[args.indexOf('-i') + 1]).toBe('video= USB  Cam ');
   });
 
   it('throws EmptyFfmpegArgsError for empty device name', () => {

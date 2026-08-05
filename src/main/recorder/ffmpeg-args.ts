@@ -35,7 +35,7 @@ export function buildFfmpegArgs(opts: FfmpegArgsOptions): string[] {
   return [
     '-f', 'dshow',
     '-rtbufsize', '100M',
-    '-i', `video=${deviceName},`, // trailing comma — dshow expects no audio device
+    '-i', `video=${deviceName}`,
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '23',
