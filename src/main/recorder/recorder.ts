@@ -66,7 +66,7 @@ export type AuditFn = (opts: {
 export type SpawnFn = (
   command: string,
   args: readonly string[],
-  options: { windowsVerbatimArguments: boolean; stdio: ['pipe', 'ignore', 'pipe'] },
+  options: { stdio: ['pipe', 'ignore', 'pipe'] },
 ) => RecorderChild;
 
 export type RecorderChild = {
@@ -89,7 +89,7 @@ export type ConcatChild = {
 export type ConcatSpawnFn = (
   command: string,
   args: readonly string[],
-  options: { windowsVerbatimArguments: boolean },
+  options: { stdio: ['pipe', 'ignore', 'pipe'] },
 ) => ConcatChild;
 
 export type ProcFs = {
@@ -235,7 +235,6 @@ export class Recorder {
     });
 
     const child = this.deps.spawn(this.deps.ffmpegPath(), args2, {
-      windowsVerbatimArguments: true,
       stdio: ['pipe', 'ignore', 'pipe'],
     });
     this.child = child;
@@ -400,7 +399,6 @@ export class Recorder {
       outputPath,
     });
     const child = this.deps.spawn(this.deps.ffmpegPath(), args2, {
-      windowsVerbatimArguments: true,
       stdio: ['pipe', 'ignore', 'pipe'],
     });
     this.child = child;
@@ -886,7 +884,7 @@ export class Recorder {
     const spawnConcat = this.deps.spawnConcat ?? defaultConcatSpawn();
     const args = buildConcatArgs({ listPath, outputPath, fallbackReencode });
     const child = spawnConcat(this.deps.ffmpegPath(), args, {
-      windowsVerbatimArguments: true,
+      stdio: ['pipe', 'ignore', 'pipe'],
     });
     return new Promise<boolean>((resolve) => {
       child.proc.on('exit', (code) => {
