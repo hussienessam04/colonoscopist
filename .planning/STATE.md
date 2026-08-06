@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_5_plan_02_complete
-stopped_at: Completed 05-02-PLAN.md
-last_updated: "2026-08-06T21:25:00.000Z"
+status: phase_5_plan_03_complete
+stopped_at: Completed 05-03-PLAN.md
+last_updated: "2026-08-06T23:53:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 21
+  completed_plans: 22
 ---
 
 # State: Colonoscopist
@@ -41,6 +41,8 @@ Phase 5 Plan 01 (screenshots + Procedure Review real impl) shipped: migration 00
 
 Phase 5 Plan 02 (right-rail Polish) shipped: pause markers on Scrubber from procedure_segments (D-11), per-thumbnail inline ScreenshotAnnotation (D-12), read-only ProcedureNotesReview accordion (D-09), reusable StatusBadge component, useProcedures SWR-style hook (parallel fetch + optimistic updateAnnotation), ScreenshotTimeline +Capture gate on crashed (D-13), PROCEDURES_LIST_SEGMENTS IPC channel + handler, hand-ported shadcn Accordion primitive (no @radix-ui/react-accordion dep), scrubber.css utility module with z-index ordering for the layered track. 67/67 unit tests pass across 10 files (Plan 01's 39 + Plan 02's 28 new). Plan 03 (trim + /media/ route) + Plan 04 (validation + UAT) follow.
 
+Phase 5 Plan 03 (Trim + `/media/` route) shipped: `buildTrimArgs` pure builder (`-ss` before `-i`, `-c copy`, `-movflags +faststart` — D-08 + PITFALLS §2); `applyTrim` ffmpeg subprocess with `windowsVerbatimArguments` + 5min SIGTERM timeout + post-spawn fsync (PITFALLS §1); `proceduresRepo.updateVideoPath` uses `COALESCE(video_path_original, ?)` for the canonical first-trim-only guard (D-07); `restoreFromOriginal` re-points `video_path` to `video_path_original` with file-existence + null guards; `MediaServer` is a long-lived localhost HTTP server (boots at app start, dies on `will-quit`) with the `/media/<patientId>/<procedureId>/<file>` route — regex-validated path components + `path.relative` escape check (T-05-08/T-05-28) + `Accept-Ranges: bytes` header (T-05-22); `procedures.trim` + `procedures.restore` IPC handlers replaced the Plan 01 stubs (validates input via safeParse, partial-status gate at both renderer + IPC layers per D-13, audits `procedure.trimmed` + `procedure.restored` with userData-relative paths per Fix 6); `IPC.RECORDING_GET_MEDIA_URL` + `api.recording.getMediaUrl()`; `TrimControls` right-rail panel with Apply/Restore + inline `Loader2` spinner + partial/missing-original disabled states; `useTrim` hook wires the IPC round-trip; `useMediaUrl` hook fetches + caches the MediaServer URL; `Scrubber` extended with `trimMode`/`inMs`/`outMs`/`onTrim` props + draggable `<TrimHandle>` children (in + out) + red-shaded `<TrimRegion>` rectangle; `clampHandle` pure function with 1000ms minimum gap (PITFALLS §6). 49 new unit tests across 8 files (ffmpeg-args 5 + trim 5 + preview-server 6 + procedures-repo 6 + procedures 4 + Scrubber 5 + trim-clamp 6 + TrimControls 10). Trim-related integration: 67 Plan 01 + 28 Plan 02 + 49 Plan 03 = 144 unit tests pass. The trim-smoke integration test (RUN_SMOKE=1) exercises the real `ffmpeg-static` binary against a lavfi source — opt-in so CI stays fast. REV-04 ships (last Phase 5 requirement). Plan 04 (validation + Windows hardware UAT) follows.
+
 ## Project Reference
 
 See: `.planning/PROJECT.md` (updated 2026-07-31)
@@ -55,7 +57,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
 | 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | complete (4/4 plans; UAT 20/20 pass; +UI enhancements) |
-| 5 | Screenshots + Procedure Review + Trim | 6 | in_progress (2/4 plans) |
+| 5 | Screenshots + Procedure Review + Trim | 6 | in_progress (3/4 plans) |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
 | 7 | Search & History + Audit UI + Backup/Restore + Arabic/RTL | 8 | pending |
 | 8 | Licensing (Ed25519 signed .lic + 14-day trial + activation) | 4 | pending |
@@ -122,7 +124,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `docs(05-02): complete plan 02 - right-rail polish`
+- Last commit: `test(05-03): update screenshots IPC trim/restore assertions for real handlers`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 - All 8 Phase 3 plans have `*-SUMMARY.md`; phase-level verification can be re-run.
 - ROADMAP.md updated: Phase 3 "8/8 plans executed" with 03-07 + 03-08 added to checklist.
@@ -133,12 +135,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 |------|-------|--------|
 | 05-01 | Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement | complete (39/39 unit tests pass) |
 | 05-02 | Right-rail polish: pause markers on scrubber (D-11) + inline annotation + Notes accordion (D-09) + StatusBadge + useProcedures SWR hook | complete (Plan 02 tests + Plan 01 regression = 67 tests pass) |
+| 05-03 | Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + MediaServer + TrimControls + useTrim/useMediaUrl hooks | complete (49 new unit tests pass; trim-smoke opt-in via RUN_SMOKE=1) |
 
 ---
-*State last updated: 2026-08-06 after 05-02-PLAN.md completed (5 of 6 SCRN/REV requirements shipped; REV-04 still lands in 05-03)*
+*State last updated: 2026-08-06 after 05-03-PLAN.md completed (all 6 SCRN/REV requirements shipped — REV-04 complete)*
 
 ## Session
 
-**Last session:** 2026-08-06T21:25:00.000Z
-**Stopped at:** Completed 05-02-PLAN.md
-**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-03-PLAN.md
+**Last session:** 2026-08-06T23:53:00.000Z
+**Stopped at:** Completed 05-03-PLAN.md
+**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-04-PLAN.md

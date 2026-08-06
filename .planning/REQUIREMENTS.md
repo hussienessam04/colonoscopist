@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to a roadmap phase.
 - [x] **REV-01**: Doctor can open a finished procedure and see the recorded video with a scrubber and play/pause controls. _(Plan 05-01, 05-02, 05-03)_
 - [x] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp. _(Plan 05-01, 05-02)_
 - [x] **REV-03**: Doctor can take additional screenshots from playback (same path as in-procedure screenshots). _(Plan 05-01, 05-02)_
-- [ ] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04)_
+- [x] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04)_
 
 ### Reports
 

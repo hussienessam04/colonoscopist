@@ -128,7 +128,7 @@ Plans:
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)
-- [ ] 05-03-PLAN.md — Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers (Wave 3, depends_on: 01, 02)
+- [x] 05-03-PLAN.md — Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + MediaServer + TrimControls + useTrim/useMediaUrl hooks (Wave 3, depends_on: 01, 02)
 - [ ] 05-04-PLAN.md — Validation + integration hardening + UAT smoke (Wave 4, depends_on: 01, 02, 03)
 
 ---
