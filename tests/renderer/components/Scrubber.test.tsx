@@ -69,4 +69,34 @@ describe('Scrubber', () => {
     const fill = screen.getByTestId('scrubber-fill') as HTMLDivElement;
     expect(fill.style.width).toBe('100%');
   });
+
+  // Plan 02 — D-11 pause markers from procedure_segments.
+  it('renders one pause marker per segment at startedAt/durationMs percent', () => {
+    const onSeek = vi.fn();
+    const segments = [
+      { id: 1, procedureId: 'p1', segmentIndex: 0, filePath: '', startedAt: 2500, endedAt: 7500 },
+      { id: 2, procedureId: 'p1', segmentIndex: 1, filePath: '', startedAt: 5000, endedAt: 10000 },
+      { id: 3, procedureId: 'p1', segmentIndex: 2, filePath: '', startedAt: 7500, endedAt: 12500 },
+    ];
+    render(<Scrubber durationMs={10_000} currentMs={0} onSeek={onSeek} segments={segments} />);
+    const markers = screen.getAllByTestId('scrubber-pause-marker');
+    expect(markers).toHaveLength(3);
+    expect(markers[0]?.getAttribute('aria-label')).toMatch(/^Pause 1:/);
+    expect(markers[1]?.getAttribute('aria-label')).toMatch(/^Pause 2:/);
+    expect(markers[2]?.getAttribute('aria-label')).toMatch(/^Pause 3:/);
+    // 2500/10000 = 25%
+    expect((markers[0] as HTMLElement).style.left).toBe('25%');
+  });
+
+  it('renders zero pause markers when segments prop is absent', () => {
+    const onSeek = vi.fn();
+    render(<Scrubber durationMs={10_000} currentMs={0} onSeek={onSeek} />);
+    expect(screen.queryAllByTestId('scrubber-pause-marker')).toHaveLength(0);
+  });
+
+  it('renders zero pause markers when segments prop is empty array', () => {
+    const onSeek = vi.fn();
+    render(<Scrubber durationMs={10_000} currentMs={0} onSeek={onSeek} segments={[]} />);
+    expect(screen.queryAllByTestId('scrubber-pause-marker')).toHaveLength(0);
+  });
 });

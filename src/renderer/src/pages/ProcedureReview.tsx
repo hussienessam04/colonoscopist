@@ -256,8 +256,10 @@ export default function ProcedureReview({
                     </p>
                     <p>
                       <span className="font-medium">Status:</span>{' '}
-                      <StatusBadge status={procedure.status} />
                     </p>
+                    <div>
+                      <StatusBadge status={procedure.status} />
+                    </div>
                   </>
                 ) : (
                   <p className="text-muted-foreground">Loading…</p>

@@ -48,6 +48,9 @@ type MockApi = {
     get: ReturnType<typeof vi.fn>;
     list: ReturnType<typeof vi.fn>;
     finalize: ReturnType<typeof vi.fn>;
+    trim: ReturnType<typeof vi.fn>;
+    restore: ReturnType<typeof vi.fn>;
+    listSegments: ReturnType<typeof vi.fn>;
   };
   procedureNotes: {
     create: ReturnType<typeof vi.fn>;
@@ -60,6 +63,12 @@ type MockApi = {
     resume: ReturnType<typeof vi.fn>;
     forceCleanup: ReturnType<typeof vi.fn>;
     onStatus: ReturnType<typeof vi.fn>;
+  };
+  screenshots: {
+    add: ReturnType<typeof vi.fn>;
+    list: ReturnType<typeof vi.fn>;
+    delete: ReturnType<typeof vi.fn>;
+    updateAnnotation: ReturnType<typeof vi.fn>;
   };
 };
 
@@ -104,6 +113,9 @@ export function mockApi(): MockApi {
       get: vi.fn(),
       list: vi.fn(),
       finalize: vi.fn(),
+      trim: vi.fn(),
+      restore: vi.fn(),
+      listSegments: vi.fn().mockResolvedValue([]),
     },
     procedureNotes: {
       create: vi.fn(),
@@ -116,6 +128,12 @@ export function mockApi(): MockApi {
       resume: vi.fn(),
       forceCleanup: vi.fn().mockResolvedValue(undefined),
       onStatus: vi.fn(),
+    },
+    screenshots: {
+      add: vi.fn(),
+      list: vi.fn(),
+      delete: vi.fn(),
+      updateAnnotation: vi.fn(),
     },
   };
   (window as unknown as { api: MockApi }).api = api;

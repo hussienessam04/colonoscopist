@@ -2,7 +2,7 @@
 // ScreenshotTimeline — click-to-seek, delete × button, +Capture.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../setup';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { Scrubber } from '@/components/Scrubber';
@@ -149,6 +149,78 @@ describe('ScreenshotTimeline', () => {
       />,
     );
     expect(screen.queryAllByLabelText(/Delete screenshot at/)).toHaveLength(0);
+  });
+
+  // Plan 02 — D-13 capture gate. The +Capture button is disabled only when
+  // status === 'crashed'; recording / completed / partial all allow capture.
+  it('disables +Capture when status === "crashed"', () => {
+    const onCapture = vi.fn();
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        status="crashed"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={onCapture}
+      />,
+    );
+    const capture = screen.getByTestId('screenshot-timeline-capture');
+    expect(capture).toBeDisabled();
+    fireEvent.click(capture);
+    expect(onCapture).not.toHaveBeenCalled();
+  });
+
+  it('enables +Capture when status === "completed"', () => {
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        status="completed"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('screenshot-timeline-capture')).not.toBeDisabled();
+  });
+
+  it('enables +Capture when status === "partial"', () => {
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        status="partial"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('screenshot-timeline-capture')).not.toBeDisabled();
+  });
+
+  // Plan 02 — annotation wiring. The onAnnotate callback fires when the
+  // user edits a thumbnail's annotation.
+  it('passes onAnnotate through to the thumbnail annotation input', async () => {
+    const onAnnotate = vi.fn().mockResolvedValue(undefined);
+    const annotated: Screenshot[] = [
+      { ...fixture[0]!, annotation: 'initial' },
+    ];
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        status="completed"
+        screenshots={annotated}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onAnnotate={onAnnotate}
+      />,
+    );
+    fireEvent.click(screen.getByTestId('screenshot-annotation-caption'));
+    const input = screen.getByTestId('screenshot-annotation-input');
+    fireEvent.change(input, { target: { value: 'updated' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    await waitFor(() => {
+      expect(onAnnotate).toHaveBeenCalledTimes(1);
+    });
+    expect(onAnnotate).toHaveBeenCalledWith(annotated[0], 'updated');
   });
 });
 
