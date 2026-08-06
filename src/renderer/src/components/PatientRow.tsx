@@ -54,10 +54,10 @@ export default function PatientRow({ patient, canRestore, onEdit, onDelete, onRe
           <DropdownMenuContent align="end">
             {!isDeleted ? (
               <DropdownMenuItem
-                onSelect={() => navigate({ name: 'procedure-room', patientId: patient.id })}
+                onSelect={() => navigate({ name: 'procedure-preview', patientId: patient.id })}
                 data-testid="open-procedure-room"
               >
-                Open Procedure Room
+                Open Procedure Preview
               </DropdownMenuItem>
             ) : null}
             <DropdownMenuItem onSelect={() => onEdit(patient)}>Edit</DropdownMenuItem>

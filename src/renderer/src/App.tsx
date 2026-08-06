@@ -13,6 +13,7 @@ import SettingsUsers from './pages/SettingsUsers';
 import SettingsCapture from './pages/SettingsCapture';
 import SettingsHub from './pages/SettingsHub';
 import ProcedureRoom from './pages/ProcedureRoom';
+import ProcedurePreview from './pages/ProcedurePreview';
 import ProcedureReview from './pages/ProcedureReview';
 
 export default function App(): JSX.Element {
@@ -76,6 +77,8 @@ export default function App(): JSX.Element {
       return <SettingsUsers />;
     case 'settings-capture':
       return <SettingsCapture />;
+    case 'procedure-preview':
+      return <ProcedurePreview />;
     case 'procedure-room':
       return <ProcedureRoom />;
     case 'procedure-review':

@@ -70,15 +70,15 @@ describe('PatientRow — Open Procedure Room entry (G-03-4)', () => {
     await screen.findByText('Alice Carter');
 
     await user.click(screen.getByRole('button', { name: /actions for alice carter/i }));
-    const openProc = await screen.findByRole('menuitem', { name: /open procedure room/i });
+    const openProc = await screen.findByRole('menuitem', { name: /open procedure preview/i });
     expect(openProc).toBeInTheDocument();
 
     await user.click(openProc);
-    await waitFor(() => expect(getRoute().name).toBe('procedure-room'));
-    expect(getRoute()).toMatchObject({ name: 'procedure-room', patientId: ALICE.id });
+    await waitFor(() => expect(getRoute().name).toBe('procedure-preview'));
+    expect(getRoute()).toMatchObject({ name: 'procedure-preview', patientId: ALICE.id });
   });
 
-  it('deleted row does NOT render the "Open Procedure Room" entry (T-3-20)', async () => {
+  it('deleted row does NOT render the "Open Procedure Preview" entry (T-3-20)', async () => {
     setAdminSession([DELETED_ALICE]);
     await session.refresh();
     setRoute({ name: 'patients' });
@@ -88,9 +88,9 @@ describe('PatientRow — Open Procedure Room entry (G-03-4)', () => {
     await screen.findByText('Deleted Alice');
 
     await user.click(screen.getByRole('button', { name: /actions for deleted alice/i }));
-    // Edit + Restore are present; Open Procedure Room is NOT.
+    // Edit + Restore are present; Open Procedure Preview is NOT.
     expect(await screen.findByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument();
     expect(await screen.findByRole('menuitem', { name: /^restore$/i })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /open procedure room/i })).toBeNull();
+    expect(screen.queryByRole('menuitem', { name: /open procedure preview/i })).toBeNull();
   });
 });

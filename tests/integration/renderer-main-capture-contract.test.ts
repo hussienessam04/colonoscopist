@@ -231,12 +231,13 @@ describe('Plan 03-05 — Settings hub page (G-03-3)', () => {
   });
 });
 
-describe('Plan 03-05 — PatientRow Open Procedure Room entry (G-03-4)', () => {
-  it('PatientRow.tsx navigates to procedure-room with the patientId for non-deleted patients', () => {
-    // ponytail: the typed literal `navigate({ name: 'procedure-room', patientId: ... })`
-    // is the single source of truth for the new row action. T-3-18.
+describe('Plan 03-05 — PatientRow Open Procedure Preview entry (G-03-4 → Phase 4 split)', () => {
+  it('PatientRow.tsx navigates to procedure-preview with the patientId for non-deleted patients', () => {
+    // ponytail: the typed literal `navigate({ name: 'procedure-preview', patientId: ... })`
+    // is the single source of truth for the new row action. Phase 4 split:
+    // Preview is its own page (Step 1) before the Procedure Room (Step 2).
     expect(PATIENT_ROW_SRC).toMatch(
-      /navigate\(\s*\{\s*name:\s*['"]procedure-room['"]\s*,\s*patientId\s*:\s*patient\.id\s*\}\s*\)/,
+      /navigate\(\s*\{\s*name:\s*['"]procedure-preview['"]\s*,\s*patientId\s*:\s*patient\.id\s*\}\s*\)/,
     );
   });
 
@@ -334,8 +335,15 @@ describe('BLOCKER 1 — useCaptureDeviceMap is the single mediaDevices.enumerate
     expect(consumers.length).toBe(1);
   });
 
-  it('useCaptureDeviceMap is consumed in BOTH ProcedureRoom and SettingsCapture', () => {
-    expect(PROCEDURE_ROOM_SRC).toMatch(/useCaptureDeviceMap/);
+  it('useCaptureDeviceMap is consumed in BOTH ProcedurePreview (Phase 4 Step 1) and SettingsCapture', () => {
+    // Phase 4 split: device enumeration moved from ProcedureRoom to
+    // ProcedurePreview (Step 1). ProcedureRoom only handles recording
+    // controls (Step 2) and no longer enumerates devices.
+    const PROCEDURE_PREVIEW_SRC = fs.readFileSync(
+      path.join(ROOT, 'src/renderer/src/pages/ProcedurePreview.tsx'),
+      'utf8',
+    );
+    expect(PROCEDURE_PREVIEW_SRC).toMatch(/useCaptureDeviceMap/);
     expect(SETTINGS_CAPTURE_SRC).toMatch(/useCaptureDeviceMap/);
   });
 
