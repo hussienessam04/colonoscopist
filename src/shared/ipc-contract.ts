@@ -291,8 +291,13 @@ export interface IpcContract {
   };
   // Plan 04-01 ships start + stop + onStatus (push event). pause/resume land
   // in Plan 03; lost + scanForOrphans land in Plan 04.
+  // Plan live-preview-tee: `start` returns previewUrl (http://127.0.0.1:<port>/preview)
+  // pointing at the MJPEG-tee stream that ffmpeg writes alongside the mp4.
+  // Renderer's <img src=previewUrl> subscribes while isRecording===true so
+  // the doctor sees the camera feed during recording (ffmpeg holds the
+  // DirectShow device lock so renderer's getUserMedia can't get a stream).
   recording: {
-    start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number }>;
+    start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number; previewUrl: string }>;
     stop: (input: { procedureId: string }) => Promise<void>;
     pause: (input: { procedureId: string }) => Promise<void>;
     resume: (input: { procedureId: string }) => Promise<void>;

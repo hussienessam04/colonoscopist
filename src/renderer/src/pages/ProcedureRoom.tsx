@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CircleStop, Pause, Play, Video } from 'lucide-react';
+import { ArrowLeft, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import DeviceLostBanner from '@/components/device-lost-banner';
+import { RecordingControlsBar } from '@/components/RecordingControlsBar';
+import { RecIndicator } from '@/components/RecIndicator';
+import { FramingGuide } from '@/components/FramingGuide';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
@@ -17,14 +20,8 @@ export default function ProcedureRoom(): JSX.Element {
   const procedureIdFromRoute = route.name === 'procedure-room' ? route.procedureId : '';
   const patientIdFromRoute = route.name === 'procedure-room' ? route.patientId : '';
 
-  // Procedure row id comes from the route (created on ProcedurePreview mount).
-  // The recording.start call reuses this id via the `procedureId` IPC arg.
   const [procedureId] = useState<string | null>(procedureIdFromRoute || null);
 
-  // Live preview is shown here too — the doctor needs to see what is being
-  // captured during the procedure. ffmpeg will lock the device once
-  // recording starts; the preview may go dark or show a "Recording —
-  // preview locked" overlay depending on driver behaviour.
   const { lookup, pickBrowserId } = useCaptureDeviceMap();
   const [savedDevice, setSavedDevice] = useState<string | null>(null);
   const [selectedBrowserId, setSelectedBrowserId] = useState<string | null>(null);
@@ -39,8 +36,8 @@ export default function ProcedureRoom(): JSX.Element {
   const [timerMs, setTimerMs] = useState(0);
   const [startInFlight, setStartInFlight] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  // Ref-based in-flight guard so a fast double-click can't sneak past
-  // before React re-renders the disabled state.
+  const [notesCollapsed, setNotesCollapsed] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const startInFlightRef = useRef(false);
 
   useEffect(() => {
@@ -63,9 +60,6 @@ export default function ProcedureRoom(): JSX.Element {
 
   useEffect(() => {
     if (!defaultLoaded || !savedDevice || deviceInitRef.current) return;
-    // pickBrowserId() depends on the hook's browser+dshow mapping; if the
-    // mapping hasn't resolved yet it returns undefined. Wait until we get
-    // a real browser deviceId before committing + locking.
     const browserId = pickBrowserId(savedDevice);
     if (browserId === undefined) return;
     setSelectedBrowserId(browserId);
@@ -93,13 +87,6 @@ export default function ProcedureRoom(): JSX.Element {
     };
   }, [selectedCanonical]);
 
-  // Subscribe to recording:status on mount. React 18 StrictMode runs
-  // effects twice in dev (mount/unmount/remount). We let React handle
-  // the lifecycle — no manual guard ref — so the second mount gets its
-  // own listener. (The previous recordingInitRef guard suppressed the
-  // second mount's subscribe, leaving the live component with no
-  // listener — which is why the timer never ticked even though main
-  // emitted 'started' status rows.)
   useEffect(() => {
     const unsubscribe = window.api.recording.onStatus((status) => {
       recordingStore.setStatus(status);
@@ -110,7 +97,6 @@ export default function ProcedureRoom(): JSX.Element {
     };
   }, []);
 
-  // Local timer tick driver.
   useEffect(() => {
     if (timer.isFrozen) {
       setTimerMs(timer.displayMs);
@@ -120,10 +106,6 @@ export default function ProcedureRoom(): JSX.Element {
     const handle = setInterval(() => {
       const snap = recordingStore.__getState();
       if (snap.pausedAt !== null) return;
-      // ponytail: use timerStartedAt (virtual base that excludes paused
-      // intervals) instead of snap.startedAt (original procedure start).
-      // Falls back to startedAt so this transient-dep-less path still
-      // works during the first render before the 'started' status lands.
       const base = snap.timerStartedAt ?? snap.startedAt;
       if (base === null) {
         setTimerMs(0);
@@ -134,11 +116,11 @@ export default function ProcedureRoom(): JSX.Element {
     return () => clearInterval(handle);
   }, [timer.isFrozen, timer.displayMs]);
 
-  // Navigate to procedure-review on stopped.
   useEffect(() => {
     if (recordingState.status === 'stopped' && recordingState.procedureId) {
       const pid = recordingState.procedureId;
       recordingStore.reset();
+      setPreviewUrl(null);
       navigate({ name: 'procedure-review', procedureId: pid });
     }
   }, [recordingState.status, recordingState.procedureId, navigate]);
@@ -147,6 +129,7 @@ export default function ProcedureRoom(): JSX.Element {
     recordingState.status === 'recording' ||
     recordingState.status === 'paused' ||
     recordingState.status === 'lost';
+  const isPaused = recordingState.status === 'paused';
   const recordingBusy =
     recordingState.status === 'starting' || recordingState.status === 'stopping';
 
@@ -179,12 +162,13 @@ export default function ProcedureRoom(): JSX.Element {
           setStartError('No preset saved for this device. Save one in Settings → Capture.');
           return;
         }
-        await window.api.recording.start({
+        const startResult = await window.api.recording.start({
           patientId: patientIdFromRoute,
           procedureId,
           deviceId: device,
           preset: resolvedPreset,
         });
+        setPreviewUrl(startResult.previewUrl);
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : 'Could not start recording.';
         setStartError(msg);
@@ -204,15 +188,53 @@ export default function ProcedureRoom(): JSX.Element {
     }
   }
 
+  // ponytail: keyboard shortcuts — Space (pause/resume), Esc (stop), R
+  // (record). Guarded so they don't fire while the doctor is typing in the
+  // notes textarea. Modifier-key combos (Ctrl+R etc.) bypass the page-level
+  // handler so the browser's reload shortcut still works.
+  useEffect(() => {
+    function isTypingTarget(target: EventTarget | null): boolean {
+      if (!(target instanceof HTMLElement)) return false;
+      const tag = target.tagName;
+      if (tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT') return true;
+      if (target.isContentEditable) return true;
+      return false;
+    }
+    function handler(e: KeyboardEvent): void {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if (isTypingTarget(e.target)) return;
+      if (e.key === ' ' || e.code === 'Space') {
+        e.preventDefault();
+        if (isRecording) handlePauseResumeToggle();
+      } else if (e.key === 'Escape') {
+        if (isRecording) {
+          e.preventDefault();
+          handleRecordToggle();
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (!isRecording) {
+          e.preventDefault();
+          handleRecordToggle();
+        }
+      }
+    }
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [isRecording, recordingState.status, procedureId]);
+
+  const canRecord = !!(procedureId && selectedCanonical && preset);
+
   return (
     <main className="min-h-screen bg-slate-100 p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Step 2
+            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+              Procedure Room
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              Record, pause, and review the colonoscopy procedure.
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Procedure Room</h1>
           </div>
           {!isRecording ? (
             <Button
@@ -228,13 +250,30 @@ export default function ProcedureRoom(): JSX.Element {
               <ArrowLeft aria-hidden="true" />
               Back to Preview
             </Button>
-          ) : null}
+          ) : (
+            <span className="text-xs text-muted-foreground" aria-live="polite">
+              Shortcuts: <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
+              pause/resume · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
+              stop · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">R</kbd>{' '}
+              record
+            </span>
+          )}
         </header>
 
-        <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="flex flex-col gap-4">
-            <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
-              <div className="relative aspect-video">
+        <section
+          className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'}`}
+        >
+          <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
+            <div className="relative aspect-video">
+              {isRecording && previewUrl ? (
+                <img
+                  src={previewUrl}
+                  alt="Live capture preview"
+                  aria-label="Live capture preview"
+                  className="size-full object-contain"
+                  data-testid="live-preview-img"
+                />
+              ) : (
                 <video
                   ref={preview.videoRef}
                   autoPlay
@@ -243,122 +282,75 @@ export default function ProcedureRoom(): JSX.Element {
                   aria-label="Live capture preview"
                   className="size-full object-contain"
                 />
-                {!defaultLoaded ? (
-                  <div className="absolute inset-0 grid place-items-center text-sm text-slate-400">
-                    Finding capture devices…
+              )}
+              <FramingGuide />
+              <RecIndicator visible={recordingState.status === 'recording'} paused={isPaused} />
+              {!defaultLoaded ? (
+                <div className="absolute inset-0 grid place-items-center text-sm text-slate-400">
+                  Finding capture devices…
+                </div>
+              ) : !selectedCanonical ? (
+                <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
+                  <div className="flex max-w-md flex-col items-center gap-3">
+                    <Video className="size-9 text-slate-400" aria-hidden="true" />
+                    <p className="font-medium">No device selected — set a default in Settings → Capture</p>
+                    <Button
+                      variant="secondary"
+                      onClick={() => navigate({ name: 'settings-capture' })}
+                    >
+                      Open Settings
+                    </Button>
                   </div>
-                ) : !selectedCanonical ? (
-                  <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
-                    <div className="flex max-w-md flex-col items-center gap-3">
-                      <Video className="size-9 text-slate-400" aria-hidden="true" />
-                      <p className="font-medium">No device selected — set a default in Settings → Capture</p>
-                      <Button
-                        variant="secondary"
-                        onClick={() => navigate({ name: 'settings-capture' })}
-                      >
-                        Open Settings
-                      </Button>
-                    </div>
-                  </div>
-                ) : isRecording ? (
-                  <div className="absolute inset-0 grid place-items-center bg-black/60 p-6 text-center text-white">
-                    <div className="flex max-w-md flex-col items-center gap-3">
-                      <Video className="size-9 text-rose-300" aria-hidden="true" />
-                      <p className="font-medium">Recording in progress</p>
-                      <p className="text-sm text-slate-300">
-                        Live preview disabled during recording.
-                      </p>
-                    </div>
-                  </div>
-                ) : null}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-sm">
-              <div className="flex flex-col gap-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Procedure duration
-                </p>
-                <p
-                  aria-label="Procedure duration"
-                  className="font-mono text-3xl tabular-nums text-foreground"
-                  data-testid="procedure-duration"
-                >
-                  {timerLabel}
-                </p>
-                {recordingState.currentSegmentIndex > 0 &&
-                recordingState.status !== 'idle' &&
-                recordingState.status !== 'stopped' &&
-                recordingState.status !== null ? (
-                  <p className="text-xs text-muted-foreground" data-testid="pause-count">
-                    Pause #{recordingState.currentSegmentIndex}
-                  </p>
-                ) : null}
-              </div>
-
-              <div className="flex flex-col gap-2" data-testid="recording-step">
-                {isRecording ? (
-                  <Button
-                    variant="destructive"
-                    onClick={handleRecordToggle}
-                    disabled={recordingBusy}
-                    data-testid="stop-recording-button"
-                  >
-                    <CircleStop aria-hidden="true" />
-                    Stop Recording
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleRecordToggle}
-                    disabled={!procedureId || recordingBusy || startInFlight || !selectedCanonical || !preset}
-                    data-testid="record-button"
-                  >
-                    <CircleStop aria-hidden="true" />
-                    Start Recording
-                  </Button>
-                )}
-                {startError ? (
-                  <p
-                    role="alert"
-                    className="text-xs text-destructive"
-                    data-testid="start-error"
-                  >
-                    {startError}
-                  </p>
-                ) : null}
-                {recordingState.status === 'recording' ? (
-                  <Button
-                    variant="outline"
-                    onClick={handlePauseResumeToggle}
-                    disabled={recordingBusy}
-                    data-testid="pause-button"
-                  >
-                    <Pause aria-hidden="true" />
-                    Pause
-                  </Button>
-                ) : recordingState.status === 'paused' ? (
-                  <Button
-                    variant="outline"
-                    onClick={handlePauseResumeToggle}
-                    disabled={recordingBusy}
-                    data-testid="resume-button"
-                  >
-                    <Play aria-hidden="true" />
-                    Resume
-                  </Button>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
+              <RecordingControlsBar
+                isRecording={isRecording}
+                recordingBusy={recordingBusy}
+                isPaused={isPaused}
+                canRecord={canRecord}
+                startInFlight={startInFlight}
+                timerLabel={timerLabel}
+                pauseCount={recordingState.currentSegmentIndex}
+                startError={startError}
+                onRecordToggle={handleRecordToggle}
+                onPauseResumeToggle={handlePauseResumeToggle}
+              />
             </div>
           </div>
 
-          <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm">
-            <ProcedureNotesPanel procedureId={procedureId} />
-
-            <DeviceLostBanner
-              lastLost={lastLost}
-              onDismiss={() => recordingStore.clearLastLost()}
-            />
-          </aside>
+          {!notesCollapsed ? (
+            <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Side panel
+                </p>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setNotesCollapsed(true)}
+                  aria-label="Collapse notes panel"
+                >
+                  Hide
+                </Button>
+              </div>
+              <ProcedureNotesPanel procedureId={procedureId} />
+              <DeviceLostBanner
+                lastLost={lastLost}
+                onDismiss={() => recordingStore.clearLastLost()}
+              />
+            </aside>
+          ) : (
+            <div className="flex items-start justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setNotesCollapsed(false)}
+                aria-label="Show notes panel"
+              >
+                Show notes
+              </Button>
+            </div>
+          )}
         </section>
       </div>
     </main>

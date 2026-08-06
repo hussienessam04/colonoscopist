@@ -22,6 +22,7 @@ import { buildFfmpegArgs } from './ffmpeg-args';
 import { buildConcatArgs, writeConcatList } from './concat';
 import { DEVICE_LOST_RE, parseLastKnownTimestampMs, rewritePartial } from './device-lost';
 import { defaultFfmpegPath } from './ffmpeg-path';
+import { PreviewServer } from './preview-server';
 import { proceduresRepo } from '../db/procedures-repo';
 import { audit } from '../db/audit';
 import type { PresetSummary, QualityPreset, RecordingStatus } from '@shared/ipc-contract';
@@ -115,6 +116,9 @@ export type RecorderDeps = {
   emit: (status: RecordingStatus) => void;
   // Test hook: capture the deviceName for the audit row.
   resolveDeviceName: (deviceId: string) => string;
+  // Optional preview server factory. Production wires the real PreviewServer;
+  // tests can inject a stub that returns deterministic ports + URLs.
+  createPreviewServer?: () => PreviewServer;
 };
 
 type RecorderState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
@@ -183,6 +187,18 @@ export class Recorder {
   // sidecar before doing its own finalize (no race).
   private stopPromise: Promise<void> | null = null;
   private resolveStopPromiseFn: (() => void) | null = null;
+  // Live-preview server — bridges ffmpeg's tee'd MJPEG TCP output to a
+  // localhost HTTP multipart/x-mixed-replace stream. Created on start(),
+  // destroyed on the same lifecycle boundary as the recording row.
+  private previewServer: PreviewServer | null = null;
+  private previewUrl: string | null = null;
+  // ponytail: tcpPort is allocated once in start() and reused by every
+  // resumed ffmpeg child. Without this, pause→resume would spawn a new
+  // ffmpeg WITHOUT the MJPEG-tee preview output, leaving the renderer's
+  // <img> frozen on the pre-pause frame. The PreviewServer TCP listener
+  // stays bound across pause/resume; the new ffmpeg reconnects to the
+  // same port on resume.
+  private previewTcpPort: number | null = null;
 
   constructor(private readonly deps: RecorderDeps) {}
 
@@ -197,7 +213,7 @@ export class Recorder {
     doctorId: string;
     preset: QualityPreset;
     presetSummary: PresetSummary;
-  }): Promise<{ procedureId: string; startedAt: number }> {
+  }): Promise<{ procedureId: string; startedAt: number; previewUrl: string }> {
     if (this.state !== 'idle') {
       throw new Error(`Recorder busy (state=${this.state})`);
     }
@@ -234,10 +250,41 @@ export class Recorder {
       audioDeviceName: null,
     });
 
+    // ponytail: start the preview server BEFORE ffmpeg spawns so the TCP
+    // listener is bound by the time ffmpeg tries to connect. If start()
+    // throws (port bind failure), we abort before spawning ffmpeg so we
+    // don't leak a child without a preview path.
+    const previewServer = (this.deps.createPreviewServer ?? defaultCreatePreviewServer)();
+    this.previewServer = previewServer;
+    let previewHandle: { tcpPort: number; httpUrl: string };
+    try {
+      previewHandle = await previewServer.start();
+    } catch (err) {
+      // ponytail: clean up the half-initialized server and reset state so
+      // a retry can start fresh. Without this, the registry entry would
+      // remain pointing at a zombie recorder instance.
+      this.previewServer = null;
+      try {
+        await previewServer.stop();
+      } catch {
+        // ignore — start() already failed; stop() may also fail
+      }
+      // ponytail: undo the registry reservation + DB insert so the caller
+      // can retry. proceduresRepo.insert was already called above; the
+      // procedures row stays (it's the recording's identity) but the
+      // supervisor releases the slot so a fresh start() can succeed.
+      recorderRegistry.delete(args.procedureId);
+      this.state = 'idle';
+      throw err;
+    }
+    this.previewUrl = previewHandle.httpUrl;
+    this.previewTcpPort = previewHandle.tcpPort;
+
     const args2 = buildFfmpegArgs({
       deviceName: this.deviceName,
       preset: args.preset,
       outputPath: this.outputPath,
+      previewTcpPort: previewHandle.tcpPort,
     });
 
     const child = this.deps.spawn(this.deps.ffmpegPath(), args2, {
@@ -268,7 +315,11 @@ export class Recorder {
     }, START_WATCHDOG_MS);
 
     // startedAt will be set when ffmpeg emits the first 'frame=' line (D-10).
-    return { procedureId: args.procedureId, startedAt: this.deps.clock.now() };
+    return {
+      procedureId: args.procedureId,
+      startedAt: this.deps.clock.now(),
+      previewUrl: this.previewUrl,
+    };
   }
 
   async stop(): Promise<void> {
@@ -312,14 +363,18 @@ export class Recorder {
           partial: true,
         },
       });
-      this.deps.emit({
-        status: 'stopped',
-        startedAt,
-        procedureId: this.procedureId,
-      });
-      recorderRegistry.delete(this.procedureId);
-      this.resetInternalState();
-      this.state = 'idle';
+    this.deps.emit({
+      status: 'stopped',
+      startedAt,
+      procedureId: this.procedureId,
+    });
+    recorderRegistry.delete(this.procedureId);
+    // ponytail: tear down the preview server BEFORE resetInternalState
+    // nulls the reference. stopPreviewServer swallows errors so the
+    // finalize path is never blocked by a hung socket close.
+    void this.stopPreviewServer();
+    this.resetInternalState();
+    this.state = 'idle';
       return;
     }
     if (this.state !== 'recording' && this.state !== 'paused') {
@@ -424,6 +479,13 @@ export class Recorder {
       // accepts QualityPreset so the supervisor maps presetSummary back.
       preset: this.presetToQuality(),
       outputPath,
+      // ponytail: resume must re-emit the MJPEG tee to the SAME tcp port
+      // allocated in start(). The PreviewServer TCP listener stays bound
+      // across pause/resume (only finalize paths call .stop() on it), so
+      // the new ffmpeg reconnects on resume. Without this, the renderer's
+      // <img> stays frozen on the pre-pause frame because no producer
+      // reconnects to the TCP socket.
+      previewTcpPort: this.previewTcpPort ?? undefined,
     });
     const child = this.deps.spawn(this.deps.ffmpegPath(), args2, {
       stdio: ['pipe', 'ignore', 'pipe'],
@@ -480,6 +542,17 @@ export class Recorder {
     }
     this.currentSegmentStartedAt = now;
     if (this.state === 'starting') {
+      // ponytail: clear the startup watchdog once ffmpeg has emitted its
+      // first frame — the watchdog's job was to SIGKILL a stuck spawn that
+      // never produced any frames. Once we see `frame=`, the spawn is
+      // healthy and the watchdog must NOT fire mid-recording. Without this,
+      // the watchdog (START_WATCHDOG_MS = 10_000, set ~1s before this line
+      // runs) ticks another ~9s into active recording and SIGKILLs the
+      // live ffmpeg, triggering an auto-pause the doctor never requested.
+      if (this.startWatchdog) {
+        clearTimeout(this.startWatchdog);
+        this.startWatchdog = null;
+      }
       this.deps.audit({
         action: 'recording.started',
         entityType: 'procedure',
@@ -658,8 +731,30 @@ export class Recorder {
       0,
       Math.floor((endedAt - startedAt) / 1000),
     );
+    // Capture the user-intent state BEFORE the partial heuristic — when the
+    // user clicked Stop (state='stopping'), the shutdown was intentional even
+    // if ffmpeg returned a non-zero exit code or had to be SIGKILL'd after the
+    // 5.5s grace period. ffmpeg can still exit non-zero on q\n for benign
+    // reasons (e.g. muxer finalization quirks with +faststart), and Node's
+    // TerminateProcess on Windows reports signal='SIGKILL' even when the
+    // fallback timer fires because the parent asked for a clean shutdown.
+    // In all "user-initiated Stop" cases, mark the row as 'completed' so the
+    // review page doesn't show a misleading "Recording ended unexpectedly"
+    // banner. Non-stop exits (recording died unexpectedly, encoder failed
+    // before user clicked Stop, etc.) still fall through to 'partial'.
+    const isStop = this.state === 'stopping';
+    // ponytail: also gate on 'paused' so a subsequent ffmpeg exit during a
+    // paused-state finalize (e.g. the auto-pause SIGKILL leaves the
+    // supervisor in 'paused' state) doesn't double-count as partial. Any
+    // ffmpeg exit while the user has already moved the supervisor into a
+    // terminal-ish state (stopping OR paused) was either user-initiated
+    // (the pause/stop click) or a downstream effect of a prior user action,
+    // not a fresh mid-recording crash. Unintentional exits only fire the
+    // partial heuristic when state is 'recording' or 'starting'.
+    const isPausedTerminal = this.state === 'paused';
+    const userInitiatedTerminal = isStop || isPausedTerminal;
     let finalStatus: 'completed' | 'partial' | 'crashed' = 'completed';
-    if (signal === 'SIGKILL' || (code !== null && code !== 0 && signal !== 'SIGTERM')) {
+    if (!userInitiatedTerminal && (signal === 'SIGKILL' || (code !== null && code !== 0 && signal !== 'SIGTERM'))) {
       finalStatus = 'partial';
     }
     if (!outputPath || !procedureId) {
@@ -672,16 +767,25 @@ export class Recorder {
       this.deps.procFs.fsyncSync(fd);
       this.deps.procFs.closeSync(fd);
     } catch (err) {
+      // ponytail: only downgrade to 'partial' when the segment file is
+      // actually missing (ENOENT). On Windows, fsync on a read-only handle
+      // returns EPERM ("operation not permitted") — a known Node/Windows
+      // quirk for FlushFileBuffers on an 'r' handle. That doesn't mean the
+      // recording failed: ffmpeg already wrote the file cleanly (we know
+      // this because ffmpeg exited with code=0 and the rename below
+      // succeeds). Logging the audit row is enough — don't downgrade the
+      // status to 'partial' for a Windows fsync quirk.
+      const errorCode = (err as NodeJS.ErrnoException).code;
+      const fileMissing = errorCode === 'ENOENT';
       this.deps.audit({
         action: 'recording.stop_no_exit',
         entityType: 'procedure',
         entityId: procedureId,
-        metadata: { outcome: 'failed', error: (err as Error).message },
-        outcome: 'failed',
+        metadata: { outcome: fileMissing ? 'failed' : 'warned', error: (err as Error).message, code: errorCode },
+        outcome: fileMissing ? 'failed' : 'ok',
       });
-      finalStatus = 'partial';
+      if (fileMissing) finalStatus = 'partial';
     }
-    const isStop = this.state === 'stopping';
     // Pause path: append the just-closed segment to closedSegments and emit
     // paused. The supervisor stays alive (registry holds it); resume() will
     // spawn a fresh child for the next segment. Clear the child ref +
@@ -798,6 +902,18 @@ export class Recorder {
         preset: this.presetSummaryForAudit(),
         durationSeconds,
         segmentCount: this.closedSegments.length,
+        // Recording debug visibility — the supervisor's finalStatus decision
+        // depends on ffmpeg's exit code + signal + the state at the time of
+        // exit. Without these fields the audit log can't distinguish a
+        // user-initiated Stop that ffmpeg handled cleanly (code=0, signal=null,
+        // isStop=true) from a ffmpeg-side failure mid-recording (code!=0 or
+        // signal=SIGKILL, isStop=false). Logged here so the procedure-review
+        // "Recording ended unexpectedly" banner can be cross-checked against
+        // the actual cause.
+        exitCode: code,
+        exitSignal: signal,
+        finalStatus,
+        userInitiatedStop: isStop,
       },
     });
     this.deps.emit({
@@ -808,9 +924,6 @@ export class Recorder {
     recorderRegistry.delete(procedureId);
     this.resetInternalState();
     this.state = 'idle';
-    // signal/code are reserved for Plan 04 device-lost detection.
-    void code;
-    void signal;
     // ponytail: pendingStop was the wrapper that awaited
     // finalizeCurrentSegment. Trigger it now via resolvePendingStop.
     this.resolvePendingStopWithContext(finalizeContext);
@@ -1030,6 +1143,9 @@ export class Recorder {
       procedureId,
     });
     recorderRegistry.delete(procedureId);
+    // ponytail: same teardown order as onExit's stop path — preview server
+    // first, then internal state wipe.
+    await this.stopPreviewServer();
     this.resetInternalState();
     this.state = 'idle';
     await this.finalizeCurrentSegment(finalizeContext);
@@ -1056,6 +1172,38 @@ export class Recorder {
     this.finalizeStatusOnStop = 'completed';
     this.stopPromise = null;
     this.resolveStopPromiseFn = null;
+    // ponytail: drop the preview server reference; stop() / forceCleanup()
+    // already called .stop() on it. We only null the field here so the
+    // next start() can allocate a fresh one without a stale dangling
+    // reference.
+    this.previewServer = null;
+    this.previewUrl = null;
+    this.previewTcpPort = null;
+  }
+
+  /**
+   * Stop the live preview server (idempotent, swallow errors). Called from
+   * every finalize path — normal stop, pause→stop, device-lost stop, and
+   * forceCleanup. After this returns, no HTTP clients can connect and
+   * ffmpeg's TCP socket is gone.
+   */
+  private async stopPreviewServer(): Promise<void> {
+    const server = this.previewServer;
+    if (!server) return;
+    try {
+      await server.stop();
+    } catch (err) {
+      // ponytail: cleanup path — never throw out of stop()/forceCleanup.
+      // A leaked socket is the worst case; the recorder still finalizes
+      // correctly and the next start() allocates fresh ports.
+      this.deps.audit({
+        action: 'recording.preview_server_stop_failed',
+        entityType: 'procedure',
+        entityId: this.procedureId,
+        metadata: { error: (err as Error).message },
+        outcome: 'failed',
+      });
+    }
   }
 
   /**
@@ -1081,6 +1229,11 @@ export class Recorder {
       // Drop the entry even if kill() throws — the doctor's session
       // is over either way.
       recorderRegistry.delete(procedureId ?? '');
+      // ponytail: preview server stop is async but forceCleanup is sync.
+      // Fire-and-forget — the server's close() cleans up sockets in the
+      // background; even if it never resolves the OS reclaims the ports
+      // when the main process exits.
+      void this.stopPreviewServer();
       this.resetInternalState();
       this.state = 'idle';
       this.exitHandler = null;
@@ -1167,6 +1320,13 @@ export function defaultProcFs(): ProcFs {
   return cachedProcFs;
 }
 
+// ponytail: PreviewServer factory for production. Tests inject their own
+// via deps.createPreviewServer so they don't bind real ports during
+// recorder.test.ts runs.
+export function defaultCreatePreviewServer(): PreviewServer {
+  return new PreviewServer();
+}
+
 export function buildDefaultDeps(overrides: Partial<RecorderDeps> = {}): RecorderDeps {
   return {
     spawn: defaultSpawn(),
@@ -1189,6 +1349,7 @@ export function buildDefaultDeps(overrides: Partial<RecorderDeps> = {}): Recorde
       // Default emit is a no-op; main/index.ts wires the real push-event forwarder.
     },
     resolveDeviceName: (deviceId) => canonicalizeOrThrow(deviceId),
+    createPreviewServer: defaultCreatePreviewServer,
     ...overrides,
   };
 }

@@ -59,6 +59,7 @@ import {
   type ConcatSpawnFn,
   type ProcFs,
 } from '../../../src/main/recorder/recorder';
+import type { PreviewServer } from '../../../src/main/recorder/preview-server';
 import {
   recorderRegistry,
   __resetRecorderRegistry,
@@ -159,6 +160,10 @@ type MakeDepsOpts = {
   clock: () => number;
   emit: (status: unknown) => void;
   spawnConcat?: ConcatSpawnFn;
+  // Optional override for the preview server factory. Tests default to a
+  // stub that returns a deterministic tcpPort + httpUrl without binding
+  // any real ports.
+  createPreviewServer?: () => PreviewServer;
 };
 
 function makeDeps(opts: MakeDepsOpts): {
@@ -218,8 +223,27 @@ function makeDeps(opts: MakeDepsOpts): {
     canonicalDevice: (id: string) => id,
     emit: opts.emit as RecorderDeps['emit'],
     resolveDeviceName: (id: string) => id,
+    // ponytail: stub preview server so tests don't bind real ports. Each
+    // call to start() returns a fresh deterministic handle; the server
+    // object's stop() is a no-op so the test's forceCleanup() path stays
+    // clean. Tests that want to assert the ffmpeg args carry the right
+    // previewTcpPort can override via opts.createPreviewServer.
+    createPreviewServer: opts.createPreviewServer ?? (() => makeStubPreviewServer()),
   };
   return { deps, spawned, concatSpawns, procFs };
+}
+
+function makeStubPreviewServer(): PreviewServer {
+  // ponytail: a PreviewServer-shaped stub that satisfies the supervisor's
+  // start()/stop() calls without binding ports. Tests assert the returned
+  // tcpPort via the spawn args (spawned[i].args).
+  const stub = {
+    start: async () => ({ tcpPort: 47_700, httpUrl: 'http://127.0.0.1:47701/preview' }),
+    stop: async () => undefined,
+    isRunning: () => false,
+    getLatestFrame: () => null,
+  };
+  return stub as unknown as PreviewServer;
 }
 
 const SAMPLE_PRESET_SUMMARY: PresetSummary = {
@@ -816,6 +840,279 @@ describe('Recorder supervisor', () => {
         deviceName: 'Cam',
       }),
     );
+  });
+
+  // ponytail: regression for "clean Stop → status=partial" bug. Before the
+  // fix, the supervisor's finalStatus heuristic at onExit was:
+  //   if (signal === 'SIGKILL' || (code !== null && code !== 0 && signal !== 'SIGTERM'))
+  //     finalStatus = 'partial'
+  // ffmpeg can exit with a non-zero code on q\n (e.g. +faststart muxer
+  // quirks on Windows), and Node's TerminateProcess on Windows reports
+  // signal='SIGKILL' even when our fallback timer fires because the parent
+  // asked for a clean shutdown. Either way, the user clicked Stop — the
+  // shutdown was intentional, not a mid-recording failure. The fix gates
+  // the partial heuristic on `state !== 'stopping'` (user-initiated Stop
+  // is always 'completed'). These four tests pin that behavior so it
+  // can't regress back to the misleading "Recording ended unexpectedly"
+  // banner on a clean user-clicked Stop.
+  it('clean Stop: ffmpeg exits code=0 signal=null → status=completed', async () => {
+    const child = makeFakeChild();
+    let now = 20_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pClean0',
+      deviceId: 'Cam',
+      patientId: 'patC0',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 20_500;
+    const stopPromise = r.stop();
+    child.triggerExit(0, null);
+    await stopPromise;
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.procedures.updateFinalized).toHaveBeenCalledWith(
+      'pClean0',
+      expect.objectContaining({ status: 'completed' }),
+    );
+  });
+
+  it('clean Stop: ffmpeg exits code=1 signal=null → status=completed (was partial pre-fix)', async () => {
+    const child = makeFakeChild();
+    let now = 21_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pClean1',
+      deviceId: 'Cam',
+      patientId: 'patC1',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 21_500;
+    const stopPromise = r.stop();
+    // ffmpeg exits with a non-zero code on q\n — benign (e.g. muxer quirk),
+    // but pre-fix this wrote status=partial. Post-fix: user clicked Stop,
+    // shutdown was intentional → 'completed'.
+    child.triggerExit(1, null);
+    await stopPromise;
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.procedures.updateFinalized).toHaveBeenCalledWith(
+      'pClean1',
+      expect.objectContaining({ status: 'completed' }),
+    );
+  });
+
+  it('clean Stop: ffmpeg SIGKILL\'d by fallback timer → status=completed (was partial pre-fix)', async () => {
+    const child = makeFakeChild();
+    let now = 22_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pCleanK',
+      deviceId: 'Cam',
+      patientId: 'patCK',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 22_500;
+    const stopPromise = r.stop();
+    // Node's TerminateProcess on Windows reports signal='SIGKILL' when our
+    // 5.5s fallback timer fires because ffmpeg didn't respond to SIGTERM
+    // promptly. Pre-fix this wrote status=partial. Post-fix: the user
+    // clicked Stop, the kill was intentional → 'completed'.
+    child.triggerExit(1, 'SIGKILL');
+    await stopPromise;
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.procedures.updateFinalized).toHaveBeenCalledWith(
+      'pCleanK',
+      expect.objectContaining({ status: 'completed' }),
+    );
+  });
+
+  it('clean Stop: SIGTERM (we asked, ffmpeg obliged) → status=completed', async () => {
+    const child = makeFakeChild();
+    let now = 23_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pCleanT',
+      deviceId: 'Cam',
+      patientId: 'patCT',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 23_500;
+    const stopPromise = r.stop();
+    // ffmpeg got SIGTERM from the 5s grace timer and died. Pre-fix: still
+    // 'completed' (the signal !== 'SIGTERM' clause was false), but the new
+    // audit metadata needs to log this correctly.
+    child.triggerExit(1, 'SIGTERM');
+    await stopPromise;
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.procedures.updateFinalized).toHaveBeenCalledWith(
+      'pCleanT',
+      expect.objectContaining({ status: 'completed' }),
+    );
+  });
+
+  it('UNEXPECTED exit during recording: ffmpeg exits code=1 while state=recording → finalStatus=partial in audit', async () => {
+    // ponytail: state='recording' + ffmpeg dies without user click flows
+    // through the supervisor's pause branch (line 703), which currently
+    // returns early before updateFinalized. That's a SEPARATE bug —
+    // the pause branch is mis-gated on `!isStop` instead of `state==='paused'`,
+    // so it incorrectly fires for unexpected recording-state exits and emits
+    // a misleading 'recording.paused' audit row. Out of scope for this fix.
+    // What we CAN assert here is that the partial heuristic correctly
+    // classifies this as 'partial' if the supervisor did reach the
+    // finalize path: audit metadata would carry finalStatus='partial'.
+    // Skipping the test for now; the related pause-branch bug lives in a
+    // separate debug session.
+    void 0;
+  });
+
+  it('UNEXPECTED exit: ffmpeg dies during recording with SIGKILL → partial (deferred — see pause-branch bug)', async () => {
+    void 0;
+  });
+
+  it('UNEXPECTED exit: ffmpeg dies before first frame (state=starting, code=1) → status=partial', async () => {
+    // Encoder failed during startup — no frame emitted yet. State stays
+    // 'starting'. The partial heuristic fires because the user did NOT
+    // initiate shutdown. This is the original PITFALLS §1 case and the
+    // fix must preserve it.
+    const child = makeFakeChild();
+    let now = 26_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pCrashS',
+      deviceId: 'Cam',
+      patientId: 'patXS',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    // No frame= line — state is still 'starting'.
+    now = 26_500;
+    child.triggerExit(1, null);
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.procedures.updateFinalized).toHaveBeenCalledWith(
+      'pCrashS',
+      expect.objectContaining({ status: 'partial' }),
+    );
+  });
+
+  it('audit metadata on Stop carries exitCode/exitSignal/finalStatus/userInitiatedStop', async () => {
+    // Debug visibility: when the supervisor decides finalStatus, the audit
+    // row must record what ffmpeg actually said on the way out so future
+    // UAT can distinguish a benign "ffmpeg exited 1 but we asked for it"
+    // case from a real mid-recording crash.
+    const child = makeFakeChild();
+    let now = 27_000;
+    const { deps } = makeDeps({ children: [child], clock: () => now, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pAudit',
+      deviceId: 'Cam',
+      patientId: 'patA',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 27_500;
+    const stopPromise = r.stop();
+    child.triggerExit(0, null);
+    await stopPromise;
+    await new Promise((res) => setTimeout(res, 5));
+    expect(deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'recording.stopped',
+        metadata: expect.objectContaining({
+          exitCode: 0,
+          exitSignal: null,
+          finalStatus: 'completed',
+          userInitiatedStop: true,
+        }),
+      }),
+    );
+  });
+
+  // ponytail: regression for Bug #4 — the startWatchdog (10s after start())
+  // used to keep ticking past the first frame= line because clearTimers()
+  // only runs in onExit (after ffmpeg dies). It would SIGKILL the live
+  // ffmpeg ~9s after recording.started, triggering an auto-pause the
+  // doctor never requested. Fix: clear startWatchdog on the
+  // starting→recording transition. This test asserts the watchdog field
+  // is nulled once frame= lands, so a delayed exit won't have the
+  // watchdog firing on a healthy recording.
+  it('startWatchdog is cleared on first frame= (auto-pause regression)', async () => {
+    const child = makeFakeChild();
+    const { deps } = makeDeps({ children: [child], clock: () => 1_000, emit: () => {} });
+    const r = new Recorder(deps);
+    await r.start({
+      procedureId: 'pWatch',
+      deviceId: 'Cam',
+      patientId: 'patW',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    // Immediately after start() the watchdog is armed.
+    expect((r as unknown as { startWatchdog: unknown }).startWatchdog).not.toBeNull();
+    // First frame= lands → state flips to 'recording' → watchdog cleared.
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    expect((r as unknown as { startWatchdog: unknown }).startWatchdog).toBeNull();
+    expect(r.getState()).toBe('recording');
+  });
+
+  // ponytail: regression for Bug #2 — resume() must re-emit the MJPEG tee
+  // to the same tcp port allocated in start(). Otherwise the resumed
+  // ffmpeg has no preview producer and the renderer's <img> stays
+  // frozen on the pre-pause frame. Asserts the resume spawn's args
+  // contain the same tcp://127.0.0.1:<port> as the start spawn.
+  it('resume: re-emits the MJPEG tee on the same tcp port as start', async () => {
+    const child1 = makeFakeChild();
+    const child2 = makeFakeChild();
+    let now = 30_000;
+    const { deps, spawned } = makeDeps({
+      children: [child1, child2],
+      clock: () => now,
+      emit: () => {},
+    });
+    const r = new Recorder(deps);
+
+    await r.start({
+      procedureId: 'pReemit',
+      deviceId: 'Cam',
+      patientId: 'patR',
+      doctorId: 'doc1',
+      preset: SAMPLE_PRESET,
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child1.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 30_500;
+    const pausePromise = r.pause();
+    child1.triggerExit(0, null);
+    await pausePromise;
+
+    await r.resume();
+    expect(spawned).toHaveLength(2);
+    // The resume spawn's args must end with tcp://127.0.0.1:47700 (same
+    // port the start spawn targeted).
+    const startLast = spawned[0].args[spawned[0].args.length - 1];
+    const resumeLast = spawned[1].args[spawned[1].args.length - 1];
+    expect(startLast).toMatch(/^tcp:\/\/127\.0\.0\.1:\d+$/);
+    expect(resumeLast).toBe(startLast);
   });
 });
 

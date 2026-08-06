@@ -359,7 +359,13 @@ describe('BLOCKER 1 — useCaptureDeviceMap is the single mediaDevices.enumerate
     }
     walk(rendererDir);
     const consumers = files.filter((file) =>
-      fs.readFileSync(file, 'utf8').includes('getUserMedia'),
+      // ponytail: strip line + block comments before matching so prose
+      // mentions of getUserMedia don't register as consumers.
+      fs
+        .readFileSync(file, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '')
+        .replace(/\/\/[^\n]*/g, '')
+        .match(/\bgetUserMedia\s*\(/g) !== null,
     );
     expect(consumers).toContain(path.join(rendererDir, 'hooks', 'useVideoPreview.ts'));
     expect(consumers.length).toBe(1);

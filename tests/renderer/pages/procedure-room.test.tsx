@@ -90,14 +90,25 @@ afterEach(() => {
 });
 
 describe('ProcedurePreview', () => {
-  it('renders Start Preview and Continue-to-recording at idle', async () => {
+  it('renders Continue-to-recording at idle and auto-starts the preview when a device is picked', async () => {
     setRoute({ name: 'procedure-preview', patientId: 'pat-1' });
+    makeMediaMock();
+
     render(<ProcedurePreview />);
 
-    // Match the h1 specifically (other matches exist for the step label).
     expect(await screen.findByRole('heading', { name: /preview/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /start preview/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /continue to recording/i })).toBeInTheDocument();
+
+    // ponytail: the explicit Start Preview button is gone — the preview
+    // auto-starts when the doctor selects a device. Verify by selecting
+    // and asserting getUserMedia was called.
+    const trigger = await screen.findByLabelText(/capture device/i);
+    const user = userEvent.setup();
+    await user.click(trigger);
+    await user.click(await screen.findByRole('option', { name: /HDMI Capture/ }));
+
+    const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
+    await waitFor(() => expect(md.getUserMedia).toHaveBeenCalled());
   });
 
   it('does NOT call setDefaultDevice or setPreset when the picker changes', async () => {
@@ -116,24 +127,22 @@ describe('ProcedurePreview', () => {
     expect(api.capture.setPreset).not.toHaveBeenCalled();
   });
 
-  it('opens getUserMedia only after Start Preview, and releases every track on Stop', async () => {
+  it('opens getUserMedia automatically after device pick', async () => {
     setRoute({ name: 'procedure-preview', patientId: 'pat-1' });
-    const { stop } = makeMediaMock();
+    makeMediaMock();
 
     render(<ProcedurePreview />);
 
-    await waitForStartButton();
-    fireEvent.click(screen.getByRole('button', { name: /start preview/i }));
+    const trigger = await screen.findByLabelText(/capture device/i);
+    const user = userEvent.setup();
+    await user.click(trigger);
+    await user.click(await screen.findByRole('option', { name: /HDMI Capture/ }));
+
+    // ponytail: getUserMedia is called automatically once the doctor picks
+    // a device — the explicit Start Preview button is gone. Track-stop on
+    // Continue is an internal detail covered by the hook's unit tests.
     const md = navigator.mediaDevices as unknown as { getUserMedia: ReturnType<typeof vi.fn> };
     await waitFor(() => expect(md.getUserMedia).toHaveBeenCalled());
-    // G-03-8 — under Electron-as-Node ABI, await the resolved promise value
-    // so the .then has set streamRef.current before the test clicks Stop.
-    await md.getUserMedia.mock.results[0].value;
-    await screen.findByRole('button', { name: /stop preview/i });
-
-    fireEvent.click(screen.getByRole('button', { name: /stop preview/i }));
-
-    await waitFor(() => expect(stop.every((s) => s.mock.calls.length === 1)).toBe(true), { timeout: 5_000 });
   });
 });
 

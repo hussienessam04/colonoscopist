@@ -79,7 +79,7 @@ export type StartInput = {
   preset: QualityPreset;
 };
 
-export type StartResult = { procedureId: string; startedAt: number };
+export type StartResult = { procedureId: string; startedAt: number; previewUrl: string };
 
 export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
   ipcMain.handle(IPC.RECORDING_START, async (_e, raw) => {
@@ -92,6 +92,7 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
       const db = getDb();
       let procedureId = '';
       let startedAt = 0;
+      let previewUrl = '';
       db.transaction(() => {
         // Per Plan 02 — the renderer may have already created the procedure
         // row via `procedures.create` so the notes panel has a stable id
@@ -125,7 +126,7 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
         }
       })();
       const recorder = deps.buildRecorder();
-      const { startedAt: startedNow } = await recorder.start({
+      const startResult = await recorder.start({
         procedureId,
         deviceId: canonical,
         patientId: parsed.patientId,
@@ -133,7 +134,8 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
         preset: parsed.preset,
         presetSummary,
       });
-      startedAt = startedNow;
+      startedAt = startResult.startedAt;
+      previewUrl = startResult.previewUrl;
       audit({
         action: 'recording.start',
         entityType: 'procedure',
@@ -144,7 +146,7 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
           preset: presetSummary,
         },
       });
-      return { procedureId, startedAt };
+      return { procedureId, startedAt, previewUrl };
     } catch (err) {
       throw asIpcError(err);
     }
