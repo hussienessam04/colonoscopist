@@ -127,7 +127,13 @@ function stmts() {
       `SELECT * FROM procedure_notes WHERE procedure_id = ? ORDER BY created_at ASC`,
     ),
     insertSegment: db.prepare(
-      `INSERT INTO procedure_segments (procedure_id, segment_index, file_path, started_at, ended_at)
+      // INSERT OR IGNORE: the (procedure_id, segment_index) UNIQUE
+      // constraint protects against double-insert on onExit retries,
+      // pause/resume races, and any path that emits the same segment
+      // row more than once. The supervisor treats insertSegment as
+      // best-effort — the closedSegments in-memory list is the source
+      // of truth for the final concat list.
+      `INSERT OR IGNORE INTO procedure_segments (procedure_id, segment_index, file_path, started_at, ended_at)
        VALUES (@procedure_id, @segment_index, @file_path, @started_at, @ended_at)`,
     ),
     listSegments: db.prepare(

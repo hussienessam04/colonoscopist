@@ -92,7 +92,10 @@ describe('proceduresRepo.insertSegment / listSegments', () => {
     expect(rows[0]).toEqual(seg);
   });
 
-  it('two inserts with the same (procedureId, segmentIndex) throw SQLITE_CONSTRAINT_UNIQUE', async () => {
+  it('two inserts with the same (procedureId, segmentIndex) are idempotent (INSERT OR IGNORE)', async () => {
+    // The supervisor treats insertSegment as best-effort — onExit may
+    // fire more than once for the same segment during pause/resume
+    // races and recovery paths. INSERT OR IGNORE keeps the first row.
     const { proceduresRepo, procedureId } = await bootstrapAndSeed();
     proceduresRepo.insertSegment({
       procedureId,
@@ -109,7 +112,10 @@ describe('proceduresRepo.insertSegment / listSegments', () => {
         startedAt: 1_500,
         endedAt: 2_500,
       }),
-    ).toThrow(/SQLITE_CONSTRAINT_UNIQUE|UNIQUE/i);
+    ).not.toThrow();
+    const rows = proceduresRepo.listSegments(procedureId);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.endedAt).toBe(2_000); // first row wins
   });
 
   it('listSegments returns rows ordered by segment_index ASC', async () => {
