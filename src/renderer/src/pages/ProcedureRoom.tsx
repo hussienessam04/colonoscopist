@@ -316,58 +316,93 @@ export default function ProcedureRoom(): JSX.Element {
             {deviceError ? <p role="alert" className="text-sm text-destructive">{deviceError}</p> : null}
             {preview.error ? <p role="alert" className="text-sm text-destructive">{preview.error.message}</p> : null}
 
-            <div className="flex flex-col gap-2">
-              {isRunning ? (
-                <Button variant="outline" onClick={preview.stop}>
-                  <CircleStop aria-hidden="true" />
-                  Stop Preview
-                </Button>
-              ) : (
-                <Button onClick={preview.start} disabled={!hasSelection}>
-                  <Video aria-hidden="true" />
-                  Start Preview
-                </Button>
-              )}
-              {isRecording ? (
-                <Button variant="destructive" onClick={handleRecordToggle} disabled={recordingBusy}>
-                  <CircleStop aria-hidden="true" />
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleRecordToggle}
-                  disabled={!hasSelection || !preset || recordingBusy}
-                >
-                  <CircleStop aria-hidden="true" />
-                  Record
-                </Button>
-              )}
-              {recordingState.status === 'recording' ? (
-                <Button
-                  variant="outline"
-                  onClick={handlePauseResumeToggle}
-                  disabled={recordingBusy}
-                  data-testid="pause-button"
-                >
-                  <Pause aria-hidden="true" />
-                  Pause
-                </Button>
-              ) : recordingState.status === 'paused' ? (
-                <Button
-                  variant="outline"
-                  onClick={handlePauseResumeToggle}
-                  disabled={recordingBusy}
-                  data-testid="resume-button"
-                >
-                  <Play aria-hidden="true" />
-                  Resume
-                </Button>
-              ) : (
-                <Button variant="outline" disabled aria-label="Pause or resume">
-                  <Pause aria-hidden="true" />
-                  Pause
-                </Button>
-              )}
+            <div className="flex flex-col gap-4">
+              {/* Step 1 — Preview. Always available once a device is selected.
+                  Preview and Recording are two separate flows; the Record
+                  button stays disabled until the preview is running so the
+                  doctor sees the live feed before committing to capture. */}
+              <div
+                className="rounded-md border border-slate-200 p-3"
+                data-testid="preview-step"
+              >
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Step 1 · Preview
+                </p>
+                {isRunning ? (
+                  <Button variant="outline" onClick={preview.stop} data-testid="stop-preview-button">
+                    <CircleStop aria-hidden="true" />
+                    Stop Preview
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={preview.start}
+                    disabled={!hasSelection}
+                    data-testid="start-preview-button"
+                  >
+                    <Video aria-hidden="true" />
+                    Start Preview
+                  </Button>
+                )}
+              </div>
+
+              {/* Step 2 — Recording. Gated on preview running so the doctor
+                  doesn't capture before verifying the device + framing. */}
+              <div
+                className="rounded-md border border-slate-200 p-3"
+                data-testid="recording-step"
+              >
+                <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Step 2 · Recording
+                </p>
+                {!isRunning && !isRecording ? (
+                  <p className="text-xs text-muted-foreground">
+                    Start preview to enable recording.
+                  </p>
+                ) : null}
+                {isRecording ? (
+                  <Button
+                    variant="destructive"
+                    onClick={handleRecordToggle}
+                    disabled={recordingBusy}
+                    data-testid="stop-recording-button"
+                  >
+                    <CircleStop aria-hidden="true" />
+                    Stop Recording
+                  </Button>
+                ) : (
+                  <Button
+                    onClick={handleRecordToggle}
+                    disabled={!isRunning || !hasSelection || !preset || recordingBusy}
+                    data-testid="record-button"
+                  >
+                    <CircleStop aria-hidden="true" />
+                    Start Recording
+                  </Button>
+                )}
+                {recordingState.status === 'recording' ? (
+                  <Button
+                    variant="outline"
+                    onClick={handlePauseResumeToggle}
+                    disabled={recordingBusy}
+                    className="mt-2"
+                    data-testid="pause-button"
+                  >
+                    <Pause aria-hidden="true" />
+                    Pause
+                  </Button>
+                ) : recordingState.status === 'paused' ? (
+                  <Button
+                    variant="outline"
+                    onClick={handlePauseResumeToggle}
+                    disabled={recordingBusy}
+                    className="mt-2"
+                    data-testid="resume-button"
+                  >
+                    <Play aria-hidden="true" />
+                    Resume
+                  </Button>
+                ) : null}
+              </div>
             </div>
 
             <ProcedureNotesPanel procedureId={procedureId} />

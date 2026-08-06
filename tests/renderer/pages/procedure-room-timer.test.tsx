@@ -278,20 +278,15 @@ describe('ProcedureRoom Pause/Resume button', () => {
         currentSegmentIndex: 0,
       });
     });
-    // The button visible in the recording state has data-testid="pause-button"
-    // and is enabled. To verify "disabled when stopping", check the disabled
-    // fallback button (data-testid omitted) — easier path: when status is
-    // null/idle, both icons render disabled. We assert the disabled fallback
-    // button is rendered with the disabled attribute.
+    // After recordingStore.reset(), status is null — no Pause/Resume button
+    // is rendered (the design only shows Pause/Resume when actively
+    // recording or paused). Verify the Step 2 Recording section has no
+    // active pause/resume button.
     await act(async () => {
       recordingStore.reset();
     });
-    const buttons = screen.getAllByRole('button');
-    // The Pause/Resume fallback is a disabled <button>. Find one with
-    // aria-label="Pause or resume".
-    const fallback = screen.getByLabelText(/pause or resume/i) as HTMLButtonElement;
-    expect(fallback.disabled).toBe(true);
-    void buttons;
+    expect(screen.queryByTestId('pause-button')).toBeNull();
+    expect(screen.queryByTestId('resume-button')).toBeNull();
   });
 });
 
@@ -387,7 +382,7 @@ describe('ProcedureRoom DeviceLostBanner', () => {
         deviceName: 'USB Video Device',
       });
     });
-    const stopBtn = await screen.findByRole('button', { name: /^stop$/i }) as HTMLButtonElement;
+    const stopBtn = await screen.findByTestId('stop-recording-button') as HTMLButtonElement;
     expect(stopBtn.disabled).toBe(false);
   });
 
