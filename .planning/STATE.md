@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: phase_4_verified_complete
-stopped_at: Phase 4 UAT complete (20/20 pass)
-last_updated: "2026-08-06T19:30:00.000Z"
+stopped_at: Phase 5 context gathered
+last_updated: "2026-08-06T16:28:13.084Z"
 progress:
-  total_phases: 4
+  total_phases: 5
   completed_phases: 4
-  total_plans: 23
-  completed_plans: 23
+  total_plans: 19
+  completed_plans: 19
 ---
 
 # State: Colonoscopist
@@ -26,6 +26,7 @@ progress:
 Phase 4 — Recording (ffmpeg child + timer + device-lost): **FULLY VERIFIED** (all 20 UAT tests pass on Windows hardware, zero issues). Recording end-to-end works: ffmpeg-static spawns, segment files rename/concat into canonical `video.mp4`, mid-procedure notes save, Pause freezes the timer, Resume continues, Stop finalizes as `completed` (Windows EPERM on read-only fsync no longer downgrades status), device-lost detection renames the live segment to `.partial.mp4` and shows the inline banner, scanForOrphans writes `recording.crash_partial` on next launch, the recorder loads `ffmpeg-static` from `asarUnpack` in the packaged build.
 
 Extra fixes landed during Phase 4 verification (out of original SUMMARY scope):
+
 - RecorderControlsBar overlay (timer + record/pause inside the preview pane, doctor doesn't look away from the screen)
 - FramingGuide rule-of-thirds SVG overlay
 - RecIndicator red "Rec" badge during recording
@@ -129,6 +130,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-04T10:40:20.324Z
-**Stopped at:** Phase 4 context gathered
-**Resume file:** .planning\phases\04-recording-timer-device-lost\04-CONTEXT.md
+**Last session:** 2026-08-06T16:28:13.065Z
+**Stopped at:** Phase 5 context gathered
+**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-CONTEXT.md
