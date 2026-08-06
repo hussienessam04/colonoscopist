@@ -23,4 +23,11 @@ const child = spawn(electronBin, args, {
   shell: false,
 });
 
+// ponytail: surface RUN_SMOKE in the parent so devs can verify the env
+// made it through npm's shell into the wrapper. Vitest forks its own
+// workers; if those don't see RUN_SMOKE, the per-test opt-in won't fire.
+if (process.env.RUN_SMOKE) {
+  process.stderr.write(`[run-vitest] RUN_SMOKE=${process.env.RUN_SMOKE} forwarding to vitest\n`);
+}
+
 child.on('exit', (code) => process.exit(code ?? 1));
