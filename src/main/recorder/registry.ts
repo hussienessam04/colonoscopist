@@ -9,11 +9,14 @@ export const recorderRegistry = {
   set(procedureId: string, recorder: Recorder): void {
     const existing = globalRegistry.get(procedureId);
     if (existing && existing !== recorder) {
-      // Stale entry from a previous session whose stop() completed
-      // cleanly (state='idle') is safe to replace — the new start()
-      // takes over the procedureId. An active recorder (state !== idle)
-      // still throws RecorderBusyError.
-      if (existing.getState() === 'idle') {
+      // Replace stale entries that cannot be making progress:
+      // - 'idle': previous Stop completed cleanly; new Start takes over.
+      // - 'starting': previous spawn died before reaching onExit (rare;
+      //   e.g. ffmpeg process killed by Windows). Allow replacement so
+      //   the doctor can retry instead of being locked out.
+      // Active states ('recording' / 'paused' / 'stopping') still throw.
+      const state = existing.getState();
+      if (state === 'idle' || state === 'starting') {
         globalRegistry.delete(procedureId);
       } else {
         throw new RecorderBusyError(procedureId);

@@ -28,6 +28,14 @@ describe('recorderRegistry', () => {
     expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).toThrow(RecorderBusyError);
   });
 
+  it('allows a fresh recorder to replace a stuck \'starting\' entry (stale-spawn cleanup)', () => {
+    recorderRegistry.set('p1', fakeRecorder('r1', 'starting'));
+    // Previous ffmpeg child died without reaching onExit; the new Start
+    // takes over instead of locking the doctor out.
+    expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).not.toThrow();
+    expect(recorderRegistry.get('p1')).toBeDefined();
+  });
+
   it('allows a fresh recorder to replace an idle entry (stale-session cleanup)', () => {
     recorderRegistry.set('p1', fakeRecorder('r1', 'idle'));
     // Should NOT throw — replaces the stale idle entry.

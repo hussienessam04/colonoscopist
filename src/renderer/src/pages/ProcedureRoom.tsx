@@ -38,6 +38,10 @@ export default function ProcedureRoom(): JSX.Element {
   const lastLost = useLastLost();
   const [timerMs, setTimerMs] = useState(0);
   const [startInFlight, setStartInFlight] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
+  // Ref-based in-flight guard so a fast double-click can't sneak past
+  // before React re-renders the disabled state.
+  const startInFlightRef = useRef(false);
   const recordingInitRef = useRef(false);
 
   useEffect(() => {
@@ -151,18 +155,20 @@ export default function ProcedureRoom(): JSX.Element {
       void window.api.recording.stop({ procedureId }).catch(() => undefined);
       return;
     }
-    if (startInFlight) return;
+    if (startInFlightRef.current) return;
+    startInFlightRef.current = true;
     setStartInFlight(true);
+    setStartError(null);
     void (async (): Promise<void> => {
       try {
         const device = await window.api.capture.getDefaultDevice();
         if (!device) {
-          setStartInFlight(false);
+          setStartError('No default capture device set. Open Settings → Capture and pick one.');
           return;
         }
         const resolvedPreset = await window.api.capture.getPreset({ deviceId: device });
         if (!resolvedPreset) {
-          setStartInFlight(false);
+          setStartError('No preset saved for this device. Save one in Settings → Capture.');
           return;
         }
         await window.api.recording.start({
@@ -171,10 +177,11 @@ export default function ProcedureRoom(): JSX.Element {
           deviceId: device,
           preset: resolvedPreset,
         });
-      } catch {
-        // Surface via the standard error path (ipcMain throws → renderer
-        // catches); nothing else to do.
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Could not start recording.';
+        setStartError(msg);
       } finally {
+        startInFlightRef.current = false;
         setStartInFlight(false);
       }
     })();
@@ -292,6 +299,15 @@ export default function ProcedureRoom(): JSX.Element {
                     Start Recording
                   </Button>
                 )}
+                {startError ? (
+                  <p
+                    role="alert"
+                    className="text-xs text-destructive"
+                    data-testid="start-error"
+                  >
+                    {startError}
+                  </p>
+                ) : null}
                 {recordingState.status === 'recording' ? (
                   <Button
                     variant="outline"

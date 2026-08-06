@@ -384,7 +384,12 @@ describe('Recorder supervisor', () => {
       presetSummary: { kind: 'hd', resolution: '1920x1080', framerate: 30, bitrate: '10M' },
     });
 
-    // Second recorder instance tries the same id; the registry throws.
+    // First start is still in 'starting' state (no ffmpeg frame seen yet,
+    // no exit fired). The new registry semantics replace a stuck 'starting'
+    // entry with the new Recorder so the test asserts the new behavior:
+    // a second start() now SUCCEEDS by taking over the slot, rather than
+    // throwing RecorderBusyError. An in-flight Recorder in 'recording'
+    // / 'paused' / 'stopping' still throws.
     const child2 = makeFakeChild();
     const { deps: deps2 } = makeDeps({
       children: [child2],
@@ -402,7 +407,7 @@ describe('Recorder supervisor', () => {
         preset: { preset: 'sd' },
         presetSummary: SAMPLE_PRESET_SUMMARY,
       }),
-    ).rejects.toThrow(/Recorder already active|already active|busy/i);
+    ).resolves.toMatchObject({ procedureId: 'pX', startedAt: 1_500 });
   });
 
   it('pause: writes q\\n, closes segment, inserts procedure_segments row, emits paused', async () => {
