@@ -38,12 +38,12 @@ Requirements for initial release. Each maps to a roadmap phase.
 
 ### Screenshots & Procedure Review
 
-- [ ] **SCRN-01**: Doctor can take a screenshot during a procedure; screenshot is rendered from the current `<video>` preview frame to JPEG.
-- [ ] **SCRN-02**: Screenshots are persisted under `<userData>/data/media/patients/<patientId>/<procedureId>/screenshots/<timestamp>.jpg` and indexed in the `screenshots` table.
-- [ ] **REV-01**: Doctor can open a finished procedure and see the recorded video with a scrubber and play/pause controls.
-- [ ] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp.
-- [ ] **REV-03**: Doctor can take additional screenshots from playback (same path as in-procedure screenshots).
-- [ ] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy.
+- [x] **SCRN-01**: Doctor can take a screenshot during a procedure; screenshot is rendered from the current `<video>` preview frame to JPEG. _(Plan 05-01)_
+- [x] **SCRN-02**: Screenshots are persisted under `<userData>/data/media/patients/<patientId>/<procedureId>/screenshots/<timestamp>.jpg` and indexed in the `screenshots` table. _(Plan 05-01)_
+- [x] **REV-01**: Doctor can open a finished procedure and see the recorded video with a scrubber and play/pause controls. _(Plan 05-01, 05-03)_
+- [x] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp. _(Plan 05-01)_
+- [x] **REV-03**: Doctor can take additional screenshots from playback (same path as in-procedure screenshots). _(Plan 05-01)_
+- [ ] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04)_
 
 ### Reports
 
@@ -159,12 +159,12 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | CAPT-08 | Phase 4 | Pending |
 | CAPT-09 | Phase 4 | Pending |
 | CAPT-10 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
-| SCRN-01 | Phase 5 | Pending |
-| SCRN-02 | Phase 5 | Pending |
-| REV-01 | Phase 5 | Pending |
-| REV-02 | Phase 5 | Pending |
-| REV-03 | Phase 5 | Pending |
-| REV-04 | Phase 5 | Pending |
+| SCRN-01 | Phase 5 | Done (05-01: migration 0003 + screenshots IPC + repo + preload bridge) |
+| SCRN-02 | Phase 5 | Done (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey) |
+| REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture) |
+| REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete) |
+| REV-03 | Phase 5 | Done (05-01: ProcedureReview real impl with video left + scrubber + timeline + bare metadata sidebar) |
+| REV-04 | Phase 5 | Pending (lands in 05-03 trim handles + PROCEDURES_TRIM/RESTORE handlers) |
 | RPT-01 | Phase 6 | Pending |
 | RPT-02 | Phase 6 | Pending |
 | RPT-03 | Phase 6 | Pending |

@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_4_verified_complete
-stopped_at: Phase 5 context gathered
-last_updated: "2026-08-06T16:28:13.084Z"
+status: phase_5_plan_01_complete
+stopped_at: Completed 05-01-PLAN.md
+last_updated: "2026-08-06T20:52:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 20
+  completed_plans: 20
 ---
 
 # State: Colonoscopist
@@ -37,7 +37,7 @@ Extra fixes landed during Phase 4 verification (out of original SUMMARY scope):
 
 `/gsd-verify-work 4` complete: UAT status `complete`, 20/20 pass, 0 issues, 0 blocked. Phase 4 is shippable for its scope (recording + pause/resume + device-lost).
 
-Phase 5 (Screenshots + Procedure Review + Trim) is the next milestone.
+Phase 5 Plan 01 (screenshots + Procedure Review real impl) shipped: migration 0003 (screenshots table + procedures.video_path_original), IPC handlers add/list/delete/updateAnnotation, PROCEDURES_TRIM/RESTORE stubs throwing IPC_NOT_IMPLEMENTED, capture-screenshot lib, Scrubber with setPointerCapture + click-to-seek + drag-to-seek, ScreenshotTimeline with memoized ScreenshotThumbnail + Toast-undo delete store, useScreenshotIntake hook, ProcedureRoom Camera button + S hotkey, ProcedureReview replaces the Phase 4 placeholder. 39/39 unit tests pass across 6 files (migration, repo, IPC, capture-screenshot, Scrubber, ScreenshotTimeline). Plan 02 (Pause markers + Notes accordion + annotation panel) + Plan 03 (trim + /media/ route) + Plan 04 (validation + UAT) follow.
 
 ## Project Reference
 
@@ -53,7 +53,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
 | 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | complete (4/4 plans; UAT 20/20 pass; +UI enhancements) |
-| 5 | Screenshots + Procedure Review + Trim | 6 | pending |
+| 5 | Screenshots + Procedure Review + Trim | 6 | in_progress (1/4 plans) |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
 | 7 | Search & History + Audit UI + Backup/Restore + Arabic/RTL | 8 | pending |
 | 8 | Licensing (Ed25519 signed .lic + 14-day trial + activation) | 4 | pending |
@@ -120,16 +120,22 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `docs(03): record test 9 pass — auto-detect heuristic confirmed on real hardware; UAT complete (29/29)`
+- Last commit: `test(05-01): Wave 0 unit tests for migration/repo/IPC/capture-screenshot/Scrubber/Timeline`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 - All 8 Phase 3 plans have `*-SUMMARY.md`; phase-level verification can be re-run.
 - ROADMAP.md updated: Phase 3 "8/8 plans executed" with 03-07 + 03-08 added to checklist.
 
+## Phase 5 sub-plans
+
+| Plan | Title | Status |
+|------|-------|--------|
+| 05-01 | Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement | complete (39/39 unit tests pass) |
+
 ---
-*State last updated: 2026-08-03 after /gsd-verify-work 3 completed (29/29 UAT tests pass)*
+*State last updated: 2026-08-06 after 05-01-PLAN.md completed (5 of 6 SCRN/REV requirements shipped)*
 
 ## Session
 
-**Last session:** 2026-08-06T16:28:13.065Z
-**Stopped at:** Phase 5 context gathered
-**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-CONTEXT.md
+**Last session:** 2026-08-06T20:52:00.000Z
+**Stopped at:** Completed 05-01-PLAN.md
+**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-02-PLAN.md
