@@ -97,6 +97,7 @@ Plans:
 **Pitfalls addressed:** Pitfall 1 (corrupt mp4 at end of long procedure), Pitfall 2 (device-lost mid-recording), Pitfall 10 (Windows path quoting).
 **Notes:** This is the highest-leverage phase for risk concentration. The supervisor state machine lives in `src/main/recorder/` and is exercised at minimum with a 60-second recording + unplug-mock test.
 **Plans:** 4/4 plans complete
+**UAT:** 20/20 pass, 0 issues, 0 blocked (verified 2026-08-06)
 **Tracer-first decomposition:** Plan 01 ships the production-quality end-to-end recording slice (migration + injected Recorder + IPC + Record button + HH:MM:SS timer + `'procedure-review'` placeholder) covering CAPT-04..CAPT-07 + D-01/D-02/D-05/D-10/D-12; Plan 02 layers the mid-procedure notes feature covering CAPT-08 + D-06/D-07/D-08/D-09; Plan 03 layers Pause/Resume via segment-and-concat covering D-11; Plan 04 layers device-lost detection + crash-recovery covering CAPT-09 + D-03/D-04. Wave 1=Plan 01; Wave 2=Plan 02 (depends on 01); Wave 3=Plan 03 (depends on 01); Wave 4=Plan 04 (depends on 01).
 
 Plans:

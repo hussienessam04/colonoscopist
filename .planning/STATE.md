@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_3_verified_complete
-stopped_at: Phase 4 context gathered
-last_updated: "2026-08-05T12:04:07.643Z"
+status: phase_4_verified_complete
+stopped_at: Phase 4 UAT complete (20/20 pass)
+last_updated: "2026-08-06T19:30:00.000Z"
 progress:
   total_phases: 4
   completed_phases: 4
-  total_plans: 19
-  completed_plans: 19
+  total_plans: 23
+  completed_plans: 23
 ---
 
 # State: Colonoscopist
@@ -23,11 +23,20 @@ progress:
 
 ## Current Focus
 
-Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets: **FULLY VERIFIED** (all 29 UAT tests pass — 20 automated + 9 human-confirmed on Windows hardware). Gap-closure cycle closed; both `gaps_found` items from the original `03-VERIFICATION.md` (G-03-7 + G-03-8) resolved by plans 03-07 + 03-08 and re-verified end-to-end.
+Phase 4 — Recording (ffmpeg child + timer + device-lost): **FULLY VERIFIED** (all 20 UAT tests pass on Windows hardware, zero issues). Recording end-to-end works: ffmpeg-static spawns, segment files rename/concat into canonical `video.mp4`, mid-procedure notes save, Pause freezes the timer, Resume continues, Stop finalizes as `completed` (Windows EPERM on read-only fsync no longer downgrades status), device-lost detection renames the live segment to `.partial.mp4` and shows the inline banner, scanForOrphans writes `recording.crash_partial` on next launch, the recorder loads `ffmpeg-static` from `asarUnpack` in the packaged build.
 
-`/gsd-verify-work 3` complete: UAT status `complete`, no issues, no skipped-without-reason tests, no blocked tests. Phase 3 is shippable for its scope (capture + preview + presets, no recording).
+Extra fixes landed during Phase 4 verification (out of original SUMMARY scope):
+- RecorderControlsBar overlay (timer + record/pause inside the preview pane, doctor doesn't look away from the screen)
+- FramingGuide rule-of-thirds SVG overlay
+- RecIndicator red "Rec" badge during recording
+- Keyboard shortcuts (Space=pause/resume, Esc=stop, R=record, suppressed in textarea inputs)
+- Collapsible side panel (notes + device-lost banner can be hidden)
+- Cleaner headers (no "Step 1 / Step 2" labels)
+- Auto-start preview on device pick (no explicit Start Preview button)
 
-Phase 4 (Recording) is the next milestone: ffmpeg child process + procedure timer + device-lost handling. All capture-side infrastructure (IPC contract, hook release ordering, Settings surfaces, Procedure Room entry) is now in a verified-deterministic state.
+`/gsd-verify-work 4` complete: UAT status `complete`, 20/20 pass, 0 issues, 0 blocked. Phase 4 is shippable for its scope (recording + pause/resume + device-lost).
+
+Phase 5 (Screenshots + Procedure Review + Trim) is the next milestone.
 
 ## Project Reference
 
@@ -42,7 +51,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 1 | Scaffold (electron-vite + security baseline + native rebuild) | 4 | complete |
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
 | 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
-| 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | pending |
+| 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | complete (4/4 plans; UAT 20/20 pass; +UI enhancements) |
 | 5 | Screenshots + Procedure Review + Trim | 6 | pending |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
 | 7 | Search & History + Audit UI + Backup/Restore + Arabic/RTL | 8 | pending |
