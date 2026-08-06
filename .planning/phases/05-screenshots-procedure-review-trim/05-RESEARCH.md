@@ -631,7 +631,7 @@ ipcMain.handle(IPC.PROCEDURES_RESTORE, async (_e, raw) => {
 
 **If this table is empty:** Not applicable. The 8 assumptions above are noted; the planner should treat them as defaults — any change is a UI/UX tweak, not a schema or architecture change.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **None blocking.** All decisions in CONTEXT.md D-01..D-13 are explicit; the agent's-discretion items (annotation UX, capture source, thumbnail size, delete UX, handle color, restore placement, audit metadata keys, migration split) are documented with reasonable defaults above.
 
