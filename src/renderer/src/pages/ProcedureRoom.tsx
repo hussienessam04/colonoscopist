@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, CircleStop, Pause, Play } from 'lucide-react';
+import { ArrowLeft, CircleStop, Pause, Play, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import DeviceLostBanner from '@/components/device-lost-banner';
+import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
+import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import type { QualityPreset } from '@shared/ipc-contract';
 
 export default function ProcedureRoom(): JSX.Element {
   const routeState = useRoute();
@@ -18,11 +21,69 @@ export default function ProcedureRoom(): JSX.Element {
   // The recording.start call reuses this id via the `procedureId` IPC arg.
   const [procedureId] = useState<string | null>(procedureIdFromRoute || null);
 
+  // Live preview is shown here too — the doctor needs to see what is being
+  // captured during the procedure. ffmpeg will lock the device once
+  // recording starts; the preview may go dark or show a "Recording —
+  // preview locked" overlay depending on driver behaviour.
+  const { lookup, pickBrowserId } = useCaptureDeviceMap();
+  const [savedDevice, setSavedDevice] = useState<string | null>(null);
+  const [selectedBrowserId, setSelectedBrowserId] = useState<string | null>(null);
+  const [defaultLoaded, setDefaultLoaded] = useState(false);
+  const [preset, setPreset] = useState<QualityPreset>();
+  const deviceInitRef = useRef(false);
+  const preview = useVideoPreview(selectedBrowserId, preset);
+
   const recordingState = useRecordingState();
   const timer = useTimerSnapshot();
   const lastLost = useLastLost();
   const [timerMs, setTimerMs] = useState(0);
+  const [startInFlight, setStartInFlight] = useState(false);
   const recordingInitRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.capture
+      .getDefaultDevice()
+      .then((device) => {
+        if (!cancelled) setSavedDevice(device);
+      })
+      .catch(() => {
+        if (!cancelled) setSavedDevice(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDefaultLoaded(true);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!defaultLoaded || deviceInitRef.current) return;
+    deviceInitRef.current = true;
+    setSelectedBrowserId(savedDevice ? pickBrowserId(savedDevice) ?? null : null);
+  }, [defaultLoaded, pickBrowserId, savedDevice]);
+
+  const selectedCanonical = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
+
+  useEffect(() => {
+    if (!selectedCanonical) {
+      setPreset(undefined);
+      return;
+    }
+    let cancelled = false;
+    void window.api.capture
+      .getPreset({ deviceId: selectedCanonical })
+      .then((nextPreset) => {
+        if (!cancelled) setPreset(nextPreset ?? undefined);
+      })
+      .catch(() => {
+        if (!cancelled) setPreset(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedCanonical]);
 
   // Subscribe to recording:status once on mount.
   useEffect(() => {
@@ -85,23 +146,31 @@ export default function ProcedureRoom(): JSX.Element {
       void window.api.recording.stop({ procedureId }).catch(() => undefined);
       return;
     }
-    // Read the device + preset saved on the Preview page, then start.
-    // Stored via capture.getDefaultDevice + capture.getPreset (set there).
+    if (startInFlight) return;
+    setStartInFlight(true);
     void (async (): Promise<void> => {
       try {
         const device = await window.api.capture.getDefaultDevice();
-        if (!device) return;
-        const preset = await window.api.capture.getPreset({ deviceId: device });
-        if (!preset) return;
+        if (!device) {
+          setStartInFlight(false);
+          return;
+        }
+        const resolvedPreset = await window.api.capture.getPreset({ deviceId: device });
+        if (!resolvedPreset) {
+          setStartInFlight(false);
+          return;
+        }
         await window.api.recording.start({
           patientId: patientIdFromRoute,
           procedureId,
           deviceId: device,
-          preset,
+          preset: resolvedPreset,
         });
       } catch {
         // Surface via the standard error path (ipcMain throws → renderer
         // catches); nothing else to do.
+      } finally {
+        setStartInFlight(false);
       }
     })();
   }
@@ -143,15 +212,46 @@ export default function ProcedureRoom(): JSX.Element {
         </header>
 
         <section className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-          <div className="overflow-hidden rounded-xl border bg-card p-8 shadow-sm">
-            <div className="flex flex-col gap-4">
-              <div>
+          <div className="flex flex-col gap-4">
+            <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
+              <div className="relative aspect-video">
+                <video
+                  ref={preview.videoRef}
+                  autoPlay
+                  muted
+                  playsInline
+                  aria-label="Live capture preview"
+                  className="size-full object-contain"
+                />
+                {!defaultLoaded ? (
+                  <div className="absolute inset-0 grid place-items-center text-sm text-slate-400">
+                    Finding capture devices…
+                  </div>
+                ) : !selectedCanonical ? (
+                  <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
+                    <div className="flex max-w-md flex-col items-center gap-3">
+                      <Video className="size-9 text-slate-400" aria-hidden="true" />
+                      <p className="font-medium">No device selected — set a default in Settings → Capture</p>
+                      <Button
+                        variant="secondary"
+                        onClick={() => navigate({ name: 'settings-capture' })}
+                      >
+                        Open Settings
+                      </Button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 rounded-xl border bg-card p-5 shadow-sm">
+              <div className="flex flex-col gap-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Procedure duration
                 </p>
                 <p
                   aria-label="Procedure duration"
-                  className="font-mono text-5xl tabular-nums text-foreground"
+                  className="font-mono text-3xl tabular-nums text-foreground"
                   data-testid="procedure-duration"
                 >
                   {timerLabel}
@@ -180,7 +280,7 @@ export default function ProcedureRoom(): JSX.Element {
                 ) : (
                   <Button
                     onClick={handleRecordToggle}
-                    disabled={!procedureId || recordingBusy}
+                    disabled={!procedureId || recordingBusy || startInFlight || !selectedCanonical || !preset}
                     data-testid="record-button"
                   >
                     <CircleStop aria-hidden="true" />

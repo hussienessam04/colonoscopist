@@ -9,7 +9,15 @@ export const recorderRegistry = {
   set(procedureId: string, recorder: Recorder): void {
     const existing = globalRegistry.get(procedureId);
     if (existing && existing !== recorder) {
-      throw new RecorderBusyError(procedureId);
+      // Stale entry from a previous session whose stop() completed
+      // cleanly (state='idle') is safe to replace — the new start()
+      // takes over the procedureId. An active recorder (state !== idle)
+      // still throws RecorderBusyError.
+      if (existing.getState() === 'idle') {
+        globalRegistry.delete(procedureId);
+      } else {
+        throw new RecorderBusyError(procedureId);
+      }
     }
     globalRegistry.set(procedureId, recorder);
   },

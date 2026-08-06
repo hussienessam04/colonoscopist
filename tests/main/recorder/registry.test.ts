@@ -8,7 +8,8 @@ import {
 } from '../../../src/main/recorder/registry';
 import type { Recorder } from '../../../src/main/recorder/recorder';
 
-const fakeRecorder = (id: string): Recorder => ({}) as Recorder;
+const fakeRecorder = (id: string, state: 'idle' | 'recording' = 'idle'): Recorder =>
+  ({ getState: () => state }) as unknown as Recorder;
 
 afterEach(() => {
   __resetRecorderRegistry();
@@ -23,8 +24,15 @@ describe('recorderRegistry', () => {
   });
 
   it('rejects a second recorder for the same procedureId with RecorderBusyError', () => {
-    recorderRegistry.set('p1', fakeRecorder('r1'));
+    recorderRegistry.set('p1', fakeRecorder('r1', 'recording'));
     expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).toThrow(RecorderBusyError);
+  });
+
+  it('allows a fresh recorder to replace an idle entry (stale-session cleanup)', () => {
+    recorderRegistry.set('p1', fakeRecorder('r1', 'idle'));
+    // Should NOT throw — replaces the stale idle entry.
+    expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).not.toThrow();
+    expect(recorderRegistry.get('p1')).toBeDefined();
   });
 
   it('delete() lets a fresh recorder claim the procedureId', () => {
