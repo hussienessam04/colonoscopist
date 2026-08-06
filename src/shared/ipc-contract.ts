@@ -49,6 +49,11 @@ export const IPC = {
   // carries the `paused` + `resumed` arms.
   RECORDING_PAUSE: 'recording:pause',
   RECORDING_RESUME: 'recording:resume',
+  // Force-cleanup: renderer unmounts ProcedureRoom while recording is
+  // active (e.g. doctor clicks "Back to Preview" mid-recording). Main
+  // kills any active recorder for the given procedureId so the next
+  // session isn't blocked by a stale registry entry.
+  RECORDING_FORCE_CLEANUP: 'recording:force-cleanup',
   // Push event channel — value is the channel string the renderer subscribes to.
   RECORDING_STATUS: 'recording:status',
 } as const;
@@ -291,6 +296,7 @@ export interface IpcContract {
     stop: (input: { procedureId: string }) => Promise<void>;
     pause: (input: { procedureId: string }) => Promise<void>;
     resume: (input: { procedureId: string }) => Promise<void>;
+    forceCleanup: (input: { procedureId: string }) => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
   };
 }

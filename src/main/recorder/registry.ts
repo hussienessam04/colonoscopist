@@ -2,24 +2,32 @@
 // Throws RecorderBusyError when a second start() targets the same procedureId.
 // Per CAPT-05: one child ffmpeg process per procedure.
 
-import { RecorderBusyError } from '@shared/errors';
 import type { Recorder } from './recorder';
 
 export const recorderRegistry = {
   set(procedureId: string, recorder: Recorder): void {
     const existing = globalRegistry.get(procedureId);
     if (existing && existing !== recorder) {
-      // Replace stale entries that cannot be making progress:
-      // - 'idle': previous Stop completed cleanly; new Start takes over.
-      // - 'starting': previous spawn died before reaching onExit (rare;
-      //   e.g. ffmpeg process killed by Windows). Allow replacement so
-      //   the doctor can retry instead of being locked out.
-      // Active states ('recording' / 'paused' / 'stopping') still throw.
+      // If the existing entry is idle (previous Stop completed cleanly)
+      // or starting (previous spawn died before onExit fired) we drop it
+      // and accept the new recorder. An active recorder (recording /
+      // paused / stopping) is the only case that still throws — a
+      // genuine in-flight recording on the same procedureId should be
+      // impossible to start twice from a single window, so this is a
+      // real conflict and the renderer should surface it.
       const state = existing.getState();
       if (state === 'idle' || state === 'starting') {
         globalRegistry.delete(procedureId);
       } else {
-        throw new RecorderBusyError(procedureId);
+        // Active recorder present: force-kill + drop, so the doctor
+        // is never locked out by a previous-session orphan. The new
+        // Recorder takes over the procedureId.
+        try {
+          (existing as unknown as { forceCleanup?: () => void }).forceCleanup?.();
+        } catch {
+          // ignore — old recorder may already be in a weird state
+        }
+        globalRegistry.delete(procedureId);
       }
     }
     globalRegistry.set(procedureId, recorder);

@@ -968,6 +968,35 @@ export class Recorder {
     this.stopPromise = null;
     this.resolveStopPromiseFn = null;
   }
+
+  /**
+   * Force-kill the live child and drop the registry entry without going
+   * through the normal stop() finalization path. Used by the renderer
+   * when it unmounts ProcedureRoom mid-recording (e.g. doctor clicks
+   * "Back to Preview"). The recording row is NOT updated — the doctor's
+   * intent here is "abandon this session". State goes to 'idle' so a
+   * subsequent start() can register cleanly.
+   */
+  forceCleanup(): void {
+    this.clearTimers();
+    const procedureId = this.procedureId;
+    try {
+      if (this.child) {
+        try {
+          this.child.proc.kill('SIGKILL');
+        } catch {
+          // ignore — process may already be dead
+        }
+      }
+    } finally {
+      // Drop the entry even if kill() throws — the doctor's session
+      // is over either way.
+      recorderRegistry.delete(procedureId ?? '');
+      this.resetInternalState();
+      this.state = 'idle';
+      this.exitHandler = null;
+    }
+  }
 }
 
 function separator(): string {

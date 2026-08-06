@@ -1,7 +1,6 @@
 // ponytail: one child per procedureId + busy error (per D-01 + Anti-Pattern 5).
 
 import { afterEach, describe, expect, it } from 'vitest';
-import { RecorderBusyError } from '../../../src/shared/errors';
 import {
   recorderRegistry,
   __resetRecorderRegistry,
@@ -23,9 +22,15 @@ describe('recorderRegistry', () => {
     expect(recorderRegistry.has('p1')).toBe(true);
   });
 
-  it('rejects a second recorder for the same procedureId with RecorderBusyError', () => {
+  it('replaces an active recorder by force-cleaning it (never blocks the doctor)', () => {
+    // The renderer is the only place that can fire recording:start for
+    // a given procedureId. If it fires twice (e.g. user clicks Start
+    // after a hung previous session) we MUST unblock them — the
+    // supervisor orphans an active child via forceCleanup and
+    // accepts the new Recorder.
     recorderRegistry.set('p1', fakeRecorder('r1', 'recording'));
-    expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).toThrow(RecorderBusyError);
+    expect(() => recorderRegistry.set('p1', fakeRecorder('r2'))).not.toThrow();
+    expect(recorderRegistry.get('p1')).toBeDefined();
   });
 
   it('allows a fresh recorder to replace a stuck \'starting\' entry (stale-spawn cleanup)', () => {
