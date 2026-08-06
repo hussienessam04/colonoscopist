@@ -1,43 +1,40 @@
-// Procedure Review — Phase 5 / Plan 01. Per D-10 + D-12 + D-13 — video left,
-// scrubber + screenshot timeline below the video, bare procedure metadata
-// sidebar right. Trim handles, pause markers, Notes accordion land in
-// Plan 02 + Plan 03. The <video> src is a placeholder until Plan 03 wires
-// the `/media/` route on PreviewServer — click-to-seek wiring is exercised
-// via test fixtures that mock the <video> element's currentTime getter/setter.
+// Procedure Review — Phase 5 / Plan 02. Per D-10 + D-12 + D-13 — video left,
+// scrubber + screenshot timeline below the video, right rail gains the
+// read-only Notes accordion + the conditional `<DeviceLostBanner>` for
+// partial recordings. Plan 03 wires the `/media/` route on PreviewServer
+// + the trim action panel.
+//
+// D-11 — the Scrubber receives `segments` from `useProcedures` so pause
+// markers render as tick marks. The default no-pause case (zero segments)
+// renders a clean track.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import DeviceLostBanner from '@/components/device-lost-banner';
 import { Scrubber } from '@/components/Scrubber';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
-import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
+import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
+import { StatusBadge } from '@/components/StatusBadge';
+import { useProcedures } from '@/hooks/useProcedures';
 import { useRoute } from '@/store/route';
-import { useLastLost } from '@/store/recording';
+import { useLastLost, recordingStore } from '@/store/recording';
 import { useScreenshotToasts, screenshotToastStore } from '@/store/screenshot-toast';
+import { captureScreenshot } from '@/lib/capture-screenshot';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { Patient, Procedure, ProcedureStatus, Screenshot } from '@shared/ipc-contract';
+import type { Patient, Screenshot } from '@shared/ipc-contract';
 
 function formatTimestamp(ms: number | null): string {
   if (ms === null) return '—';
   return new Date(ms).toISOString().replace('T', ' ').slice(0, 19);
 }
 
-function statusBadgeVariant(
-  status: ProcedureStatus,
-): 'default' | 'secondary' | 'destructive' {
-  if (status === 'completed') return 'default';
-  if (status === 'recording') return 'secondary';
-  return 'destructive';
-}
-
 // Per D-13 — the doctor can play + capture on partial recordings, but Trim
-// is disabled (no meaningful cut for a half-formed mp4). For Plan 01 we
+// is disabled (no meaningful cut for a half-formed mp4). For Plan 02 we
 // just expose the playback + capture; Trim ships in Plan 03.
-function isInteractiveStatus(status: ProcedureStatus): boolean {
+function isInteractiveStatus(status: string): boolean {
   return status === 'recording' || status === 'completed' || status === 'partial';
 }
 
@@ -50,53 +47,18 @@ export default function ProcedureReview({
   const route = useRoute().current;
   const routeProcedureId = route.name === 'procedure-review' ? route.procedureId : null;
   const procedureId = initialId ?? routeProcedureId ?? null;
-  const [procedure, setProcedure] = useState<Procedure | null>(null);
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [loading, setLoading] = useState(true);
+
+  const { procedure, segments, screenshots, refresh, updateAnnotation } = useProcedures(procedureId);
   const lastLost = useLastLost();
 
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [currentMs, setCurrentMs] = useState(0);
-
-  const [screenshotList, setScreenshotList] = useState<Screenshot[]>([]);
-
-  const screenshotIntake = useScreenshotIntake({
-    procedureId: procedureId ?? '',
-    sourceRef: videoRef,
-    isRecording: false,
-    startedAt: null,
-  });
-  // ponytail: keep a single source-of-truth for the screenshot list so the
-  // timeline + capture handler share state. The hook's internal state is
-  // discarded after the first load.
+  // Fetch the patient row separately so the metadata sidebar shows the
+  // full name (procedure.patientId is a UUID, not human-readable).
+  const [patient, setPatient] = useState<Patient | null>(null);
   useEffect(() => {
-    setScreenshotList(screenshotIntake.screenshots);
-  }, [screenshotIntake.screenshots]);
-
-  const toasts = useScreenshotToasts();
-
-  useEffect(() => {
-    if (!procedureId) return;
-    let cancelled = false;
-    setLoading(true);
-    void window.api.procedures
-      .get({ id: procedureId })
-      .then((row) => {
-        if (!cancelled) setProcedure(row);
-      })
-      .catch(() => {
-        if (!cancelled) setProcedure(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [procedureId]);
-
-  useEffect(() => {
-    if (!procedure || !procedure.patientId) return;
+    if (!procedure?.patientId) {
+      setPatient(null);
+      return;
+    }
     let cancelled = false;
     void window.api.patients
       .get(procedure.patientId)
@@ -111,10 +73,8 @@ export default function ProcedureReview({
     };
   }, [procedure?.patientId]);
 
-  const durationMs = useMemo(() => {
-    if (!procedure) return 0;
-    return procedure.durationSeconds * 1000;
-  }, [procedure?.durationSeconds]);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [currentMs, setCurrentMs] = useState(0);
 
   // Track video time updates while playing.
   useEffect(() => {
@@ -136,37 +96,66 @@ export default function ProcedureReview({
   }, []);
 
   const handleCapture = useCallback(async (): Promise<void> => {
-    const result = await screenshotIntake.capture();
-    if (result) {
-      setScreenshotList((prev) => [...prev, result]);
-      toast.success('Screenshot captured');
-    } else {
-      toast.error('Failed to capture screenshot');
+    const video = videoRef.current;
+    if (!video) {
+      toast.error('Video not ready');
+      return;
     }
-  }, [screenshotIntake]);
-
-  const handleDelete = useCallback(
-    (s: Screenshot): void => {
-      // Optimistic UI: remove the screenshot from local state immediately
-      // so the × visual feels instant (D-12). The Toast store schedules
-      // the actual IPC delete after 5s; the user can Undo before then.
-      setScreenshotList((prev) => prev.filter((row) => row.id !== s.id));
-      screenshotToastStore.enqueueDelete(s.id, s.procedureId);
-      toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
-        duration: 5_000,
-        action: {
-          label: 'Undo',
-          onClick: () => screenshotToastStore.undoDelete(s.id),
-        },
+    if (video.readyState < 2) {
+      toast.error('Video metadata not loaded yet');
+      return;
+    }
+    try {
+      const { base64 } = await captureScreenshot(video);
+      const timestampInVideoMs = Math.max(0, Math.round(video.currentTime * 1000));
+      if (!procedure) return;
+      await window.api.screenshots.add({
+        procedureId: procedure.id,
+        timestampInVideoMs,
+        jpegBase64: base64,
       });
+      toast.success('Screenshot captured');
+      void refresh();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to capture screenshot');
+    }
+  }, [procedure, refresh]);
+
+  const handleDelete = useCallback((s: Screenshot): void => {
+    // Optimistic UI: remove the screenshot from local state immediately
+    // so the × visual feels instant (D-12). The Toast store schedules
+    // the actual IPC delete after 5s; the user can Undo before then.
+    void refresh().then(() => undefined);
+    screenshotToastStore.enqueueDelete(s.id, s.procedureId);
+    toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
+      duration: 5_000,
+      action: {
+        label: 'Undo',
+        onClick: () => screenshotToastStore.undoDelete(s.id),
+      },
+    });
+  }, [refresh]);
+
+  const handleAnnotate = useCallback(
+    async (screenshot: Screenshot, annotation: string | null): Promise<void> => {
+      try {
+        await updateAnnotation(screenshot.id, annotation);
+      } catch {
+        // toast already fired inside updateAnnotation
+      }
     },
-    [],
+    [updateAnnotation],
   );
 
-  // ponytail: if a delete expires and the IPC fails, we have no rollback
-  // here — the screenshot is gone from local state. Plan 02's pull-right
-  // guard refines this; Plan 01 ships the simple happy-path version.
-  void toasts; // ensure subscription so the store's listeners stay wired
+  // ponytail: subscribe to the toast store so its listeners stay wired
+  // (mirrors Plan 01). The subscription is otherwise unused.
+  const toasts = useScreenshotToasts();
+  void toasts;
+
+  const durationMs = useMemo(() => {
+    if (!procedure) return 0;
+    return procedure.durationSeconds * 1000;
+  }, [procedure?.durationSeconds]);
 
   if (!procedureId) {
     return (
@@ -195,6 +184,7 @@ export default function ProcedureReview({
                 ? navigate({ name: 'patient-detail', id: procedure.patientId })
                 : navigate({ name: 'patients' })
             }
+            data-testid="procedure-review-back"
           >
             <ArrowLeft aria-hidden="true" />
             {procedure ? 'Back to Patient' : 'Back'}
@@ -223,88 +213,83 @@ export default function ProcedureReview({
                 </div>
               ) : null}
             </div>
-            <Scrubber durationMs={durationMs} currentMs={currentMs} onSeek={handleSeek} />
+            <Scrubber
+              durationMs={durationMs}
+              currentMs={currentMs}
+              onSeek={handleSeek}
+              segments={segments}
+            />
             <ScreenshotTimeline
               procedureId={procedureId}
-              screenshots={screenshotList}
+              status={procedure?.status}
+              screenshots={screenshots}
               onSeek={handleSeek}
               onCapture={handleCapture}
               onDelete={handleDelete}
+              onAnnotate={handleAnnotate}
             />
-
-            {procedure?.status === 'partial' ? (
-              <Alert
-                variant="destructive"
-                data-testid="procedure-review-partial-alert"
-              >
-                <AlertTitle>Partial recording</AlertTitle>
-                <AlertDescription>
-                  {procedure.videoPath.endsWith('.partial.mp4') ? (
-                    <>
-                      Recording stopped because the capture device disconnected.
-                      The mp4 was preserved up to{' '}
-                      <span className="font-mono">
-                        {formatDurationHHMMSS(lastLost?.lastKnownTimestampMs ?? 0)}
-                      </span>
-                      .
-                    </>
-                  ) : (
-                    <>
-                      Recording ended unexpectedly. The mp4 may be shorter
-                      than the wall-clock duration. Check the audit log for
-                      the cause.
-                    </>
-                  )}
-                </AlertDescription>
-              </Alert>
-            ) : null}
           </div>
 
-          <Card data-testid="procedure-review-metadata">
-            <CardHeader>
-              <CardTitle>Procedure</CardTitle>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm">
-              {loading ? (
-                <p className="text-muted-foreground">Loading…</p>
-              ) : procedure ? (
-                <>
-                  <p>
-                    <span className="font-medium">Patient:</span>{' '}
-                    {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
-                  </p>
-                  <p>
-                    <span className="font-medium">Started:</span>{' '}
-                    {formatTimestamp(procedure.startedAt)}
-                  </p>
-                  <p>
-                    <span className="font-medium">Ended:</span>{' '}
-                    {formatTimestamp(procedure.endedAt)}
-                  </p>
-                  <p>
-                    <span className="font-medium">Duration:</span>{' '}
-                    {formatDurationHHMMSS(procedure.durationSeconds * 1000)}
-                  </p>
-                  <p>
-                    <span className="font-medium">Status:</span>{' '}
-                    {procedure.status === 'partial' ? null : (
-                      <Badge
-                        variant={statusBadgeVariant(procedure.status)}
-                        className="capitalize"
-                      >
-                        {procedure.status}
-                      </Badge>
-                    )}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Video: <code className="break-all">{procedure.videoPath}</code>
-                  </p>
-                </>
-              ) : (
-                <p className="text-destructive">Procedure not found.</p>
-              )}
-            </CardContent>
-          </Card>
+          <aside className="flex flex-col gap-3" data-testid="procedure-review-right">
+            <Card data-testid="procedure-review-metadata">
+              <CardHeader>
+                <CardTitle>Procedure</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                {procedure ? (
+                  <>
+                    <p>
+                      <span className="font-medium">Patient:</span>{' '}
+                      {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Started:</span>{' '}
+                      {formatTimestamp(procedure.startedAt)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Ended:</span>{' '}
+                      {formatTimestamp(procedure.endedAt)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Duration:</span>{' '}
+                      {formatDurationHHMMSS(durationMs)}
+                    </p>
+                    <p>
+                      <span className="font-medium">Status:</span>{' '}
+                      <StatusBadge status={procedure.status} />
+                    </p>
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">Loading…</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <ProcedureNotesReview
+              procedureId={procedureId}
+              status={procedure?.status ?? 'completed'}
+            />
+
+            {procedure?.status === 'partial' && procedure.videoPath.endsWith('.partial.mp4') ? (
+              <DeviceLostBanner
+                lastLost={lastLost}
+                onDismiss={() => recordingStore.clearLastLost()}
+              />
+            ) : null}
+
+            {procedure && procedure.status !== 'partial' ? (
+              <Card className="border-dashed bg-muted/30">
+                <CardHeader>
+                  <CardTitle className="text-base font-medium text-muted-foreground">
+                    Trim
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-muted-foreground">
+                  Trim ships in Plan 03.
+                </CardContent>
+              </Card>
+            ) : null}
+          </aside>
         </section>
       </div>
     </main>

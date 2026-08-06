@@ -261,6 +261,30 @@ export function registerProceduresIpc(opts: {
       throw asIpcError(err);
     }
   });
+
+  // Phase 5 / Plan 02 — pause-marker source for the review scrubber (D-11).
+  // Returns rows in their canonical order (segmentIndex ASC).
+  ipcMain.handle(IPC.PROCEDURES_LIST_SEGMENTS, (_e, raw) => {
+    try {
+      const { procedureId } = safeParse(
+        z.object({ procedureId: z.string().uuid() }),
+        raw,
+        'procedureId',
+      );
+      const userId = requireSession();
+      const rows = proceduresRepo.listSegments(procedureId);
+      audit({
+        action: 'procedure.segments_list',
+        entityType: 'procedure',
+        entityId: procedureId,
+        userId,
+        metadata: { procedureId, count: rows.length },
+      });
+      return rows;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
 }
 
 function defaultPresetSummary(): import('@shared/ipc-contract').PresetSummary {

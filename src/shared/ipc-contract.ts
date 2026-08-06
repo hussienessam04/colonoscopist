@@ -64,6 +64,9 @@ export const IPC = {
   SCREENSHOTS_UPDATE_ANNOTATION: 'screenshots:update-annotation',
   PROCEDURES_TRIM: 'procedures:trim',
   PROCEDURES_RESTORE: 'procedures:restore',
+  // Phase 5 / Plan 02 — pause markers from procedure_segments. Renderer
+  // fetches the segments list so the Scrubber can render D-11 ticks.
+  PROCEDURES_LIST_SEGMENTS: 'procedures:list-segments',
 } as const;
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
@@ -307,6 +310,9 @@ export interface IpcContract {
     // in Plan 01; Plan 03 fills them. @plan Implemented in Plan 03/05-03.
     trim: (input: { id: string; inMs: number; outMs: number }) => Promise<Procedure>;
     restore: (input: { id: string }) => Promise<Procedure>;
+    // Phase 5 / Plan 02 — pause-marker source. Returns the procedure_segments
+    // rows for the scrubber (D-11).
+    listSegments: (input: { procedureId: string }) => Promise<ProcedureSegment[]>;
   };
   // Plan 02-of-phase-04 fills the main handlers. Preload bridge is final here
   // so the renderer contract never needs to change shape in Plan 02.

@@ -1,0 +1,132 @@
+// useProcedures — SWR-style hook for the Procedure Review screen.
+// Plan 02 unifies the fetch + capture + annotation lifecycle into one hook
+// so the screen state doesn't duplicate across `useScreenshotIntake` +
+// ad-hoc `useEffect` fetches.
+//
+// Surface:
+//   procedure   — row from `procedures.get({ id })`
+//   segments    — rows from `proceduresRepo.listSegments(procedureId)` via
+//                 `procedures.listSegments({ procedureId })`
+//   notes       — rows from `procedureNotes.list({ procedureId })` ASC
+//   screenshots — rows from `screenshots.list({ procedureId })` ASC
+//   loading     — true until the parallel fetch settles (or errors)
+//   error       — first rejection (string for `useState` ergonomics)
+//   refresh     — re-fetches all four slices in parallel
+//   updateAnnotation — optimistic local mutation + IPC round-trip;
+//                       on failure, restores the prior value + toasts
+//
+// ponytail: no `useReducer`, no Zustand — `useState` + `useEffect` is
+// enough for one screen. The hook is single-purpose.
+
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
+import type {
+  Procedure,
+  ProcedureNote,
+  ProcedureSegment,
+  Screenshot,
+} from '@shared/ipc-contract';
+
+export type UseProceduresResult = {
+  procedure: Procedure | null;
+  segments: ProcedureSegment[];
+  notes: ProcedureNote[];
+  screenshots: Screenshot[];
+  loading: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  updateAnnotation: (id: number, annotation: string | null) => Promise<void>;
+};
+
+export function useProcedures(procedureId: string | null): UseProceduresResult {
+  const [procedure, setProcedure] = useState<Procedure | null>(null);
+  const [segments, setSegments] = useState<ProcedureSegment[]>([]);
+  const [notes, setNotes] = useState<ProcedureNote[]>([]);
+  const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  // ponytail: refreshInFlightRef guards against concurrent refresh calls
+  // (e.g. fast double-click on a Capture button). The second call awaits
+  // the first so the local state stays consistent.
+  const refreshInFlightRef = useRef<Promise<void> | null>(null);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!procedureId) {
+      setProcedure(null);
+      setSegments([]);
+      setNotes([]);
+      setScreenshots([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
+    if (refreshInFlightRef.current) return refreshInFlightRef.current;
+    const promise = (async (): Promise<void> => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [proc, segs, noteRows, shotRows] = await Promise.all([
+          window.api.procedures.get({ id: procedureId }),
+          window.api.procedures.listSegments({ procedureId }),
+          window.api.procedureNotes.list({ procedureId }),
+          window.api.screenshots.list({ procedureId }),
+        ]);
+        setProcedure(proc ?? null);
+        setSegments(segs);
+        setNotes(noteRows);
+        setScreenshots(shotRows);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to load procedure');
+      } finally {
+        setLoading(false);
+        refreshInFlightRef.current = null;
+      }
+    })();
+    refreshInFlightRef.current = promise;
+    return promise;
+  }, [procedureId]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const updateAnnotation = useCallback(
+    async (id: number, annotation: string | null): Promise<void> => {
+      // Optimistic local update + rollback on failure.
+      let prev: Screenshot | null = null;
+      setScreenshots((rows) =>
+        rows.map((row) => {
+          if (row.id !== id) return row;
+          prev = row;
+          return { ...row, annotation };
+        }),
+      );
+      try {
+        const updated = await window.api.screenshots.updateAnnotation({ id, annotation });
+        setScreenshots((rows) => rows.map((row) => (row.id === id ? updated : row)));
+      } catch (err: unknown) {
+        // Roll back to the previous value if the IPC failed.
+        if (prev !== null) {
+          setScreenshots((rows) =>
+            rows.map((row) => (row.id === id ? (prev as Screenshot) : row)),
+          );
+        }
+        const msg = err instanceof Error ? err.message : 'Failed to save annotation';
+        toast.error(msg);
+        throw err;
+      }
+    },
+    [],
+  );
+
+  return {
+    procedure,
+    segments,
+    notes,
+    screenshots,
+    loading,
+    error,
+    refresh,
+    updateAnnotation,
+  };
+}

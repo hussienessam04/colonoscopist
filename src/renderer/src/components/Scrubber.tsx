@@ -1,18 +1,25 @@
 // Scrubber — single-track click-to-seek + drag-to-seek control.
-// Plan 01 ships the BARE scrubber; Plan 02 stacks Pause markers + Plan 03
-// stacks Trim handles as child layers over the same track.
+//
+// Plan 02 adds pause markers from `procedure_segments` (D-11). Each marker
+// is a thin vertical tick positioned at `segment.startedAtMs / durationMs * 100%`
+// of the track width. Plan 03 stacks trim handles over the same track.
 //
 // PITFALLS §8 — pointer events use `setPointerCapture` so the drag stays
 // alive when the cursor leaves the track rectangle (e.g. doctor drags
 // all the way to the right edge of the screen). Without the capture, the
 // drag stops at the track border, which surfaces as a stuck handle.
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import '@/styles/scrubber.css';
+import { formatDurationHHMMSS } from '@/lib/format-duration';
+import type { ProcedureSegment } from '@shared/ipc-contract';
 
 export type ScrubberProps = {
   durationMs: number;
   currentMs: number;
   onSeek: (ms: number) => void;
+  // D-11 — pause markers. When undefined or empty, the track renders clean.
+  segments?: ProcedureSegment[];
   ariaLabel?: string;
   testId?: string;
 };
@@ -33,6 +40,7 @@ export function Scrubber({
   durationMs,
   currentMs,
   onSeek,
+  segments,
   ariaLabel = 'Procedure scrubber',
   testId = 'scrubber-track',
 }: ScrubberProps): JSX.Element {
@@ -83,6 +91,17 @@ export function Scrubber({
 
   const fillPct = pctFor(currentMs, durationMs);
 
+  // ponytail: memoize the markers list so a re-render driven by currentMs
+  // doesn't allocate a new array (PITFALLS §4 — sibling re-renders).
+  const markers = useMemo(() => {
+    if (!segments || segments.length === 0 || durationMs <= 0) return [];
+    return segments.map((seg, i) => {
+      const left = pctFor(seg.startedAt, durationMs);
+      const pauseLabel = `Pause ${i + 1}: ${formatDurationHHMMSS(seg.startedAt)}\u2013${formatDurationHHMMSS(seg.endedAt)}`;
+      return { key: seg.id, left, pauseLabel };
+    });
+  }, [segments, durationMs]);
+
   return (
     <div
       ref={trackRef}
@@ -97,13 +116,23 @@ export function Scrubber({
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      className="relative h-8 cursor-pointer select-none touch-none rounded bg-slate-200"
+      className="scrubber-track relative h-8 cursor-pointer select-none touch-none rounded bg-slate-200"
     >
       <div
-        className="absolute inset-y-0 left-0 rounded bg-slate-500"
+        className="scrubber-progress absolute inset-y-0 left-0 rounded bg-slate-500"
         style={{ width: `${fillPct}%` }}
         data-testid="scrubber-fill"
       />
+      {markers.map((m) => (
+        <div
+          key={m.key}
+          className="scrubber-pause-marker absolute inset-y-0 w-0.5 bg-slate-700/40"
+          style={{ left: `${m.left}%` }}
+          aria-label={m.pauseLabel}
+          title={m.pauseLabel}
+          data-testid="scrubber-pause-marker"
+        />
+      ))}
     </div>
   );
 }

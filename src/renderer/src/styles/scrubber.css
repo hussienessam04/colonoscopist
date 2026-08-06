@@ -1,0 +1,30 @@
+/* Scrubber utility classes — pointer-event specifics that Tailwind doesn't
+ * express cleanly.
+ *
+ * - `touch-action: none` on the track so Pointer Events don't get hijacked by
+ *   native scroll (PITFALLS §8) on Windows tablets / touch laptops.
+ * - `user-select: none` so a long press doesn't start a text selection.
+ * - Pause markers and trim handles live in the same track div with z-index
+ *   ordering so Plan 02's markers (z=1) sit beneath Plan 03's trim handles
+ *   (z=10); the progress fill is the bottom layer (z=0).
+ */
+
+.scrubber-track {
+  touch-action: none;
+  user-select: none;
+}
+
+.scrubber-progress {
+  z-index: 0;
+}
+
+.scrubber-pause-marker {
+  z-index: 1;
+  pointer-events: auto;
+}
+
+.scrubber-trim-handle {
+  z-index: 10;
+  pointer-events: auto;
+  cursor: ew-resize;
+}

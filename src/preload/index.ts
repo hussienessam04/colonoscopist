@@ -52,6 +52,8 @@ const api: IpcContract = {
     // contract surface doesn't shift between plans.
     trim: (input) => ipcRenderer.invoke(IPC.PROCEDURES_TRIM, input),
     restore: (input) => ipcRenderer.invoke(IPC.PROCEDURES_RESTORE, input),
+    // Plan 02 — pause-marker source for the review scrubber.
+    listSegments: (input) => ipcRenderer.invoke(IPC.PROCEDURES_LIST_SEGMENTS, input),
   },
   // Plan 02-of-phase-04 fills the main handlers; preload bridge is final here
   // so the renderer contract never needs to change shape.
