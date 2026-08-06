@@ -75,30 +75,15 @@ export default function ProcedurePreview(): JSX.Element {
 
   const selectedCanonical = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
 
-  // Lazy-create the procedure row on mount so the procedureId is ready when
-  // the doctor clicks Continue. Reuse the incoming procedureId if the route
-  // already carries one (return-from-procedure-room path).
-  const [procedureId, setProcedureId] = useState<string | null>(
+  // Procedure row id is created on Continue click (not on mount). This way
+  // the Continue button is always clickable; we surface any IPC error
+  // inline. Reuse the incoming procedureId if the route carries one
+  // (return-from-procedure-room path).
+  const [procedureId] = useState<string | null>(
     incomingProcedureId ?? null,
   );
-  const procedureInitRef = useRef(incomingProcedureId != null);
-  useEffect(() => {
-    if (procedureInitRef.current) return;
-    if (!patientId) return;
-    procedureInitRef.current = true;
-    let cancelled = false;
-    void window.api.procedures
-      .create({ patientId })
-      .then((row: Procedure) => {
-        if (!cancelled) setProcedureId(row.id);
-      })
-      .catch(() => {
-        if (!cancelled) procedureInitRef.current = false;
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [patientId]);
+  const [procedureError, setProcedureError] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const ready = !loading && defaultLoaded;
   const hasSelection = selectedBrowserId !== null;
@@ -108,13 +93,36 @@ export default function ProcedurePreview(): JSX.Element {
   }
 
   function continueToRecording(): void {
-    if (!procedureId || !patientId) return;
-    preview.stop();
-    navigate({
-      name: 'procedure-room',
-      patientId,
-      procedureId,
-    });
+    if (!patientId || creating) return;
+    // If we already have a procedureId (incoming route param), go straight.
+    if (procedureId) {
+      preview.stop();
+      navigate({
+        name: 'procedure-room',
+        patientId,
+        procedureId,
+      });
+      return;
+    }
+    // Otherwise create one now, then navigate.
+    setCreating(true);
+    setProcedureError(null);
+    window.api.procedures
+      .create({ patientId })
+      .then((row: Procedure) => {
+        preview.stop();
+        navigate({
+          name: 'procedure-room',
+          patientId,
+          procedureId: row.id,
+        });
+      })
+      .catch((err: unknown) => {
+        setCreating(false);
+        setProcedureError(
+          err instanceof Error ? err.message : 'Could not prepare the procedure row.',
+        );
+      });
   }
 
   return (
@@ -220,16 +228,27 @@ export default function ProcedurePreview(): JSX.Element {
 
             <Button
               onClick={continueToRecording}
-              disabled={!procedureId}
+              disabled={creating || !patientId}
               data-testid="continue-to-recording-button"
             >
-              Continue to recording
+              {creating ? 'Preparing…' : 'Continue to recording'}
               <ArrowRight aria-hidden="true" />
             </Button>
+            {procedureError ? (
+              <p
+                role="alert"
+                className="text-xs text-destructive"
+                data-testid="procedure-error"
+              >
+                {procedureError}
+              </p>
+            ) : null}
             <p className="text-xs text-muted-foreground">
-              {procedureId
-                ? 'Procedure row ready. Continue once you are happy with the framing.'
-                : 'Preparing procedure row…'}
+              {creating
+                ? 'Preparing procedure row…'
+                : procedureId
+                  ? 'Procedure row ready. Continue once you are happy with the framing.'
+                  : 'Click Continue to start the procedure.'}
             </p>
           </aside>
         </section>
