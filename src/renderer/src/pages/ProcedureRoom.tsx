@@ -42,7 +42,6 @@ export default function ProcedureRoom(): JSX.Element {
   // Ref-based in-flight guard so a fast double-click can't sneak past
   // before React re-renders the disabled state.
   const startInFlightRef = useRef(false);
-  const recordingInitRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,10 +93,14 @@ export default function ProcedureRoom(): JSX.Element {
     };
   }, [selectedCanonical]);
 
-  // Subscribe to recording:status once on mount.
+  // Subscribe to recording:status on mount. React 18 StrictMode runs
+  // effects twice in dev (mount/unmount/remount). We let React handle
+  // the lifecycle — no manual guard ref — so the second mount gets its
+  // own listener. (The previous recordingInitRef guard suppressed the
+  // second mount's subscribe, leaving the live component with no
+  // listener — which is why the timer never ticked even though main
+  // emitted 'started' status rows.)
   useEffect(() => {
-    if (recordingInitRef.current) return;
-    recordingInitRef.current = true;
     const unsubscribe = window.api.recording.onStatus((status) => {
       recordingStore.setStatus(status);
     });
