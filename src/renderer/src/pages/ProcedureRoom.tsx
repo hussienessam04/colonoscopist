@@ -59,9 +59,14 @@ export default function ProcedureRoom(): JSX.Element {
   }, []);
 
   useEffect(() => {
-    if (!defaultLoaded || deviceInitRef.current) return;
+    if (!defaultLoaded || !savedDevice || deviceInitRef.current) return;
+    // pickBrowserId() depends on the hook's browser+dshow mapping; if the
+    // mapping hasn't resolved yet it returns undefined. Wait until we get
+    // a real browser deviceId before committing + locking.
+    const browserId = pickBrowserId(savedDevice);
+    if (browserId === undefined) return;
+    setSelectedBrowserId(browserId);
     deviceInitRef.current = true;
-    setSelectedBrowserId(savedDevice ? pickBrowserId(savedDevice) ?? null : null);
   }, [defaultLoaded, pickBrowserId, savedDevice]);
 
   const selectedCanonical = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
