@@ -99,4 +99,82 @@ describe('Scrubber', () => {
     render(<Scrubber durationMs={10_000} currentMs={0} onSeek={onSeek} segments={[]} />);
     expect(screen.queryAllByTestId('scrubber-pause-marker')).toHaveLength(0);
   });
+
+  // Plan 03 — trim handles (D-06).
+  it('renders two trim handles + a trim region when trimMode=true + inMs/outMs supplied', () => {
+    const onSeek = vi.fn();
+    const onTrim = vi.fn();
+    render(
+      <Scrubber
+        durationMs={20_000}
+        currentMs={0}
+        onSeek={onSeek}
+        trimMode={true}
+        inMs={2_000}
+        outMs={18_000}
+        onTrim={onTrim}
+      />,
+    );
+    expect(screen.getByTestId('scrubber-trim-handle-in')).toBeInTheDocument();
+    expect(screen.getByTestId('scrubber-trim-handle-out')).toBeInTheDocument();
+    expect(screen.getByTestId('scrubber-trim-region')).toBeInTheDocument();
+  });
+
+  it('does NOT render trim handles when trimMode=false (default)', () => {
+    const onSeek = vi.fn();
+    render(<Scrubber durationMs={20_000} currentMs={0} onSeek={onSeek} />);
+    expect(screen.queryByTestId('scrubber-trim-handle-in')).toBeNull();
+    expect(screen.queryByTestId('scrubber-trim-handle-out')).toBeNull();
+    expect(screen.queryByTestId('scrubber-trim-region')).toBeNull();
+  });
+
+  it('in-handle drag clamps at outMs - 1000ms (1000ms minimum gap)', () => {
+    const onSeek = vi.fn();
+    const onTrim = vi.fn();
+    render(
+      <Scrubber
+        durationMs={20_000}
+        currentMs={0}
+        onSeek={onSeek}
+        trimMode={true}
+        inMs={2_000}
+        outMs={10_000}
+        onTrim={onTrim}
+      />,
+    );
+    const inHandle = screen.getByTestId('scrubber-trim-handle-in') as HTMLElement;
+    inHandle.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, top: 0, left: 0, right: 200, bottom: 32, width: 200, height: 32, toJSON: () => '' }) as DOMRect;
+    const track = screen.getByTestId('scrubber-track') as HTMLElement;
+    track.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, top: 0, left: 0, right: 200, bottom: 32, width: 200, height: 32, toJSON: () => '' }) as DOMRect;
+    // Attempt to drag the in-handle to 90% (18_000ms), past outMs (10_000ms).
+    // clampHandle should pin it at outMs - 1000 = 9_000ms.
+    fireEvent.pointerDown(inHandle, { pointerId: 1, clientX: 180, button: 0 });
+    expect(onTrim).toHaveBeenCalledWith({ inMs: 9_000, outMs: 10_000 });
+  });
+
+  it('out-handle drag clamps at inMs + 1000ms (1000ms minimum gap)', () => {
+    const onSeek = vi.fn();
+    const onTrim = vi.fn();
+    render(
+      <Scrubber
+        durationMs={20_000}
+        currentMs={0}
+        onSeek={onSeek}
+        trimMode={true}
+        inMs={5_000}
+        outMs={10_000}
+        onTrim={onTrim}
+      />,
+    );
+    const outHandle = screen.getByTestId('scrubber-trim-handle-out') as HTMLElement;
+    const track = screen.getByTestId('scrubber-track') as HTMLElement;
+    track.getBoundingClientRect = () =>
+      ({ x: 0, y: 0, top: 0, left: 0, right: 200, bottom: 32, width: 200, height: 32, toJSON: () => '' }) as DOMRect;
+    // Attempt to drag the out-handle to 10% (2_000ms), past inMs (5_000ms).
+    // clampHandle should pin it at inMs + 1000 = 6_000ms.
+    fireEvent.pointerDown(outHandle, { pointerId: 2, clientX: 20, button: 0 });
+    expect(onTrim).toHaveBeenCalledWith({ inMs: 5_000, outMs: 6_000 });
+  });
 });

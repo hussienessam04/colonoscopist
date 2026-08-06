@@ -4,6 +4,7 @@
 // happens at read time via path.join(app.getPath('userData'), storedRelPath).
 
 import type Database from 'better-sqlite3';
+import { existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { getDb } from './index';
 import type {
@@ -13,6 +14,7 @@ import type {
   PresetSummary,
 } from '@shared/ipc-contract';
 import { IpcErrorException, ipcError } from '@shared/errors';
+import { videoFilePath } from '../paths';
 
 type ProcedureRow = {
   id: string;
@@ -23,6 +25,7 @@ type ProcedureRow = {
   duration_seconds: number;
   status: 'recording' | 'completed' | 'partial' | 'crashed';
   video_path: string;
+  video_path_original: string | null;
   preset_summary: string;
   audio_device_name: string | null;
   created_at: number;
@@ -74,6 +77,8 @@ let cached: {
   getIncludingDeleted: Stmt;
   updateStartedAt: Stmt;
   updateFinalized: Stmt;
+  updateVideoPath: Stmt;
+  restoreFromOriginal: Stmt;
   listAll: Stmt;
   listByPatient: Stmt;
   listByStatus: Stmt;
@@ -101,6 +106,15 @@ function stmts() {
     updateStartedAt: db.prepare('UPDATE procedures SET started_at = ? WHERE id = ?'),
     updateFinalized: db.prepare(
       `UPDATE procedures SET ended_at = @ended_at, duration_seconds = @duration_seconds, status = @status, video_path = @video_path WHERE id = @id`,
+    ),
+    // D-07 — updateVideoPath rewrites video_path to the latest trimmed file
+    // AND preserves video_path_original via COALESCE so only the FIRST trim
+    // populates the column; subsequent trims leave it untouched.
+    updateVideoPath: db.prepare(
+      `UPDATE procedures SET video_path = ?, video_path_original = COALESCE(video_path_original, ?) WHERE id = ?`,
+    ),
+    restoreFromOriginal: db.prepare(
+      `UPDATE procedures SET video_path = video_path_original WHERE id = ? AND video_path_original IS NOT NULL`,
     ),
     listAll: db.prepare(
       `SELECT * FROM procedures ORDER BY started_at DESC LIMIT @limit OFFSET @offset`,
@@ -164,6 +178,7 @@ function rowToProcedure(row: ProcedureRow): Procedure {
     durationSeconds: row.duration_seconds,
     status: row.status,
     videoPath: row.video_path,
+    videoPathOriginal: row.video_path_original,
     presetSummary: summary,
     audioDeviceName: row.audio_device_name,
     createdAt: row.created_at,
@@ -241,6 +256,52 @@ export const proceduresRepo = {
     });
     const row = stmts().getIncludingDeleted.get(id) as ProcedureRow;
     return rowToProcedure(row);
+  },
+
+  // D-07 / D-09 — Trim repo methods.
+  //
+  // updateVideoPath rewrites video_path to the latest trimmed file. The
+  // `video_path_original` column is populated ONLY when NULL (COALESCE);
+  // subsequent trims leave it untouched so Restore always re-points to the
+  // original canonical mp4, never to an intermediate trimmed file.
+  //
+  // `originalRel` is the userData-relative path of the file the trimmed
+  // file was cut from (i.e. the row's PREVIOUS video_path). On the first
+  // trim, this is the canonical recording mp4. On subsequent trims, the
+  // COALESCE guard keeps the FIRST trim's path as the restore source.
+  updateVideoPath(id: string, newRel: string, originalRel: string): Procedure {
+    stmts().updateVideoPath.run(newRel, originalRel, id);
+    const row = stmts().getIncludingDeleted.get(id) as ProcedureRow;
+    return rowToProcedure(row);
+  },
+
+  // D-09 — Restore from video_path_original. Validates (1) the row exists,
+  // (2) video_path_original is not null (no prior trim), and (3) the
+  // original file still exists on disk (defensive against backup-restore
+  // paths that dropped the original mp4). When all three pass, re-points
+  // video_path to video_path_original in-place.
+  restoreFromOriginal(id: string): Procedure {
+    const row = stmts().getIncludingDeleted.get(id) as ProcedureRow | undefined;
+    if (!row) {
+      throw new IpcErrorException(ipcError('IPC_NOT_FOUND', `Procedure ${id} not found`));
+    }
+    if (!row.video_path_original) {
+      throw new IpcErrorException(
+        ipcError('IPC_VALIDATION', 'No original recording to restore from'),
+      );
+    }
+    const originalAbs = videoFilePath(row.patient_id, id, row.video_path_original);
+    if (!existsSync(originalAbs)) {
+      throw new IpcErrorException(
+        ipcError(
+          'IPC_NOT_FOUND',
+          `Original recording file missing at ${row.video_path_original}`,
+        ),
+      );
+    }
+    stmts().restoreFromOriginal.run(id);
+    const updated = stmts().getIncludingDeleted.get(id) as ProcedureRow;
+    return rowToProcedure(updated);
   },
 
   // Find a procedure whose stored `video_path` matches the given partial-mp4

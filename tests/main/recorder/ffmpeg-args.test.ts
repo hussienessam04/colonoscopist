@@ -1,7 +1,8 @@
 // D-12 + per-preset bitrate matrix. Pure function — no I/O.
 
 import { describe, expect, it } from 'vitest';
-import { buildFfmpegArgs } from '../../../src/main/recorder/ffmpeg-args';
+import { buildFfmpegArgs, buildTrimArgs } from '../../../src/main/recorder/ffmpeg-args';
+import { EmptyFfmpegArgsError } from '../../../src/shared/errors';
 
 describe('buildFfmpegArgs', () => {
   it('returns the D-12 arg array for SD preset', () => {
@@ -150,5 +151,94 @@ describe('buildFfmpegArgs', () => {
       previewTcpPort: 0,
     });
     expect(args).not.toContain('mjpeg');
+  });
+});
+
+describe('buildTrimArgs', () => {
+  it('returns the D-08 argv shape for a 20s trim starting at 5s', () => {
+    const args = buildTrimArgs({
+      inputPath: 'C:\\Users\\demo\\video.mp4',
+      inMs: 5_000,
+      outMs: 25_000,
+      outputPath: 'C:\\Users\\demo\\video-trimmed.mp4',
+    });
+    expect(args).toEqual([
+      '-ss', '5',
+      '-i', 'C:\\Users\\demo\\video.mp4',
+      '-t', '20',
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      '-y', 'C:\\Users\\demo\\video-trimmed.mp4',
+    ]);
+  });
+
+  it('enforces the 1000ms minimum gap with a small trim', () => {
+    const args = buildTrimArgs({
+      inputPath: '/tmp/video.mp4',
+      inMs: 0,
+      outMs: 1_000,
+      outputPath: '/tmp/trimmed.mp4',
+    });
+    expect(args).toEqual([
+      '-ss', '0',
+      '-i', '/tmp/video.mp4',
+      '-t', '1',
+      '-c', 'copy',
+      '-movflags', '+faststart',
+      '-y', '/tmp/trimmed.mp4',
+    ]);
+  });
+
+  it('handles a 60-second gap on a typical procedure', () => {
+    const args = buildTrimArgs({
+      inputPath: '/tmp/v.mp4',
+      inMs: 10_000,
+      outMs: 70_000,
+      outputPath: '/tmp/v-trimmed.mp4',
+    });
+    expect(args[args.indexOf('-ss') + 1]).toBe('10');
+    expect(args[args.indexOf('-t') + 1]).toBe('60');
+    expect(args).toContain('-c');
+    expect(args[args.indexOf('-c') + 1]).toBe('copy');
+    expect(args).toContain('-movflags');
+    expect(args[args.indexOf('-movflags') + 1]).toBe('+faststart');
+  });
+
+  it('rejects outMs <= inMs with EmptyFfmpegArgsError (PITFALLS §6)', () => {
+    expect(() =>
+      buildTrimArgs({
+        inputPath: '/tmp/video.mp4',
+        inMs: 5_000,
+        outMs: 5_000,
+        outputPath: '/tmp/trimmed.mp4',
+      }),
+    ).toThrow(EmptyFfmpegArgsError);
+    expect(() =>
+      buildTrimArgs({
+        inputPath: '/tmp/video.mp4',
+        inMs: 10_000,
+        outMs: 5_000,
+        outputPath: '/tmp/trimmed.mp4',
+      }),
+    ).toThrow(/must be greater than inMs/);
+  });
+
+  it('rejects empty input/output paths', () => {
+    expect(() =>
+      buildTrimArgs({
+        inputPath: '',
+        inMs: 0,
+        outMs: 1_000,
+        outputPath: '/tmp/trimmed.mp4',
+      }),
+    ).toThrow(EmptyFfmpegArgsError);
+    expect(() =>
+      buildTrimArgs({
+        inputPath: '/tmp/video.mp4',
+        inMs: 0,
+        outMs: 1_000,
+        outputPath: '',
+      }),
+    ).toThrow(EmptyFfmpegArgsError);
   });
 });

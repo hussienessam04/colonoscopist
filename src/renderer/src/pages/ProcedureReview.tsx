@@ -1,8 +1,13 @@
-// Procedure Review — Phase 5 / Plan 02. Per D-10 + D-12 + D-13 — video left,
+// Procedure Review — Phase 5 / Plan 03. Per D-10 + D-12 + D-13 — video left,
 // scrubber + screenshot timeline below the video, right rail gains the
 // read-only Notes accordion + the conditional `<DeviceLostBanner>` for
-// partial recordings. Plan 03 wires the `/media/` route on PreviewServer
-// + the trim action panel.
+// partial recordings + the new `<TrimControls>` panel.
+//
+// Plan 03 wires:
+//   - the `/media/` route on the long-lived MediaServer (via useMediaUrl)
+//     to source the `<video>` element;
+//   - the trim handles on the Scrubber (via useTrim);
+//   - the right-rail Trim panel (via TrimControls + useTrim).
 //
 // D-11 — the Scrubber receives `segments` from `useProcedures` so pause
 // markers render as tick marks. The default no-pause case (zero segments)
@@ -18,13 +23,16 @@ import { Scrubber } from '@/components/Scrubber';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
 import { StatusBadge } from '@/components/StatusBadge';
+import { TrimControls } from '@/components/TrimControls';
 import { useProcedures } from '@/hooks/useProcedures';
 import { useRoute } from '@/store/route';
 import { useLastLost, recordingStore } from '@/store/recording';
 import { useScreenshotToasts, screenshotToastStore } from '@/store/screenshot-toast';
+import { useMediaUrl } from '@/hooks/useMediaUrl';
+import { useTrim } from '@/hooks/useTrim';
 import { captureScreenshot } from '@/lib/capture-screenshot';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { Patient, Screenshot } from '@shared/ipc-contract';
+import type { Patient, Procedure, Screenshot } from '@shared/ipc-contract';
 
 function formatTimestamp(ms: number | null): string {
   if (ms === null) return '—';
@@ -50,6 +58,7 @@ export default function ProcedureReview({
 
   const { procedure, segments, screenshots, refresh, updateAnnotation } = useProcedures(procedureId);
   const lastLost = useLastLost();
+  const mediaUrl = useMediaUrl();
 
   // Fetch the patient row separately so the metadata sidebar shows the
   // full name (procedure.patientId is a UUID, not human-readable).
@@ -75,6 +84,45 @@ export default function ProcedureReview({
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [currentMs, setCurrentMs] = useState(0);
+
+  const durationMs = useMemo(() => {
+    if (!procedure) return 0;
+    return procedure.durationSeconds * 1000;
+  }, [procedure?.durationSeconds]);
+
+  // Plan 03 — trim orchestration. The hook returns inMs/outMs local
+  // state + IPC round-trip wiring; the parent passes the updated
+  // procedure back to refresh the right-rail metadata.
+  const trim = useTrim(procedureId ?? '', durationMs, useCallback((updated: Procedure) => {
+    // Refresh procedure + everything else so the new videoPath + the
+    // restored videoPath flow through.
+    void refresh();
+    // Reload the <video> element so the trimmed / restored mp4 plays.
+    // The src recomposes below in the effect that depends on
+    // procedure.videoPath.
+    const v = videoRef.current;
+    if (v) v.load();
+    void updated;
+  }, [refresh]));
+
+  // Compose the media URL. The procedure's `videoPath` is the userData-
+  // relative form (e.g. `data/media/patients/<p>/<proc>/video.mp4`);
+  // we only want the leaf filename for the MediaServer's `/media/`
+  // route.
+  const videoSrc = useMemo(() => {
+    if (!mediaUrl.url || !procedure?.videoPath) return null;
+    const fileName = procedure.videoPath.replace(/^.*[\\/]/, '');
+    return `${mediaUrl.url}/media/${procedure.patientId}/${procedure.id}/${fileName}`;
+  }, [mediaUrl.url, procedure?.videoPath, procedure?.patientId, procedure?.id]);
+
+  // Reload the <video> element when the src recomposes (post-trim or
+  // post-restore). The `procedure.videoPath` dep is the trigger.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && videoSrc) {
+      v.load();
+    }
+  }, [videoSrc]);
 
   // Track video time updates while playing.
   useEffect(() => {
@@ -152,11 +200,6 @@ export default function ProcedureReview({
   const toasts = useScreenshotToasts();
   void toasts;
 
-  const durationMs = useMemo(() => {
-    if (!procedure) return 0;
-    return procedure.durationSeconds * 1000;
-  }, [procedure?.durationSeconds]);
-
   if (!procedureId) {
     return (
       <main className="min-h-screen bg-slate-100 p-6">
@@ -201,6 +244,7 @@ export default function ProcedureReview({
                 className="aspect-video w-full"
                 data-testid="procedure-review-video"
                 aria-label="Procedure recording playback"
+                src={videoSrc ?? undefined}
               />
               {procedure && !isInteractiveStatus(procedure.status) ? (
                 <div className="bg-slate-100 p-6 text-center text-sm text-slate-500">
@@ -209,7 +253,7 @@ export default function ProcedureReview({
               ) : null}
               {!procedure?.videoPath ? (
                 <div className="bg-slate-100 p-6 text-center text-sm text-slate-500">
-                  Video preview unavailable — `/media/` route ships in Plan 03.
+                  Video preview unavailable — record a procedure first.
                 </div>
               ) : null}
             </div>
@@ -218,6 +262,13 @@ export default function ProcedureReview({
               currentMs={currentMs}
               onSeek={handleSeek}
               segments={segments}
+              trimMode={trim.trimMode}
+              inMs={trim.inMs}
+              outMs={trim.outMs}
+              onTrim={(range) => {
+                trim.setInMs(range.inMs);
+                trim.setOutMs(range.outMs);
+              }}
             />
             <ScreenshotTimeline
               procedureId={procedureId}
@@ -231,6 +282,24 @@ export default function ProcedureReview({
           </div>
 
           <aside className="flex flex-col gap-3" data-testid="procedure-review-right">
+            <ProcedureNotesReview
+              procedureId={procedureId}
+              status={procedure?.status ?? 'completed'}
+            />
+
+            <TrimControls
+              status={procedure?.status ?? 'completed'}
+              videoPathOriginal={procedure?.videoPathOriginal ?? null}
+              inMs={trim.inMs}
+              outMs={trim.outMs}
+              trimMode={trim.trimMode}
+              setTrimMode={trim.setTrimMode}
+              applying={trim.applying}
+              restoring={trim.restoring}
+              apply={trim.apply}
+              restore={trim.restore}
+            />
+
             <Card data-testid="procedure-review-metadata">
               <CardHeader>
                 <CardTitle>Procedure</CardTitle>
@@ -267,29 +336,11 @@ export default function ProcedureReview({
               </CardContent>
             </Card>
 
-            <ProcedureNotesReview
-              procedureId={procedureId}
-              status={procedure?.status ?? 'completed'}
-            />
-
             {procedure?.status === 'partial' && procedure.videoPath.endsWith('.partial.mp4') ? (
               <DeviceLostBanner
                 lastLost={lastLost}
                 onDismiss={() => recordingStore.clearLastLost()}
               />
-            ) : null}
-
-            {procedure && procedure.status !== 'partial' ? (
-              <Card className="border-dashed bg-muted/30">
-                <CardHeader>
-                  <CardTitle className="text-base font-medium text-muted-foreground">
-                    Trim
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="text-xs text-muted-foreground">
-                  Trim ships in Plan 03.
-                </CardContent>
-              </Card>
             ) : null}
           </aside>
         </section>

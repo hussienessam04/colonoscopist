@@ -79,6 +79,8 @@ const api: IpcContract = {
         );
       };
     },
+    // Plan 03 — long-lived media server URL for the renderer's <video>.
+    getMediaUrl: () => ipcRenderer.invoke(IPC.RECORDING_GET_MEDIA_URL),
   },
   // Phase 5 / Plan 01 — screenshot IPC. `add` carries the JPEG inline as
   // base64 to avoid an extra multipart upload via the preview server.

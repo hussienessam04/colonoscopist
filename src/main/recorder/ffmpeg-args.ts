@@ -81,3 +81,45 @@ export function buildFfmpegArgs(opts: FfmpegArgsOptions): string[] {
   }
   return args;
 }
+
+// Phase 5 / Plan 03 / D-08 — pure builder for the one-shot trim subprocess.
+// Mirrors Phase 4 concat.ts: pure argv, no spawn, no I/O — for unit tests.
+//
+// -ss BEFORE -i enables fast keyframe-aligned seek (PITFALLS §2); accepts
+// ±500 ms accuracy per D-08. -c copy is mandatory because -ss after -i
+// would require a re-encode (incompatible with stream copy).
+// -movflags +faststart rewrites the moov atom to the FRONT of the file
+// (PITFALLS §1) so the trimmed mp4 plays in browsers without a full
+// download first.
+// -y overwrites the output path without prompting (the trimmed file is a
+// sibling of the original — we never overwrite the original mp4 itself).
+export type BuildTrimArgsInput = {
+  inputPath: string;
+  inMs: number;
+  outMs: number;
+  outputPath: string;
+};
+
+export function buildTrimArgs(opts: BuildTrimArgsInput): string[] {
+  if (!opts.inputPath || opts.inputPath.length === 0) {
+    throw new EmptyFfmpegArgsError('inputPath is empty');
+  }
+  if (!opts.outputPath || opts.outputPath.length === 0) {
+    throw new EmptyFfmpegArgsError('outputPath is empty');
+  }
+  if (opts.outMs <= opts.inMs) {
+    // PITFALLS §6 / D-08 — outMs must be strictly greater than inMs.
+    // Negative or zero duration breaks ffmpeg's -t arithmetic.
+    throw new EmptyFfmpegArgsError('outMs must be greater than inMs');
+  }
+  const inSec = (opts.inMs / 1000).toString();
+  const durationSec = ((opts.outMs - opts.inMs) / 1000).toString();
+  return [
+    '-ss', inSec,
+    '-i', opts.inputPath,
+    '-t', durationSec,
+    '-c', 'copy',
+    '-movflags', '+faststart',
+    '-y', opts.outputPath,
+  ];
+}

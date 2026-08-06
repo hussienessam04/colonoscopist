@@ -10,6 +10,13 @@ import path from 'node:path';
 let tmpDir: string;
 const handlers = new Map<string, (...args: unknown[]) => unknown>();
 
+// Stub spawn so applyTrim's ffmpeg subprocess returns exit code 0 without
+// a real binary. Tests in this file that exercise trim need this.
+const spawnMock = vi.fn();
+vi.mock('node:child_process', () => ({
+  spawn: (...args: unknown[]) => spawnMock(...args),
+}));
+
 vi.mock('electron', () => ({
   app: {
     getPath: (key: string) => (key === 'userData' ? tmpDir : tmpDir),
@@ -44,6 +51,18 @@ vi.mock('electron', () => ({
 beforeEach(() => {
   tmpDir = mkdtempSync(path.join(tmpdir(), 'colonosco-procedures-ipc-'));
   handlers.clear();
+  spawnMock.mockReset();
+  spawnMock.mockImplementation(() => {
+    return {
+      stderr: { on: () => undefined },
+      on: (e: string, cb: (...a: unknown[]) => void) => {
+        if (e === 'exit') {
+          Promise.resolve().then(() => cb(0, null));
+        }
+      },
+      kill: () => undefined,
+    };
+  });
 });
 
 afterEach(() => {
@@ -203,5 +222,241 @@ describe('procedures IPC', () => {
       total: number;
     };
     expect(page2.rows).toHaveLength(1);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Plan 03 — procedures.trim + procedures.restore real handlers.
+  //
+  // The trim handler invokes applyTrim (which spawns ffmpeg); we stub
+  // the child_process spawn so the test doesn't need a real ffmpeg
+  // binary. The restore handler is purely a repo round-trip.
+  // ─────────────────────────────────────────────────────────────────────────
+
+  it('procedures.trim rejects partial recordings with IPC_VALIDATION (D-13)', async () => {
+    const adminId = await bootstrapAndLogin();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+
+    const patientId = '00000000-0000-4000-8000-000000000030';
+    db.prepare(
+      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Carol', '1993-03-03', Date.now(), Date.now());
+    const inserted = proceduresRepo.insert({
+      patientId,
+      doctorId: adminId,
+      videoPath: 'video.partial.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    proceduresRepo.updateFinalized(inserted.id, {
+      endedAt: Date.now(),
+      durationSeconds: 30,
+      status: 'partial',
+      videoPath: 'video.partial.mp4',
+    });
+
+    const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
+    registerProceduresIpc({
+      createProcedure: () => {
+        throw new Error('not used');
+      },
+    });
+
+    const trimHandler = handlers.get('procedures:trim');
+    expect(trimHandler).toBeDefined();
+    let caught: unknown = null;
+    try {
+      await trimHandler!({}, { id: inserted.id, inMs: 0, outMs: 5_000 });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).not.toBeNull();
+    const wrapped = caught as Error & { ipcError?: { code: string; message: string } };
+    expect(wrapped.ipcError?.code).toBe('IPC_VALIDATION');
+    expect(wrapped.ipcError?.message).toMatch(/partial/);
+  });
+
+  it('procedures.restore rejects when video_path_original is null', async () => {
+    const adminId = await bootstrapAndLogin();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+
+    const patientId = '00000000-0000-4000-8000-000000000040';
+    db.prepare(
+      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Dave', '1994-04-04', Date.now(), Date.now());
+    const inserted = proceduresRepo.insert({
+      patientId,
+      doctorId: adminId,
+      videoPath: 'video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    proceduresRepo.updateFinalized(inserted.id, {
+      endedAt: Date.now(),
+      durationSeconds: 60,
+      status: 'completed',
+      videoPath: 'video.mp4',
+    });
+
+    const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
+    registerProceduresIpc({
+      createProcedure: () => {
+        throw new Error('not used');
+      },
+    });
+
+    const restoreHandler = handlers.get('procedures:restore');
+    expect(restoreHandler).toBeDefined();
+    let caught: unknown = null;
+    try {
+      await restoreHandler!({}, { id: inserted.id });
+    } catch (err) {
+      caught = err;
+    }
+    const wrapped = caught as Error & { ipcError?: { code: string; message: string } };
+    expect(wrapped.ipcError?.code).toBe('IPC_VALIDATION');
+    expect(wrapped.ipcError?.message).toMatch(/original/i);
+  });
+
+  it('procedures.restore succeeds when video_path_original is populated + file exists', async () => {
+    const adminId = await bootstrapAndLogin();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+
+    const patientId = '00000000-0000-4000-8000-000000000050';
+    db.prepare(
+      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Eve', '1995-05-05', Date.now(), Date.now());
+    const inserted = proceduresRepo.insert({
+      patientId,
+      doctorId: adminId,
+      videoPath: 'video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    proceduresRepo.updateFinalized(inserted.id, {
+      endedAt: Date.now(),
+      durationSeconds: 60,
+      status: 'completed',
+      videoPath: 'video.mp4',
+    });
+    // Write the original file so restoreFromOriginal's fs.existsSync check
+    // passes.
+    const origAbs = path.join(
+      tmpDir,
+      'data',
+      'media',
+      'patients',
+      patientId,
+      inserted.id,
+      'video.mp4',
+    );
+    mkdirSync(path.dirname(origAbs), { recursive: true });
+    writeFileSync(origAbs, Buffer.alloc(64));
+    // Now simulate a prior trim having populated video_path_original.
+    proceduresRepo.updateVideoPath(inserted.id, 'video-trimmed.mp4', 'video.mp4');
+
+    const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
+    registerProceduresIpc({
+      createProcedure: () => {
+        throw new Error('not used');
+      },
+    });
+
+    const restoreHandler = handlers.get('procedures:restore');
+    expect(restoreHandler).toBeDefined();
+    const restored = (await restoreHandler!({}, { id: inserted.id })) as {
+      videoPath: string;
+      videoPathOriginal: string;
+    };
+    expect(restored.videoPath).toBe('video.mp4');
+    expect(restored.videoPathOriginal).toBe('video.mp4');
+
+    // Audit row carries the procedure.restored action.
+    const auditRows = db
+      .prepare(`SELECT action FROM audit_log WHERE entity_id = ? ORDER BY id ASC`)
+      .all(inserted.id) as { action: string }[];
+    expect(auditRows.some((r) => r.action === 'procedure.restored')).toBe(true);
+  });
+
+  it('procedures.trim audits procedure.trimmed with userData-relative paths', async () => {
+    const adminId = await bootstrapAndLogin();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+    const { writeFileSync, mkdirSync } = await import('node:fs');
+
+    const patientId = '00000000-0000-4000-8000-000000000060';
+    db.prepare(
+      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Frank', '1996-06-06', Date.now(), Date.now());
+    const inserted = proceduresRepo.insert({
+      patientId,
+      doctorId: adminId,
+      videoPath: 'video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    proceduresRepo.updateFinalized(inserted.id, {
+      endedAt: Date.now(),
+      durationSeconds: 60,
+      status: 'completed',
+      videoPath: 'video.mp4',
+    });
+    // Write the source file so applyTrim's existsSync check passes.
+    const srcAbs = path.join(
+      tmpDir,
+      'data',
+      'media',
+      'patients',
+      patientId,
+      inserted.id,
+      'video.mp4',
+    );
+    mkdirSync(path.dirname(srcAbs), { recursive: true });
+    writeFileSync(srcAbs, Buffer.alloc(64));
+
+    // Stub spawn so applyTrim's ffmpeg subprocess returns exit code 0
+    // without needing a real binary. The mock is set up in beforeEach()
+    // at the module level.
+
+    const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
+    registerProceduresIpc({
+      createProcedure: () => {
+        throw new Error('not used');
+      },
+    });
+
+    const trimHandler = handlers.get('procedures:trim');
+    expect(trimHandler).toBeDefined();
+    const trimmed = (await trimHandler!({}, {
+      id: inserted.id,
+      inMs: 1_000,
+      outMs: 30_000,
+    })) as { videoPath: string; videoPathOriginal: string };
+    expect(trimmed.videoPath).toBe('video-trimmed.mp4');
+    expect(trimmed.videoPathOriginal).toBe('video.mp4');
+
+    // Audit row carries procedure.trimmed + the userData-relative paths.
+    const auditRows = db
+      .prepare(
+        `SELECT action, metadata FROM audit_log WHERE entity_id = ? AND action = 'procedure.trimmed'`,
+      )
+      .all(inserted.id) as { action: string; metadata: string | null }[];
+    expect(auditRows.length).toBeGreaterThan(0);
+    const meta = JSON.parse(auditRows[0]?.metadata ?? '{}');
+    expect(meta.inMs).toBe(1_000);
+    expect(meta.outMs).toBe(30_000);
+    expect(meta.originalVideoPath).toBe('video.mp4');
+    expect(meta.trimmedVideoPath).toBe('video-trimmed.mp4');
   });
 });

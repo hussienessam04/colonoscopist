@@ -56,6 +56,9 @@ export const IPC = {
   RECORDING_FORCE_CLEANUP: 'recording:force-cleanup',
   // Push event channel — value is the channel string the renderer subscribes to.
   RECORDING_STATUS: 'recording:status',
+  // Phase 5 / Plan 03 — long-lived media server URL for the renderer's
+  // <video> element to compose /media/<patientId>/<procedureId>/<file>.
+  RECORDING_GET_MEDIA_URL: 'recording:get-media-url',
   // Phase 5 / Plan 01 — screenshots + trim surface. Trim/restore handlers
   // throw IPC_NOT_IMPLEMENTED in Plan 01; Plan 03 fills them.
   SCREENSHOTS_ADD: 'screenshots:add',
@@ -181,6 +184,10 @@ export type Procedure = {
   durationSeconds: number;
   status: ProcedureStatus;
   videoPath: string;
+  // D-07 — populated on the first trim and never overwritten. The trim
+  // IPC handler reads this column to decide the canonical restore source;
+  // the renderer uses it to gate the "Restore original" button.
+  videoPathOriginal: string | null;
   presetSummary: PresetSummary;
   audioDeviceName: string | null;
   createdAt: number;
@@ -327,6 +334,9 @@ export interface IpcContract {
   // Renderer's <img src=previewUrl> subscribes while isRecording===true so
   // the doctor sees the camera feed during recording (ffmpeg holds the
   // DirectShow device lock so renderer's getUserMedia can't get a stream).
+  // Plan 05-03 adds getMediaUrl(): long-lived localhost URL that the renderer
+  // composes with `/media/<patientId>/<procedureId>/<videoFile>` for the
+  // <video> element. Stays bound across ProcedureReview sessions.
   recording: {
     start: (input: { patientId: string; procedureId?: string; deviceId: string; preset: QualityPreset }) => Promise<{ procedureId: string; startedAt: number; previewUrl: string }>;
     stop: (input: { procedureId: string }) => Promise<void>;
@@ -334,6 +344,7 @@ export interface IpcContract {
     resume: (input: { procedureId: string }) => Promise<void>;
     forceCleanup: (input: { procedureId: string }) => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
+    getMediaUrl: () => Promise<string>;
   };
   // Phase 5 / Plan 01. `add` takes the base64 JPEG inline so the renderer
   // doesn't need an extra file-write round-trip; the IPC handler writes the

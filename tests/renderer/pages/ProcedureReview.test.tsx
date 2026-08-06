@@ -196,13 +196,15 @@ describe('ProcedureReview', () => {
     expect(capture).not.toBeDisabled();
   });
 
-  it('shows the Trim placeholder card for non-partial procedures', async () => {
+  it('shows the real TrimControls card for non-partial procedures (Plan 03)', async () => {
     setupApiForStatus('completed', 'data/media/video.mp4', 0);
 
     render(<ProcedureReview />);
 
     await waitFor(() => {
-      expect(screen.getByText(/Trim ships in Plan 03\./i)).toBeInTheDocument();
+      // Plan 03 replaces the placeholder card with the real TrimControls.
+      expect(screen.getByTestId('trim-controls')).toBeInTheDocument();
+      expect(screen.getByTestId('trim-mode-toggle')).toBeInTheDocument();
     });
   });
 });

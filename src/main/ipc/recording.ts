@@ -16,7 +16,7 @@ import { canonicalizeOrThrow } from '../capture/canonicalize';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
 import { Recorder, type RecorderDeps } from '../recorder/recorder';
-import { recorderRegistry } from '../recorder/registry';
+import { getMediaServer, recorderRegistry } from '../recorder/registry';
 import { recordingStartInput, procedureIdInput } from '@shared/validators';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
@@ -205,6 +205,26 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
         );
       }
       await recorder.resume();
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  // Phase 5 / Plan 03 — long-lived media server URL. The renderer's
+  // <video> element composes `/media/<patientId>/<procedureId>/<videoFile>`
+  // against this URL. The server is started by initRecorder() and stays
+  // bound across ProcedureReview sessions.
+  ipcMain.handle(IPC.RECORDING_GET_MEDIA_URL, () => {
+    try {
+      requireSession();
+      const server = getMediaServer();
+      const url = server?.getMediaUrl() ?? null;
+      if (!url) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'Media server not running'),
+        );
+      }
+      return url;
     } catch (err) {
       throw asIpcError(err);
     }

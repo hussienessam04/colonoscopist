@@ -63,6 +63,7 @@ type MockApi = {
     resume: ReturnType<typeof vi.fn>;
     forceCleanup: ReturnType<typeof vi.fn>;
     onStatus: ReturnType<typeof vi.fn>;
+    getMediaUrl: ReturnType<typeof vi.fn>;
   };
   screenshots: {
     add: ReturnType<typeof vi.fn>;
@@ -128,6 +129,7 @@ export function mockApi(): MockApi {
       resume: vi.fn(),
       forceCleanup: vi.fn().mockResolvedValue(undefined),
       onStatus: vi.fn(),
+      getMediaUrl: vi.fn().mockResolvedValue('http://127.0.0.1:0'),
     },
     screenshots: {
       add: vi.fn(),

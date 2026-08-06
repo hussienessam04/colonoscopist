@@ -1,8 +1,14 @@
 // Recorder registry — one active recorder per procedureId (per D-01 + Anti-Pattern 5).
 // Throws RecorderBusyError when a second start() targets the same procedureId.
 // Per CAPT-05: one child ffmpeg process per procedure.
+//
+// Phase 5 / Plan 03 — also owns the singleton MediaServer reference so the
+// `recording:get-media-url` IPC handler can look up the long-lived localhost
+// HTTP server without a circular import (registry is required by recording.ts
+// to avoid pulling the MediaServer class transitively into the IPC layer).
 
 import type { Recorder } from './recorder';
+import type { MediaServer } from './preview-server';
 
 export const recorderRegistry = {
   set(procedureId: string, recorder: Recorder): void {
@@ -57,4 +63,24 @@ const globalRegistry = new Map<string, Recorder>();
 // Test hook: drop the registry between tests.
 export function __resetRecorderRegistry(): void {
   globalRegistry.clear();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MediaServer singleton — Phase 5 / Plan 03. The media server is owned by
+// initRecorder() (boots at app start, lives across ProcedureReview sessions)
+// and exposed to the IPC layer via getMediaServer().
+// ─────────────────────────────────────────────────────────────────────────────
+
+let mediaServerSingleton: MediaServer | null = null;
+
+export function setMediaServer(server: MediaServer | null): void {
+  mediaServerSingleton = server;
+}
+
+export function getMediaServer(): MediaServer | null {
+  return mediaServerSingleton;
+}
+
+export function __resetMediaServerSingleton(): void {
+  mediaServerSingleton = null;
 }

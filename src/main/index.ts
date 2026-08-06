@@ -12,7 +12,12 @@ import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
 import { logStartup } from './startup-log';
-import { initRecorder, scanForOrphans } from './recorder/init';
+import {
+  initMediaServer,
+  initRecorder,
+  scanForOrphans,
+  shutdownMediaServer,
+} from './recorder/init';
 import { Recorder } from './recorder/recorder';
 
 const APP_NAME = 'Colonoscopist';
@@ -62,6 +67,17 @@ app.whenReady().then(() => {
   // inside registerProceduresIpc — see that file. Migration 0003 applies
   // on db open above.
   registerScreenshotsIpc();
+  // Phase 5 / Plan 03 — boot the long-lived MediaServer so the renderer's
+  // <video> element can compose `/media/<patientId>/<procedureId>/<file>`
+  // URLs against `recording.getMediaUrl()`. The server stays bound across
+  // ProcedureReview sessions; shutdown is wired to `will-quit` below.
+  void initMediaServer()
+    .then(() => logStartup('media-server-started'))
+    .catch((err: unknown) => {
+      logStartup(
+        `media-server-start-failed:${(err as Error).message ?? 'unknown'}`,
+      );
+    });
   logStartup('recording-ipc-registered');
 
   // Per CAPT-01 + D-10 — enumerate DirectShow devices once on launch. The
@@ -91,6 +107,10 @@ app.on('window-all-closed', () => {
 
 app.on('will-quit', () => {
   closeDb();
+  // ponytail: best-effort shutdown. The MediaServer's stop() is idempotent
+  // (no-op if the server never started), so a failed boot doesn't matter
+  // here — the catch in app.whenReady() already logged the failure.
+  void shutdownMediaServer();
 });
 
 // Used by tests in case they need to access the singleton.

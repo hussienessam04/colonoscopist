@@ -14,6 +14,7 @@ import { getDb } from '../db';
 import { proceduresRepo } from '../db/procedures-repo';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
+import { applyTrim } from '../recorder/trim';
 import {
   proceduresCreateInput,
   proceduresGetInput,
@@ -227,22 +228,81 @@ export function registerProceduresIpc(opts: {
     }
   });
 
-  // Phase 5 / Plan 01 — Trim + Restore IPC surface is declared so the renderer
-  // contract doesn't shift. The handlers are stubs that validate input via
-  // safeParse (so the stub still rejects malformed payloads) then throw
-  // IPC_NOT_IMPLEMENTED. Real impl lands in Plan 03.
-  ipcMain.handle(IPC.PROCEDURES_TRIM, (_e, raw) => {
+  // Phase 5 / Plan 03 — Trim + Restore real handlers.
+  //
+  // `procedures.trim` orchestrates the trim: safeParse → requireSession →
+  // fetch row → status gate (D-13, reject anything != 'completed') →
+  // applyTrim spawns ffmpeg → repo.updateVideoPath (COALESCE first-trim
+  // guard) + audit `procedure.trimmed` inside one db.transaction().
+  //
+  // `procedures.restore` is the inverse: safeParse → requireSession →
+  // restoreFromOriginal (validates video_path_original != null + file on
+  // disk) → audit `procedure.restored`.
+  ipcMain.handle(IPC.PROCEDURES_TRIM, async (_e, raw) => {
     try {
-      // Validate input first so T-05-09 (negative-range DoS) is mitigated
-      // even before Plan 03 ships. The schema's .refine rejects outMs <= inMs
-      // as IPC_VALIDATION.
-      safeParse(proceduresTrimInput, raw, 'id');
-      throw new IpcErrorException(
-        ipcError(
-          'IPC_NOT_IMPLEMENTED',
-          'Trim ships in Plan 03/05-03',
-        ),
-      );
+      const { id, inMs, outMs } = safeParse(proceduresTrimInput, raw, 'id');
+      const doctorId = requireSession();
+
+      const proc = proceduresRepo.get(id);
+      if (!proc) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', `Procedure ${id} not found`),
+        );
+      }
+      // D-13 — partial / recording / crashed procedures have no meaningful
+      // cut range. applyTrim enforces this too, but the explicit gate here
+      // keeps the error message in the IPC layer (audit metadata reads
+      // better when the rejection reason is in one place).
+      if (proc.status !== 'completed') {
+        throw new IpcErrorException(
+          ipcError(
+            'IPC_VALIDATION',
+            `Cannot trim a ${proc.status} recording`,
+            { field: 'status' },
+          ),
+        );
+      }
+
+      let result: { trimmedVideoPath: string };
+      try {
+        result = await applyTrim({ procedureId: id, inMs, outMs });
+      } catch (err) {
+        // ponytail: surface the underlying message verbatim so the
+        // renderer's toast shows a useful string (the ffmpeg tail is the
+        // most diagnostic bit — applyTrim already attaches it).
+        const msg = err instanceof IpcErrorException ? err.ipc.message : err instanceof Error ? err.message : 'Trim failed';
+        throw new IpcErrorException(
+          ipcError('IPC_VALIDATION', msg, { field: 'inMs' }),
+        );
+      }
+
+      // D-07 — `video_path_original` is populated ONLY on first trim. The
+      // repo's COALESCE keeps the first-trim value across subsequent trims
+      // so Restore always re-points to the original canonical mp4.
+      const originalRel = proc.videoPathOriginal ?? proc.videoPath;
+
+      const db = getDb();
+      let updated: Procedure = {} as Procedure;
+      db.transaction(() => {
+        updated = proceduresRepo.updateVideoPath(id, result.trimmedVideoPath, originalRel);
+        audit({
+          action: 'procedure.trimmed',
+          entityType: 'procedure',
+          entityId: id,
+          userId: doctorId,
+          // Fix 6 — paths are userData-relative (Anti-Pattern 2).
+          metadata: {
+            inMs,
+            outMs,
+            originalVideoPath: originalRel,
+            trimmedVideoPath: result.trimmedVideoPath,
+          },
+        });
+      })();
+
+      // Refetch after the transaction so the returned row carries the
+      // updated video_path + (locked) video_path_original.
+      return proceduresRepo.get(id) ?? updated;
     } catch (err) {
       throw asIpcError(err);
     }
@@ -250,13 +310,35 @@ export function registerProceduresIpc(opts: {
 
   ipcMain.handle(IPC.PROCEDURES_RESTORE, (_e, raw) => {
     try {
-      safeParse(proceduresRestoreInput, raw, 'id');
-      throw new IpcErrorException(
-        ipcError(
-          'IPC_NOT_IMPLEMENTED',
-          'Restore ships in Plan 03/05-03',
-        ),
-      );
+      const { id } = safeParse(proceduresRestoreInput, raw, 'id');
+      const doctorId = requireSession();
+
+      // proceduresRepo.restoreFromOriginal throws:
+      //   IPC_NOT_FOUND — procedure row missing, OR original file missing on disk.
+      //   IPC_VALIDATION — video_path_original is null (no prior trim).
+      // Both surface verbatim through asIpcError.
+      const proc = proceduresRepo.get(id);
+      if (!proc) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', `Procedure ${id} not found`),
+        );
+      }
+      const restoredFrom = proc.videoPathOriginal;
+
+      const db = getDb();
+      let updated: Procedure = {} as Procedure;
+      db.transaction(() => {
+        updated = proceduresRepo.restoreFromOriginal(id);
+        audit({
+          action: 'procedure.restored',
+          entityType: 'procedure',
+          entityId: id,
+          userId: doctorId,
+          metadata: { restoredFrom: restoredFrom ?? null },
+        });
+      })();
+
+      return proceduresRepo.get(id) ?? updated;
     } catch (err) {
       throw asIpcError(err);
     }

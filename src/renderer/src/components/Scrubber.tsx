@@ -2,7 +2,8 @@
 //
 // Plan 02 adds pause markers from `procedure_segments` (D-11). Each marker
 // is a thin vertical tick positioned at `segment.startedAtMs / durationMs * 100%`
-// of the track width. Plan 03 stacks trim handles over the same track.
+// of the track width. Plan 03 stacks trim handles over the same track when
+// `trimMode === true`.
 //
 // PITFALLS §8 — pointer events use `setPointerCapture` so the drag stays
 // alive when the cursor leaves the track rectangle (e.g. doctor drags
@@ -12,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/styles/scrubber.css';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { clampHandle } from '@/lib/trim-clamp';
 import type { ProcedureSegment } from '@shared/ipc-contract';
 
 export type ScrubberProps = {
@@ -20,6 +22,12 @@ export type ScrubberProps = {
   onSeek: (ms: number) => void;
   // D-11 — pause markers. When undefined or empty, the track renders clean.
   segments?: ProcedureSegment[];
+  // Plan 03 — trim mode. When true + inMs/outMs supplied, renders two
+  // draggable handles + a red-shaded region between them.
+  trimMode?: boolean;
+  inMs?: number;
+  outMs?: number;
+  onTrim?: (range: { inMs: number; outMs: number }) => void;
   ariaLabel?: string;
   testId?: string;
 };
@@ -41,6 +49,10 @@ export function Scrubber({
   currentMs,
   onSeek,
   segments,
+  trimMode = false,
+  inMs,
+  outMs,
+  onTrim,
   ariaLabel = 'Procedure scrubber',
   testId = 'scrubber-track',
 }: ScrubberProps): JSX.Element {
@@ -102,6 +114,15 @@ export function Scrubber({
     });
   }, [segments, durationMs]);
 
+  // Plan 03 — trim handles. Only rendered when trimMode is on AND both
+  // inMs/outMs are provided. The handles are simple <div> elements with
+  // their own pointer-event drag — see <TrimHandle> below.
+  const renderTrimHandles =
+    trimMode && typeof inMs === 'number' && typeof outMs === 'number' && durationMs > 0;
+
+  const inPct = renderTrimHandles ? pctFor(inMs as number, durationMs) : 0;
+  const outPct = renderTrimHandles ? pctFor(outMs as number, durationMs) : 0;
+
   return (
     <div
       ref={trackRef}
@@ -133,6 +154,108 @@ export function Scrubber({
           data-testid="scrubber-pause-marker"
         />
       ))}
+      {renderTrimHandles ? (
+        <>
+          {/* The red-shaded cut region. Sits BEHIND the handles (z=0) but ABOVE the progress fill so the doctor sees the cut clearly. */}
+          <div
+            className="pointer-events-none absolute inset-y-0 z-0 bg-red-300/50"
+            style={{
+              left: `${inPct}%`,
+              width: `${Math.max(0, outPct - inPct)}%`,
+            }}
+            data-testid="scrubber-trim-region"
+          />
+          <TrimHandle
+            side="in"
+            left={inPct}
+            otherMs={outMs as number}
+            durationMs={durationMs}
+            onTrim={onTrim}
+            isInHandle={true}
+          />
+          <TrimHandle
+            side="out"
+            left={outPct}
+            otherMs={inMs as number}
+            durationMs={durationMs}
+            onTrim={onTrim}
+            isInHandle={false}
+          />
+        </>
+      ) : null}
     </div>
+  );
+}
+
+type TrimHandleProps = {
+  side: 'in' | 'out';
+  left: number;
+  otherMs: number;
+  durationMs: number;
+  onTrim?: (range: { inMs: number; outMs: number }) => void;
+  isInHandle: boolean;
+};
+
+function TrimHandle(_props: TrimHandleProps): JSX.Element {
+  // ponytail: `side` is unused in the rendered output (the testid encodes
+  // isInHandle) — but kept in the prop type for clarity at call-sites.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { left, otherMs, durationMs, onTrim, isInHandle } = _props;
+  // ponytail: per-handle drag state — we don't track the pointerId in the
+  // parent because each handle has its own capture.
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>): void => {
+      if (e.button !== 0) return;
+      // stopPropagation so the underlying scrubber's onPointerDown doesn't
+      // also fire a seek (we want pure drag, no seek-jump).
+      e.stopPropagation();
+      e.currentTarget.setPointerCapture(e.pointerId);
+      const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+      if (!rect) return;
+      const attemptedMs = msFromClientX(e.clientX, rect, durationMs);
+      if (onTrim) {
+        onTrim(clampHandle(otherMs, attemptedMs, isInHandle, durationMs));
+      }
+    },
+    [durationMs, isInHandle, onTrim, otherMs],
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>): void => {
+      if (e.buttons === 0) return;
+      const rect = e.currentTarget.parentElement?.getBoundingClientRect();
+      if (!rect) return;
+      const attemptedMs = msFromClientX(e.clientX, rect, durationMs);
+      if (onTrim) {
+        onTrim(clampHandle(otherMs, attemptedMs, isInHandle, durationMs));
+      }
+    },
+    [durationMs, isInHandle, onTrim, otherMs],
+  );
+
+  const handlePointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>): void => {
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // ignore — pointer may have been released already
+    }
+  }, []);
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={isInHandle ? 'Trim in-point' : 'Trim out-point'}
+      tabIndex={-1}
+      data-testid={isInHandle ? 'scrubber-trim-handle-in' : 'scrubber-trim-handle-out'}
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      // z-10 so the handle sits ABOVE the trim region + the progress fill
+      // (z=0) and the pause markers (z=1) — captures pointer events first.
+      className="absolute inset-y-0 z-10 w-1 cursor-ew-resize bg-red-600"
+      style={{ left: `${left}%` }}
+    />
   );
 }
