@@ -121,6 +121,11 @@ type RecorderState = 'idle' | 'starting' | 'recording' | 'paused' | 'stopping';
 
 const SIGTERM_GRACE_MS = 5_000;
 const SIGKILL_FALLBACK_MS = 5_500;
+// If ffmpeg hasn't emitted 'frame=' AND hasn't exited within this window,
+// force-kill it. Prevents the supervisor from getting stuck in
+// 'starting' state forever when the OS never delivers an 'exit' event
+// (rare but observed with Windows + MFT resource failures).
+const START_WATCHDOG_MS = 10_000;
 
 type FinalizeContext = {
   procedureId: string;
@@ -154,6 +159,7 @@ export class Recorder {
   } | null = null;
   private sigtermTimer: ReturnType<typeof setTimeout> | null = null;
   private sigkillTimer: ReturnType<typeof setTimeout> | null = null;
+  private startWatchdog: ReturnType<typeof setTimeout> | null = null;
   private deviceName = '';
   private currentSegmentStartedAt: number | null = null;
   private currentSegmentRelPath: string | null = null;
@@ -245,6 +251,21 @@ export class Recorder {
 
     this.exitHandler = (code, signal) => this.onExit(code, signal);
     child.proc.on('exit', this.exitHandler);
+
+    // Watchdog: if ffmpeg neither emits 'frame=' nor exits within
+    // START_WATCHDOG_MS, force-kill it and run onExit. This guarantees
+    // the registry entry gets cleared even when the process wedges (e.g.
+    // spawn() returns but the child never actually launches, or the OS
+    // never delivers the 'exit' event). Without this, a wedged spawn
+    // leaves the recorder stuck in 'starting' state and every
+    // subsequent start() throws RecorderBusyError.
+    this.startWatchdog = setTimeout(() => {
+      try {
+        child.proc.kill('SIGKILL');
+      } catch {
+        // ignore — process may already be dead
+      }
+    }, START_WATCHDOG_MS);
 
     // startedAt will be set when ffmpeg emits the first 'frame=' line (D-10).
     return { procedureId: args.procedureId, startedAt: this.deps.clock.now() };
@@ -901,6 +922,10 @@ export class Recorder {
     if (this.sigkillTimer) {
       clearTimeout(this.sigkillTimer);
       this.sigkillTimer = null;
+    }
+    if (this.startWatchdog) {
+      clearTimeout(this.startWatchdog);
+      this.startWatchdog = null;
     }
   }
 
