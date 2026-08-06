@@ -56,6 +56,14 @@ export const IPC = {
   RECORDING_FORCE_CLEANUP: 'recording:force-cleanup',
   // Push event channel — value is the channel string the renderer subscribes to.
   RECORDING_STATUS: 'recording:status',
+  // Phase 5 / Plan 01 — screenshots + trim surface. Trim/restore handlers
+  // throw IPC_NOT_IMPLEMENTED in Plan 01; Plan 03 fills them.
+  SCREENSHOTS_ADD: 'screenshots:add',
+  SCREENSHOTS_LIST: 'screenshots:list',
+  SCREENSHOTS_DELETE: 'screenshots:delete',
+  SCREENSHOTS_UPDATE_ANNOTATION: 'screenshots:update-annotation',
+  PROCEDURES_TRIM: 'procedures:trim',
+  PROCEDURES_RESTORE: 'procedures:restore',
 } as const;
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
@@ -191,6 +199,18 @@ export type ProcedureSegment = {
   endedAt: number;
 };
 
+// Phase 5 / Plan 01 / D-04 + D-05 — single screenshot row. `filePath` is
+// stored as a userData-relative path per Anti-Pattern 2; the absolute path
+// is resolved at read time.
+export type Screenshot = {
+  id: number;
+  procedureId: string;
+  timestampInVideoMs: number;
+  filePath: string;
+  annotation: string | null;
+  createdAt: number;
+};
+
 // Discriminated union for the recording:status push event.
 // Plan 04-01 only emits `started` and `stopped`; paused/resumed are Plan 03,
 // lost is Plan 04. The shape is fixed now so the renderer's store is final.
@@ -282,6 +302,11 @@ export interface IpcContract {
       videoPath: string;
       partialJson?: ProcedurePartialJson;
     }) => Promise<Procedure>;
+    // Phase 5 / Plan 01 — Trim + Restore are declared in Plan 01 so the
+    // renderer contract doesn't shift. The handlers throw IPC_NOT_IMPLEMENTED
+    // in Plan 01; Plan 03 fills them. @plan Implemented in Plan 03/05-03.
+    trim: (input: { id: string; inMs: number; outMs: number }) => Promise<Procedure>;
+    restore: (input: { id: string }) => Promise<Procedure>;
   };
   // Plan 02-of-phase-04 fills the main handlers. Preload bridge is final here
   // so the renderer contract never needs to change shape in Plan 02.
@@ -303,6 +328,16 @@ export interface IpcContract {
     resume: (input: { procedureId: string }) => Promise<void>;
     forceCleanup: (input: { procedureId: string }) => Promise<void>;
     onStatus: (cb: (status: RecordingStatus) => void) => () => void;
+  };
+  // Phase 5 / Plan 01. `add` takes the base64 JPEG inline so the renderer
+  // doesn't need an extra file-write round-trip; the IPC handler writes the
+  // JPEG to disk itself after validating payload size. `list` returns
+  // rows ASC by `timestampInVideoMs` for the timeline query.
+  screenshots: {
+    add: (input: { procedureId: string; timestampInVideoMs: number; jpegBase64: string }) => Promise<Screenshot>;
+    list: (input: { procedureId: string }) => Promise<Screenshot[]>;
+    delete: (input: { id: number }) => Promise<{ ok: true }>;
+    updateAnnotation: (input: { id: number; annotation: string | null }) => Promise<Screenshot>;
   };
 }
 

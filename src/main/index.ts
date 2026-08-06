@@ -7,6 +7,7 @@ import { registerPatientsIpc } from './ipc/patients';
 import { registerCaptureIpc } from './ipc/capture';
 import { registerProceduresIpc } from './ipc/procedures';
 import { registerRecordingIpc } from './ipc/recording';
+import { registerScreenshotsIpc } from './ipc/screenshots';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -57,6 +58,10 @@ app.whenReady().then(() => {
   registerRecordingIpc({
     buildRecorder: () => recorderModule.newRecorder(),
   });
+  // Phase 5 / Plan 01 — screenshots handler set. Trim/restore are stubbed
+  // inside registerProceduresIpc — see that file. Migration 0003 applies
+  // on db open above.
+  registerScreenshotsIpc();
   logStartup('recording-ipc-registered');
 
   // Per CAPT-01 + D-10 — enumerate DirectShow devices once on launch. The

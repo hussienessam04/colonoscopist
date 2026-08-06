@@ -47,6 +47,11 @@ const api: IpcContract = {
     get: (input) => ipcRenderer.invoke(IPC.PROCEDURES_GET, input),
     list: (input) => ipcRenderer.invoke(IPC.PROCEDURES_LIST, input),
     finalize: (input) => ipcRenderer.invoke(IPC.PROCEDURES_FINALIZE, input),
+    // Plan 01 — trim/restore throw IPC_NOT_IMPLEMENTED; Plan 03 fills the
+    // handlers. The preload bridge exposes the channel so the renderer
+    // contract surface doesn't shift between plans.
+    trim: (input) => ipcRenderer.invoke(IPC.PROCEDURES_TRIM, input),
+    restore: (input) => ipcRenderer.invoke(IPC.PROCEDURES_RESTORE, input),
   },
   // Plan 02-of-phase-04 fills the main handlers; preload bridge is final here
   // so the renderer contract never needs to change shape.
@@ -72,6 +77,15 @@ const api: IpcContract = {
         );
       };
     },
+  },
+  // Phase 5 / Plan 01 — screenshot IPC. `add` carries the JPEG inline as
+  // base64 to avoid an extra multipart upload via the preview server.
+  screenshots: {
+    add: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_ADD, input),
+    list: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_LIST, input),
+    delete: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_DELETE, input),
+    updateAnnotation: (input) =>
+      ipcRenderer.invoke(IPC.SCREENSHOTS_UPDATE_ANNOTATION, input),
   },
 };
 

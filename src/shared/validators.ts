@@ -177,6 +177,49 @@ export const recordingStartInput = z.object({
   preset: qualityPresetSchema,
 });
 
+// Phase 5 / Plan 01 screenshots + trim validators. The trim input is
+// declared now so the IPC surface is final; the validator still rejects
+// malformed payloads even though Plan 01's stub handler returns
+// IPC_NOT_IMPLEMENTED. `.refine` enforces the half-open interval
+// [inMs, outMs) per D-08 trim semantics.
+export const screenshotsAddInput = z.object({
+  procedureId: z.string().uuid(),
+  // ponytail: maxLongEdge=1280 + JPEG q=0.85 produces ~80–400 KB decoded
+  // for typical 1920x1080 / 720x480 input. 8 MB base64 cap
+  // (≈6 MB decoded) leaves headroom for the doctor's worst case while
+  // bounding the JS heap + disk-usage DoS surface.
+  timestampInVideoMs: z.number().int().nonnegative(),
+  jpegBase64: z.string().min(1).max(8_000_000),
+});
+
+export const screenshotsListInput = z.object({
+  procedureId: z.string().uuid(),
+});
+
+export const screenshotsDeleteInput = z.object({
+  id: z.number().int().positive(),
+});
+
+export const screenshotsUpdateAnnotationInput = z.object({
+  id: z.number().int().positive(),
+  annotation: z.string().min(1).max(1000).nullable(),
+});
+
+export const proceduresTrimInput = z
+  .object({
+    id: z.string().uuid(),
+    inMs: z.number().int().nonnegative(),
+    outMs: z.number().int().positive(),
+  })
+  .refine((d) => d.outMs > d.inMs, {
+    message: 'outMs must be greater than inMs',
+    path: ['outMs'],
+  });
+
+export const proceduresRestoreInput = z.object({
+  id: z.string().uuid(),
+});
+
 export type ProceduresCreateInput = z.infer<typeof proceduresCreateInput>;
 export type ProceduresGetInput = z.infer<typeof proceduresGetInput>;
 export type ProceduresListQueryInput = z.infer<typeof proceduresListQueryInput>;
@@ -184,6 +227,12 @@ export type ProceduresFinalizeInput = z.infer<typeof proceduresFinalizeInput>;
 export type ProcedureNoteCreateInput = z.infer<typeof procedureNoteCreateInput>;
 export type ProcedureNoteListInput = z.infer<typeof procedureNoteListInput>;
 export type RecordingStartInput = z.infer<typeof recordingStartInput>;
+export type ScreenshotsAddInput = z.infer<typeof screenshotsAddInput>;
+export type ScreenshotsListInput = z.infer<typeof screenshotsListInput>;
+export type ScreenshotsDeleteInput = z.infer<typeof screenshotsDeleteInput>;
+export type ScreenshotsUpdateAnnotationInput = z.infer<typeof screenshotsUpdateAnnotationInput>;
+export type ProceduresTrimInput = z.infer<typeof proceduresTrimInput>;
+export type ProceduresRestoreInput = z.infer<typeof proceduresRestoreInput>;
 
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);

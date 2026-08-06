@@ -21,6 +21,8 @@ import {
   proceduresFinalizeInput,
   procedureNoteCreateInput,
   procedureNoteListInput,
+  proceduresTrimInput,
+  proceduresRestoreInput,
 } from '@shared/validators';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
@@ -220,6 +222,41 @@ export function registerProceduresIpc(opts: {
         metadata: { procedureId, count: rows.length },
       });
       return rows;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  // Phase 5 / Plan 01 — Trim + Restore IPC surface is declared so the renderer
+  // contract doesn't shift. The handlers are stubs that validate input via
+  // safeParse (so the stub still rejects malformed payloads) then throw
+  // IPC_NOT_IMPLEMENTED. Real impl lands in Plan 03.
+  ipcMain.handle(IPC.PROCEDURES_TRIM, (_e, raw) => {
+    try {
+      // Validate input first so T-05-09 (negative-range DoS) is mitigated
+      // even before Plan 03 ships. The schema's .refine rejects outMs <= inMs
+      // as IPC_VALIDATION.
+      safeParse(proceduresTrimInput, raw, 'id');
+      throw new IpcErrorException(
+        ipcError(
+          'IPC_NOT_IMPLEMENTED',
+          'Trim ships in Plan 03/05-03',
+        ),
+      );
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.PROCEDURES_RESTORE, (_e, raw) => {
+    try {
+      safeParse(proceduresRestoreInput, raw, 'id');
+      throw new IpcErrorException(
+        ipcError(
+          'IPC_NOT_IMPLEMENTED',
+          'Restore ships in Plan 03/05-03',
+        ),
+      );
     } catch (err) {
       throw asIpcError(err);
     }
