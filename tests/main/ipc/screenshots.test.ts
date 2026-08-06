@@ -232,8 +232,12 @@ describe('screenshots IPC', () => {
   });
 });
 
-describe('procedures.trim / procedures.restore stubs', () => {
-  it('trim throws IPC_NOT_IMPLEMENTED', async () => {
+describe('procedures.trim / procedures.restore real handlers (Plan 03)', () => {
+  // Plan 03 replaces the Plan 01 stubs — the handlers now do real work.
+  // These tests assert the boundary rejection (unknown procedure id)
+  // since the deeper happy-path is exercised in procedures.test.ts.
+
+  it('trim rejects an unknown procedure with IPC_NOT_FOUND', async () => {
     await bootstrap();
     const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
     registerProceduresIpc({
@@ -251,8 +255,7 @@ describe('procedures.trim / procedures.restore stubs', () => {
     }
     expect(caught).not.toBeNull();
     const wrapped = caught as Error & { ipcError?: { code: string; message: string } };
-    expect(wrapped.ipcError?.code).toBe('IPC_NOT_IMPLEMENTED');
-    expect(wrapped.ipcError?.message).toMatch(/Plan 03/i);
+    expect(wrapped.ipcError?.code).toBe('IPC_NOT_FOUND');
   });
 
   it('trim validates input via safeParse before throwing (outMs <= inMs)', async () => {
@@ -275,7 +278,7 @@ describe('procedures.trim / procedures.restore stubs', () => {
     expect(wrapped.ipcError?.code).toBe('IPC_VALIDATION');
   });
 
-  it('restore throws IPC_NOT_IMPLEMENTED', async () => {
+  it('restore rejects an unknown procedure with IPC_NOT_FOUND', async () => {
     await bootstrap();
     const { registerProceduresIpc } = await import('../../../src/main/ipc/procedures');
     registerProceduresIpc({
@@ -292,6 +295,6 @@ describe('procedures.trim / procedures.restore stubs', () => {
     }
     expect(caught).not.toBeNull();
     const wrapped = caught as Error & { ipcError?: { code: string } };
-    expect(wrapped.ipcError?.code).toBe('IPC_NOT_IMPLEMENTED');
+    expect(wrapped.ipcError?.code).toBe('IPC_NOT_FOUND');
   });
 });
