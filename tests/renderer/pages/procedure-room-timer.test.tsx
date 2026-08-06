@@ -240,7 +240,16 @@ describe('ProcedureRoom Pause/Resume button', () => {
     await new Promise((r) => setTimeout(r, 5));
     expect(screen.getByTestId('procedure-duration')).toHaveTextContent('00:00:03');
 
-    // Resume with new startedAt — timer should restart from 00:00:00.
+    // Resume — the timer continues from the pre-pause elapsed, NOT the
+    // wall-clock since the original procedure start. The store shifts
+    // timerStartedAt on 'resumed' by the just-ended pause duration so
+    // Date.now() - timerStartedAt reads as "elapsed recording time,
+    // paused intervals excluded". Here: startedAt = T0, pausedAt = T0+3s,
+    // resume wall-clock = T0+8s. pauseDuration = 3s. timerStartedAt on
+    // resume = (T0+8s) - 3s = T0+5s. Date.now() - timerStartedAt =
+    // (T0+8s) - (T0+5s) = 3s = 00:00:03. Pre-fix this assertion was
+    // 00:00:08 (wall-clock from original start) — that locked in the
+    // bug of including the pause duration in the timer.
     clockOffset = 8_000;
     await act(async () => {
       (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
@@ -249,9 +258,7 @@ describe('ProcedureRoom Pause/Resume button', () => {
         currentSegmentIndex: 1,
       });
     });
-    // Immediately after resume, the display should reset to ~00:00:00
-    // (or close to it, depending on how quickly the test runs).
-    expect(screen.getByTestId('procedure-duration')).toHaveTextContent('00:00:00');
+    expect(screen.getByTestId('procedure-duration')).toHaveTextContent('00:00:03');
 
     Date.now = originalNow;
   });
@@ -451,6 +458,36 @@ describe('ProcedureReview partial-status Alert', () => {
     render(<ProcedureReview />);
     await waitFor(() => expect(api.procedures.get).toHaveBeenCalled());
     expect(screen.queryByTestId('procedure-review-partial-alert')).not.toBeInTheDocument();
+  });
+
+  // ponytail: regression for "Stop emits device disconnected on a clean
+  // Stop". When status='partial' is written for a non-device-lost cause
+  // (SIGKILL on unresponsive ffmpeg, ffmpeg failing to start, double-
+  // concat-failure), the supervisor keeps the canonical video.mp4 path.
+  // The Alert should show a generic "recording ended unexpectedly"
+  // message instead of the misleading "device disconnected" copy.
+  it('renders the Alert with generic copy when status=partial but videoPath is canonical (non-device-lost cause)', async () => {
+    setRoute({ name: 'procedure-review', procedureId: 'proc-sigkill' });
+    const api = getApi();
+    api.procedures.get.mockResolvedValue({
+      id: 'proc-sigkill',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      startedAt: Date.now() - 10_000,
+      endedAt: Date.now(),
+      durationSeconds: 5,
+      status: 'partial',
+      videoPath: 'data/media/patients/pat-1/proc-sigkill/video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+      createdAt: Date.now(),
+    });
+    const { default: ProcedureReview } = await import('@/pages/ProcedureReview');
+    render(<ProcedureReview />);
+    const alert = await screen.findByTestId('procedure-review-partial-alert');
+    expect(alert).toHaveTextContent(/Partial recording/);
+    expect(alert).toHaveTextContent(/Recording ended unexpectedly/i);
+    expect(alert).not.toHaveTextContent(/capture device disconnected/i);
   });
 });
 

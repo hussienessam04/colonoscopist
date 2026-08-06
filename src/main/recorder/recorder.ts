@@ -328,8 +328,14 @@ export class Recorder {
     this.state = 'stopping';
     const child = this.child;
     if (!child) {
-      // No live child — already finalized (or never started). Nothing to do.
-      return;
+      // ponytail: enter-via-paused path — the pause exit branch already
+      // pushed the just-closed segment into closedSegments and cleared the
+      // child ref. Synthesize the same finalize bookkeeping onExit's stop
+      // path runs, but synchronously — no q\n/timers/pendingStop, since
+      // the underlying Node ChildProcess already fired 'exit'. Without
+      // this branch, pause→stop would schedule timers against the stale
+      // ref and the stop() promise would hang forever.
+      return this.finalizeStopFromPaused();
     }
     return new Promise<void>((resolve, reject) => {
       this.pendingStop = {
@@ -460,10 +466,18 @@ export class Recorder {
     if (!this.stderrBuffer.includes('frame=')) return;
     this.frameSeen = true;
     const now = this.deps.clock.now();
-    if (this.state === 'starting' && this.procedureId) {
-      this.deps.procedures.updateStartedAt(this.procedureId, now);
+    // ponytail: startedAt is the ORIGINAL procedure wall-clock start time.
+    // It is captured ONCE on the starting→recording transition. Resuming
+    // a paused recording must NOT overwrite it — the renderer derives the
+    // visible HH:MM:SS from Date.now() - startedAt and resets to 0 if
+    // startedAt flips, which would look like "video restarts from the
+    // beginning" to the doctor.
+    if (this.state === 'starting') {
+      this.startedAt = now;
+      if (this.procedureId) {
+        this.deps.procedures.updateStartedAt(this.procedureId, now);
+      }
     }
-    this.startedAt = now;
     this.currentSegmentStartedAt = now;
     if (this.state === 'starting') {
       this.deps.audit({
@@ -481,7 +495,9 @@ export class Recorder {
     } else if (this.state === 'paused' || this.state === 'stopping') {
       // ponytail: the pause→resume transition flips state back to 'recording'
       // on first 'frame='. Audit row carries the segmentIndex so consumers
-      // can rebuild the segment timeline from the audit log alone.
+      // can rebuild the segment timeline from the audit log alone. The emit
+      // carries the ORIGINAL `this.startedAt` — NOT `now` — so the renderer's
+      // timer derivation stays continuous across pause/resume.
       const segmentIndex = this.currentSegmentIndex;
       this.state = 'recording';
       this.deps.audit({
@@ -492,7 +508,7 @@ export class Recorder {
       });
       this.deps.emit({
         status: 'resumed',
-        startedAt: now,
+        startedAt: this.startedAt ?? now,
         currentSegmentIndex: segmentIndex,
       });
     }
@@ -668,7 +684,11 @@ export class Recorder {
     const isStop = this.state === 'stopping';
     // Pause path: append the just-closed segment to closedSegments and emit
     // paused. The supervisor stays alive (registry holds it); resume() will
-    // spawn a fresh child for the next segment.
+    // spawn a fresh child for the next segment. Clear the child ref +
+    // currentSegmentStartedAt so a subsequent stop() (without an intervening
+    // resume) takes the paused-finalize branch instead of scheduling timers
+    // against a dead RecorderChild whose 'exit' already fired — without
+    // this, pause→stop leaves the recording.pendinɡStop unresolved forever.
     if (
       !isStop &&
       this.currentSegmentRelPath &&
@@ -700,6 +720,11 @@ export class Recorder {
         },
       });
       this.state = 'paused';
+      // ponytail: clear the live state so a follow-up stop() detects the
+      // pause-exit by child===null and routes to finalizeStopFromPaused
+      // rather than scheduling timers against the dead child.
+      this.child = null;
+      this.currentSegmentStartedAt = null;
       // ponytail: emit `startedAt` = wall-clock time at pause so the
       // renderer-side `Date.now() - startedAt` derivation freezes when
       // pausedAt is set (the renderer replaces Date.now() with pausedAt).
@@ -944,6 +969,70 @@ export class Recorder {
     this.pendingStop = null;
     if (!pending) return;
     pending.resolve(ctx);
+  }
+
+  // ponytail: stop() runs this when entered from the 'paused' state and the
+  // child ref is null. Mirrors the bookkeeping onExit's stop-path performs
+  // (updateFinalized + audit + emit 'stopped' + reset), then runs
+  // finalizeCurrentSegment for the concat/rename step. Replaces the older
+  // single-line `if (!child) return;` early return, which left pendingStop
+  // unresolved and caused the renderer button to stay "Stop Recording"
+  // indefinitely after a pause.
+  private async finalizeStopFromPaused(): Promise<void> {
+    const procedureId = this.procedureId;
+    const startedAt = this.startedAt ?? this.deps.clock.now();
+    const endedAt = this.deps.clock.now();
+    const durationSeconds = Math.max(
+      0,
+      Math.floor((endedAt - startedAt) / 1000),
+    );
+    if (!procedureId || !this.outputRelPath || !this.mediaDir) {
+      this.state = 'idle';
+      return;
+    }
+    // closedSegments already has the paused segment pushed by the pause
+    // exit branch. The currentSegmentRelPath / currentSegmentStartedAt
+    // were nulled there too, so the duplicate-push guard in onExit's
+    // stop-append branch was never reachable anyway — we synthesize
+    // the same finalize context directly.
+    const finalizeContext = {
+      procedureId,
+      patientId: this.patientId,
+      mediaDir: this.mediaDir,
+      outputRelPath: this.outputRelPath,
+      currentSegmentRelPath: this.currentSegmentRelPath,
+      segments: this.closedSegments,
+      startedAt,
+      endedAt,
+      durationSeconds,
+      finalStatus: 'completed' as const,
+    };
+    this.deps.procedures.updateFinalized(procedureId, {
+      endedAt,
+      durationSeconds,
+      status: 'completed',
+      videoPath: this.outputRelPath,
+    });
+    this.deps.audit({
+      action: 'recording.stopped',
+      entityType: 'procedure',
+      entityId: procedureId,
+      metadata: {
+        deviceName: this.deviceName,
+        preset: this.presetSummaryForAudit(),
+        durationSeconds,
+        segmentCount: this.closedSegments.length,
+      },
+    });
+    this.deps.emit({
+      status: 'stopped',
+      startedAt,
+      procedureId,
+    });
+    recorderRegistry.delete(procedureId);
+    this.resetInternalState();
+    this.state = 'idle';
+    await this.finalizeCurrentSegment(finalizeContext);
   }
 
   private resetInternalState(): void {

@@ -125,11 +125,30 @@ export default function ProcedureReview({ procedureId: initialId }: { procedureI
                     >
                       <AlertTitle>Partial recording</AlertTitle>
                       <AlertDescription>
-                        Recording stopped because the capture device disconnected. The mp4 was preserved up to{' '}
-                        <span className="font-mono">
-                          {formatDurationHHMMSS(lastLost?.lastKnownTimestampMs ?? 0)}
-                        </span>
-                        .
+                        {/* ponytail: discriminate the partial cause by the
+                            videoPath suffix. The supervisor's device-lost
+                            path rewrites the segment to <name>.partial.mp4
+                            (recorder.ts::rewritePartial); other partial
+                            causes (SIGKILL on unresponsive ffmpeg, ffmpeg
+                            failing to start, double-concat-failure) keep the
+                            canonical video.mp4 path. So a `.partial.mp4`
+                            suffix is the unambiguous device-lost fingerprint
+                            at review time — the recording store's lastLost
+                            is cleared on 'stopped' and is not available
+                            here. */}
+                        {procedure.videoPath.endsWith('.partial.mp4') ? (
+                          <>
+                            Recording stopped because the capture device disconnected. The mp4 was preserved up to{' '}
+                            <span className="font-mono">
+                              {formatDurationHHMMSS(lastLost?.lastKnownTimestampMs ?? 0)}
+                            </span>
+                            .
+                          </>
+                        ) : (
+                          <>
+                            Recording ended unexpectedly. The mp4 may be shorter than the wall-clock duration. Check the audit log for the cause.
+                          </>
+                        )}
                       </AlertDescription>
                     </Alert>
                   ) : null}

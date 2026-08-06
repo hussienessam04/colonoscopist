@@ -120,11 +120,16 @@ export default function ProcedureRoom(): JSX.Element {
     const handle = setInterval(() => {
       const snap = recordingStore.__getState();
       if (snap.pausedAt !== null) return;
-      if (snap.startedAt === null) {
+      // ponytail: use timerStartedAt (virtual base that excludes paused
+      // intervals) instead of snap.startedAt (original procedure start).
+      // Falls back to startedAt so this transient-dep-less path still
+      // works during the first render before the 'started' status lands.
+      const base = snap.timerStartedAt ?? snap.startedAt;
+      if (base === null) {
         setTimerMs(0);
         return;
       }
-      setTimerMs(Date.now() - snap.startedAt);
+      setTimerMs(Date.now() - base);
     }, 1000);
     return () => clearInterval(handle);
   }, [timer.isFrozen, timer.displayMs]);
@@ -253,6 +258,16 @@ export default function ProcedureRoom(): JSX.Element {
                       >
                         Open Settings
                       </Button>
+                    </div>
+                  </div>
+                ) : isRecording ? (
+                  <div className="absolute inset-0 grid place-items-center bg-black/60 p-6 text-center text-white">
+                    <div className="flex max-w-md flex-col items-center gap-3">
+                      <Video className="size-9 text-rose-300" aria-hidden="true" />
+                      <p className="font-medium">Recording in progress</p>
+                      <p className="text-sm text-slate-300">
+                        Live preview disabled during recording.
+                      </p>
                     </div>
                   </div>
                 ) : null}

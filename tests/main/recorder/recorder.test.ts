@@ -500,9 +500,13 @@ describe('Recorder supervisor', () => {
     // Simulate first frame on the new child — emits 'resumed'.
     now = 7_000;
     child2.stderrListeners[0](Buffer.from('frame= 100\n'));
+    // ponytail: startedAt carried by 'resumed' is the ORIGINAL procedure
+    // start time (6_000 from child1's first frame), NOT the resume
+    // wall-clock. The renderer's Date.now() - startedAt derivation stays
+    // continuous across pause/resume so the timer doesn't reset.
     expect(emits).toContainEqual({
       status: 'resumed',
-      startedAt: 7_000,
+      startedAt: 6_000,
       currentSegmentIndex: 1,
     });
     expect(deps.audit).toHaveBeenCalledWith(
@@ -600,6 +604,80 @@ describe('Recorder supervisor', () => {
     expect(procFs.renames[0].from).toMatch(/video-seg0\.mp4$/);
     expect(procFs.renames[0].to).toMatch(/video\.mp4$/);
     expect(emits).toContainEqual(expect.objectContaining({ status: 'stopped', procedureId: 'p6' }));
+  });
+
+  // ponytail: regression for pause→stop (no resume). Before the fix, the
+  // pause-exit branch never cleared the child ref, so stop() scheduled
+  // pendingStop + timers against a dead RecorderChild whose 'exit' already
+  // fired — stop()'s promise hung forever and the renderer button stayed
+  // "Stop Recording" with no navigation to review. After the fix, stop()
+  // detects the paused state via child===null and runs the paused-state
+  // finalize synchronously (1 segment, no dup-push, no concat hang).
+  it('pause→stop (no resume): stop() resolves, 1 segment in audit, child cleared after pause', async () => {
+    const child = makeFakeChild();
+    let now = 14_000;
+    const emits: unknown[] = [];
+    const { deps, concatSpawns, procFs } = makeDeps({
+      children: [child],
+      clock: () => now,
+      emit: (s) => emits.push(s),
+    });
+    const r = new Recorder(deps);
+
+    await r.start({
+      procedureId: 'pP',
+      deviceId: 'Cam',
+      patientId: 'patP',
+      doctorId: 'doc1',
+      preset: { preset: 'sd' },
+      presetSummary: SAMPLE_PRESET_SUMMARY,
+    });
+    child.stderrListeners[0](Buffer.from('frame= 100\n'));
+    now = 14_500;
+    const pausePromise = r.pause();
+    child.triggerExit(0, null);
+    await pausePromise;
+
+    // ponytail: critical assertion — the pause exit branch must null the
+    // child ref so the next stop() routes to finalizeStopFromPaused rather
+    // than scheduling timers against a dead RecorderChild.
+    expect((r as unknown as { child: unknown }).child).toBeNull();
+    expect((r as unknown as { currentSegmentStartedAt: unknown }).currentSegmentStartedAt).toBeNull();
+
+    // Stop. Pre-fix this promise never resolved. Post-fix it resolves
+    // synchronously via the paused-finalize branch.
+    const stopStart = Date.now();
+    const stopPromise = r.stop();
+    await stopPromise;
+    expect(Date.now() - stopStart).toBeLessThan(50);
+    // Drain the concat setTimeout(0) exit before assertions.
+    await new Promise((res) => setTimeout(res, 10));
+
+    // 1 segment → concat runs once (list with a single entry) → the
+    // resulting video.mp4 is fsynced. rename is NOT used because
+    // closedSegments already has one entry from pause-exit.
+    expect(concatSpawns).toHaveLength(1);
+    expect(concatSpawns[0].args).toContain('-f');
+    expect(concatSpawns[0].args[concatSpawns[0].args.indexOf('-f') + 1]).toBe('concat');
+    // -c copy branch (not the reencode fallback).
+    expect(concatSpawns[0].args).toContain('-c');
+    expect(concatSpawns[0].args[concatSpawns[0].args.indexOf('-c') + 1]).toBe('copy');
+
+    // Audit row carries segmentCount === 1, NOT 2. Pre-fix the dup-push
+    // guard let 'video-seg0.mp4' land in closedSegments twice and the
+    // concat demuxer would have concatenated the same file twice.
+    expect(deps.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'recording.stopped',
+        metadata: expect.objectContaining({ segmentCount: 1 }),
+      }),
+    );
+    // Final emits include { status: 'stopped', procedureId: 'pP' }.
+    expect(emits).toContainEqual(
+      expect.objectContaining({ status: 'stopped', procedureId: 'pP' }),
+    );
+    // registry cleared.
+    expect(recorderRegistry.has('pP')).toBe(false);
   });
 
   it('stop with concat non-zero exit: retries with reencode args; second success finalizes completed', async () => {
