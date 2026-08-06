@@ -29,3 +29,10 @@ export function procedureMediaDir(patientId: string, procedureId: string): strin
   mkdirSync(dir, { recursive: true });
   return dir;
 }
+
+// Phase 5 / D-04 — screenshots live under the procedure's media directory in a
+// `screenshots/` subfolder. Not pre-created here; the screenshots.add IPC
+// handler creates it lazily on first write.
+export function screenshotsDir(patientId: string, procedureId: string): string {
+  return path.join(procedureMediaDir(patientId, procedureId), 'screenshots');
+}

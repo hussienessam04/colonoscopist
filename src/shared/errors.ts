@@ -7,7 +7,10 @@ export type IpcError =
   | { code: 'IPC_LOCKED'; message: string; retryAt: number }
   | { code: 'IPC_VALIDATION'; message: string; field?: string }
   | { code: 'IPC_NOT_FOUND'; message: string }
-  | { code: 'IPC_ENCRYPTION_UNAVAILABLE'; message: string };
+  | { code: 'IPC_ENCRYPTION_UNAVAILABLE'; message: string }
+  // Plan 01 stub: handlers whose real implementation lands in Plan 03
+  // throw this so the renderer contract surface doesn't need to shift.
+  | { code: 'IPC_NOT_IMPLEMENTED'; message: string };
 
 export class IpcErrorException extends Error {
   readonly ipc: IpcError;
@@ -31,6 +34,8 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
     case 'IPC_NOT_FOUND':
       return { code, message };
     case 'IPC_ENCRYPTION_UNAVAILABLE':
+      return { code, message };
+    case 'IPC_NOT_IMPLEMENTED':
       return { code, message };
   }
 }
