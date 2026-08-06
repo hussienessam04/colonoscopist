@@ -7,7 +7,7 @@
 // the same visual language. Renders absolutely-positioned at the bottom of
 // its parent; parent must be `relative`.
 
-import { CircleStop, Pause, Play } from 'lucide-react';
+import { Camera, CircleStop, Pause, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -22,6 +22,10 @@ export type RecordingControlsBarProps = {
   startError: string | null;
   onRecordToggle: () => void;
   onPauseResumeToggle: () => void;
+  // Phase 5 / Plan 01 — Camera (screenshot) button. Wired only while
+  // isRecording is true; the parent owns the state for the disabled
+  // gating so the bar stays presentational.
+  onCapture?: () => void;
 };
 
 export function RecordingControlsBar({
@@ -35,6 +39,7 @@ export function RecordingControlsBar({
   startError,
   onRecordToggle,
   onPauseResumeToggle,
+  onCapture,
 }: RecordingControlsBarProps): JSX.Element {
   return (
     <div
@@ -116,6 +121,20 @@ export function RecordingControlsBar({
           >
             <Play aria-hidden="true" />
             Resume
+          </Button>
+        ) : null}
+        {isRecording && onCapture ? (
+          <Button
+            variant="outline"
+            onClick={onCapture}
+            disabled={recordingBusy}
+            data-testid="capture-screenshot-button"
+            aria-label="Capture screenshot (S)"
+            aria-keyshortcuts="S"
+            className="bg-white/10 text-white hover:bg-white/20 border-white/20"
+          >
+            <Camera aria-hidden="true" />
+            Capture
           </Button>
         ) : null}
       </div>

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Video } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import DeviceLostBanner from '@/components/device-lost-banner';
@@ -8,6 +9,7 @@ import { RecIndicator } from '@/components/RecIndicator';
 import { FramingGuide } from '@/components/FramingGuide';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
+import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
@@ -39,6 +41,10 @@ export default function ProcedureRoom(): JSX.Element {
   const [notesCollapsed, setNotesCollapsed] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const startInFlightRef = useRef(false);
+  // ponytail: when recording, the preview is the MJPEG <img> at previewUrl;
+  // when idle, it's the <video> from useVideoPreview. captureScreenshot
+  // discriminates by element type, so the same hook drives both paths.
+  const previewImgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -133,6 +139,30 @@ export default function ProcedureRoom(): JSX.Element {
   const recordingBusy =
     recordingState.status === 'starting' || recordingState.status === 'stopping';
 
+  // Phase 5 / Plan 01 — screenshot intake. The hook targets whichever
+  // element is currently the preview (img while recording, video otherwise).
+  const screenshotIntake = useScreenshotIntake({
+    procedureId: procedureId ?? '',
+    sourceRef: (isRecording ? previewImgRef : preview.videoRef) as
+      | React.RefObject<HTMLImageElement | HTMLVideoElement | null>,
+    isRecording,
+    startedAt: recordingState.startedAt,
+  });
+  // ponytail: 250 ms debounce against key auto-repeat so holding S
+  // doesn't fire dozens of captures per second (D-02).
+  const lastCaptureAtRef = useRef(0);
+  async function handleScreenshotCapture(): Promise<void> {
+    const now = Date.now();
+    if (now - lastCaptureAtRef.current < 250) return;
+    lastCaptureAtRef.current = now;
+    const result = await screenshotIntake.capture();
+    if (result) {
+      toast.success('Screenshot captured');
+    } else {
+      toast.error('Failed to capture screenshot');
+    }
+  }
+
   const timerLabel = useMemo(() => {
     if (!recordingState.startedAt || (recordingState.status !== 'recording' && recordingState.status !== 'paused')) {
       return '00:00:00';
@@ -189,9 +219,10 @@ export default function ProcedureRoom(): JSX.Element {
   }
 
   // ponytail: keyboard shortcuts — Space (pause/resume), Esc (stop), R
-  // (record). Guarded so they don't fire while the doctor is typing in the
-  // notes textarea. Modifier-key combos (Ctrl+R etc.) bypass the page-level
-  // handler so the browser's reload shortcut still works.
+  // (record), S (screenshot). Guarded so they don't fire while the doctor
+  // is typing in the notes textarea. Modifier-key combos (Ctrl+R etc.)
+  // bypass the page-level handler so the browser's reload shortcut still
+  // works.
   useEffect(() => {
     function isTypingTarget(target: EventTarget | null): boolean {
       if (!(target instanceof HTMLElement)) return false;
@@ -215,6 +246,11 @@ export default function ProcedureRoom(): JSX.Element {
         if (!isRecording) {
           e.preventDefault();
           handleRecordToggle();
+        }
+      } else if (e.key === 's' || e.key === 'S') {
+        if (isRecording) {
+          e.preventDefault();
+          void handleScreenshotCapture();
         }
       }
     }
@@ -255,7 +291,8 @@ export default function ProcedureRoom(): JSX.Element {
               Shortcuts: <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
               pause/resume · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
               stop · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">R</kbd>{' '}
-              record
+              record · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
+              screenshot
             </span>
           )}
         </header>
@@ -267,6 +304,7 @@ export default function ProcedureRoom(): JSX.Element {
             <div className="relative aspect-video">
               {isRecording && previewUrl ? (
                 <img
+                  ref={previewImgRef}
                   src={previewUrl}
                   alt="Live capture preview"
                   aria-label="Live capture preview"
@@ -314,6 +352,7 @@ export default function ProcedureRoom(): JSX.Element {
                 startError={startError}
                 onRecordToggle={handleRecordToggle}
                 onPauseResumeToggle={handlePauseResumeToggle}
+                onCapture={handleScreenshotCapture}
               />
             </div>
           </div>
