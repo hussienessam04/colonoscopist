@@ -222,6 +222,69 @@ describe('ScreenshotTimeline', () => {
     });
     expect(onAnnotate).toHaveBeenCalledWith(annotated[0], 'updated');
   });
+
+  // Plan 07 / G-05-9 — × button is a 24×24 solid-red badge. The class
+  // list is the contract; a regression to the old `h-5 w-5 bg-black/60`
+  // shape is caught here so the discoverability fix doesn't silently
+  // drift back. Mirrors T-05-58 contract guard.
+  it('× button has discoverable class list (h-6 w-6 bg-red-600) — G-05-9 contract guard', () => {
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    const deleteButtons = screen.getAllByLabelText(/Delete screenshot at/);
+    expect(deleteButtons).toHaveLength(2);
+    const cls = deleteButtons[0]!.className;
+    expect(cls).toContain('h-6');
+    expect(cls).toContain('w-6');
+    expect(cls).toContain('bg-red-600');
+  });
+
+  // Plan 07 / G-05-10 — clicking the new expand affordance opens the
+  // lightbox WITHOUT firing the parent's seek click. Mirrors T-05-57
+  // contract guard.
+  it('clicking the expand icon calls onOpen with the screenshot and does NOT trigger onSeek — G-05-10', () => {
+    const onSeek = vi.fn();
+    const onCapture = vi.fn();
+    const onDelete = vi.fn();
+    const onOpen = vi.fn();
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        screenshots={fixture}
+        onSeek={onSeek}
+        onCapture={onCapture}
+        onDelete={onDelete}
+        onOpen={onOpen}
+      />,
+    );
+    const expandButtons = screen.getAllByTestId('screenshot-thumbnail-expand');
+    expect(expandButtons).toHaveLength(2);
+    fireEvent.click(expandButtons[0]!);
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith(fixture[0]);
+    expect(onSeek).not.toHaveBeenCalled();
+  });
+
+  // Plan 07 — back-compat. The expand icon is conditional on onOpen being
+  // supplied so legacy callers (no lightbox) keep their previous DOM.
+  it('does not render the expand icon when onOpen is undefined (back-compat)', () => {
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    expect(screen.queryAllByTestId('screenshot-thumbnail-expand')).toHaveLength(0);
+  });
 });
 
 describe('Scrubber pointer events (companion)', () => {

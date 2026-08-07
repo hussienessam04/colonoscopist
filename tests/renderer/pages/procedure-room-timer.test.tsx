@@ -3,11 +3,12 @@
 // Plan 04-03 — Pause/Resume button + timer freeze behavior (D-11).
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { getApi } from '../setup';
 import { setRoute } from '@/store/route';
 import { session } from '@/store/session';
 import { recordingStore } from '@/store/recording';
+import { screenshotToastStore } from '@/store/screenshot-toast';
 import ProcedureRoom from '@/pages/ProcedureRoom';
 import type { RecordingStatus } from '@shared/ipc-contract';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
@@ -556,6 +557,96 @@ describe('ProcedureRoom live-preview IPC contract', () => {
       preset: { preset: 'sd' },
     });
     expect(result).toMatchObject({ previewUrl: expectedUrl });
+  });
+});
+
+// Plan 05-07 / G-05-8 — ProcedureRoom gallery panel. The room must render
+// <ScreenshotTimeline> in the right aside fed by
+// useScreenshotIntake.screenshots, and the × button on a gallery
+// thumbnail must call screenshotToastStore.enqueueDelete (same Toast-undo
+// flow as ProcedureReview).
+describe('ProcedureRoom screenshot gallery (G-05-8)', () => {
+  it('mounts a gallery fed by useScreenshotIntake.screenshots during recording', async () => {
+    const api = getApi();
+    // Seed two screenshots so the gallery renders two thumbnails.
+    api.screenshots.list.mockResolvedValue([
+      {
+        id: 11,
+        procedureId: 'proc-1',
+        timestampInVideoMs: 1_000,
+        filePath: 'data/media/patients/pat-1/proc-1/screenshots/1000.jpg',
+        annotation: null,
+        createdAt: 1_000,
+      },
+      {
+        id: 12,
+        procedureId: 'proc-1',
+        timestampInVideoMs: 4_000,
+        filePath: 'data/media/patients/pat-1/proc-1/screenshots/4000.jpg',
+        annotation: null,
+        createdAt: 4_000,
+      },
+    ]);
+    setRoute({ name: 'procedure-room', patientId: 'pat-1', procedureId: 'proc-1' });
+    render(<ProcedureRoom />);
+    // Push a 'started' status so the page enters the recording branch and
+    // the gallery mount gate (isRecording || screenshots.length > 0)
+    // is satisfied without depending on the screenshots.length branch
+    // alone.
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe('function'),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'started',
+        startedAt: Date.now() - 5_000,
+        currentSegmentIndex: 0,
+      });
+    });
+    const gallery = await screen.findByTestId('procedure-room-gallery');
+    expect(gallery).toBeInTheDocument();
+    // The two seed rows render as ScreenshotThumbnail cards.
+    const thumbs = within(gallery).getAllByTestId('screenshot-thumbnail');
+    expect(thumbs).toHaveLength(2);
+    // The +Capture button from the same ScreenshotTimeline.
+    expect(within(gallery).getByTestId('screenshot-timeline-capture')).toBeInTheDocument();
+  });
+
+  it('clicking the × button on a gallery thumbnail enqueues a Toast-undo delete', async () => {
+    const api = getApi();
+    api.screenshots.list.mockResolvedValue([
+      {
+        id: 21,
+        procedureId: 'proc-1',
+        timestampInVideoMs: 2_000,
+        filePath: 'data/media/patients/pat-1/proc-1/screenshots/2000.jpg',
+        annotation: null,
+        createdAt: 2_000,
+      },
+    ]);
+    setRoute({ name: 'procedure-room', patientId: 'pat-1', procedureId: 'proc-1' });
+    render(<ProcedureRoom />);
+    await waitFor(() =>
+      expect(typeof (window as unknown as { __pushRecordingStatus?: (s: RecordingStatus) => void }).__pushRecordingStatus).toBe('function'),
+    );
+    await act(async () => {
+      (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
+        status: 'started',
+        startedAt: Date.now() - 3_000,
+        currentSegmentIndex: 0,
+      });
+    });
+    const gallery = await screen.findByTestId('procedure-room-gallery');
+    const delBtn = within(gallery).getByLabelText(/Delete screenshot at/);
+    fireEvent.click(delBtn);
+    // Toast store now holds the pending delete entry.
+    const pending = screenshotToastStore.__getState().pending;
+    expect(pending).toHaveLength(1);
+    expect(pending[0]?.screenshotId).toBe(21);
+    expect(pending[0]?.procedureId).toBe('proc-1');
+    // Undo path: undoDelete clears the entry.
+    screenshotToastStore.undoDelete(21);
+    expect(screenshotToastStore.__getState().pending).toHaveLength(0);
   });
 });
 
