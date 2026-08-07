@@ -1,9 +1,9 @@
 ---
-status: partial
+status: diagnosed
 phase: 05-screenshots-procedure-review-trim
 source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-UAT.md (hardware smoke)]
 started: 2026-08-07T11:50:00.000Z
-updated: 2026-08-07T11:55:00.000Z
+updated: 2026-08-07T12:00:00.000Z
 ---
 
 ## Current Test
@@ -273,41 +273,56 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   status: failed
   reason: |
     User reported: "Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported."
-    Root cause hypothesis: <video> element loads the recorded mp4 from http://127.0.0.1:<random>/media/... (MediaServer route, Plan 03). The MediaServer does NOT send CORS headers (Access-Control-Allow-Origin), so the <video> source is treated as cross-origin by Chromium. canvas.drawImage(<video>, ...) taints the canvas, and toBlob() throws because of the tainted-canvas security guard. Same root cause likely affects any future canvas-from-<video> path.
   severity: blocker
   test: 3
-  artifacts: []
+  root_cause: |
+    <video> loads from http://127.0.0.1:<random>/media/... (MediaServer route) without crossOrigin="anonymous", AND MediaServer does not send Access-Control-Allow-Origin. Chromium treats the source as cross-origin → canvas.drawImage taints the canvas → canvas.toBlob() throws DOMException. Same latent gap exists on the live-preview <img> in ProcedureRoom (the S-hotkey capture path).
+  artifacts:
+    - path: src/renderer/src/pages/ProcedureReview.tsx
+      issue: '<video ref={videoRef} ... src={videoSrc} /> has no crossOrigin="anonymous" attribute'
+    - path: src/renderer/src/pages/ProcedureRoom.tsx
+      issue: live <img> for MJPEG preview has no crossOrigin="anonymous" attribute (latent bug for S-hotkey path)
+    - path: src/main/recorder/preview-server.ts
+      issue: 'MediaServer.onHttpRequest emits no Access-Control-Allow-Origin header (only Accept-Ranges, Content-Type, Cache-Control, Pragma, Content-Length). PreviewServer.onHttpRequest same gap on /preview MJPEG route.'
+    - path: tests/renderer/lib/capture-screenshot.test.ts
+      issue: 'toBlob monkey-patch bypasses the tainted-canvas guard — masks the bug from the unit suite'
+    - path: tests/main/recorder/preview-server.test.ts
+      issue: 'no assertion on access-control-allow-origin — the missing header is outside the contract'
   missing:
-    - CORS headers on MediaServer /media/ responses (Access-Control-Allow-Origin: * OR Access-Control-Allow-Origin: http://127.0.0.1:<rendererPort>)
-    - crossOrigin='anonymous' on <video> element (or crossorigin attribute) so Chromium treats the source as CORS-accessible
-    - Or alternative: switch to a non-canvas capture path (e.g., one-shot ffmpeg `image2` muxer write via IPC)
+    - 'Add Access-Control-Allow-Origin: * to MediaServer /media/ response headers (preview-server.ts:491-494, 539-540)'
+    - 'Add Access-Control-Allow-Origin: * to PreviewServer /preview response headers (preview-server.ts:225-227) — fixes live-preview latent bug'
+    - 'Add crossOrigin="anonymous" to the <video> element in ProcedureReview.tsx:252-260'
+    - 'Add crossOrigin="anonymous" to the live <img> element in ProcedureRoom.tsx:305-313 — fixes S-hotkey latent bug'
+    - 'Update tests/renderer/lib/capture-screenshot.test.ts to assert a real toBlob (or skip the mock when source is a <video>)'
+    - 'Update tests/main/recorder/preview-server.test.ts to assert access-control-allow-origin header'
+  debug_session: .planning/debug/DEBUG-tainted-canvas-screenshot.md
 - gap_id: G-05-5
   truth: |
     Clicking Apply in the Trim panel runs ffmpeg against the canonical mp4 path stored in procedures.video_path and produces a trimmed sibling file. video_path_original is preserved (first-trim-only COALESCE).
   status: failed
   reason: |
     User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: Source video missing at data/media/patients/88147c14-658c-440a-badf-e0707f52acb7/116315a0-355f-4f7f-8c88-75ed80510524/video.mp4"
-    The recording flow (Test 2) reportedly succeeded (preview appeared, timer ticked, Stop finalized). But the canonical mp4 at the proceduresRepo.updateVideoPath resolution path does not exist on disk. Possible causes:
-    - Stop finalization failed to write video.mp4 at the expected location (file written elsewhere — e.g., as a segment file, or as <procedureId>/video-segment-0.mp4 + concat never ran)
-    - procedures.video_path was set to a stale path that points to a file the recording pipeline never wrote
-    - The path resolution in trim.ts resolves to <userData>/data/media/.../video.mp4 but the actual file is at a different name (e.g., video-partial.mp4 + .partial suffix for partial status, or video-segment-0.mp4)
-    - Test 2 should be re-examined: did the Stop click actually finalize the procedure with status='completed' AND rename the segment files into the canonical video.mp4? Or did it leave the procedure as 'partial'?
   severity: blocker
   test: 5
-  artifacts: []
+  root_cause: |
+    Path-shape contract drift between Phase 4 recorder and Phase 5 trim resolver. Recorder stores `data/media/patients/<patientId>/<procedureId>/video.mp4` (full userData-relative path) into procedures.video_path, but `paths.ts::videoFilePath` joins procedureMediaDir (which already returns `<userData>/data/media/patients/<patientId>/<procedureId>`) with the stored value. Result: doubled absolute path `<userData>/data/media/patients/<patientId>/<procedureId>/data/media/patients/<patientId>/<procedureId>/video.mp4` → existsSync returns false → applyTrim throws IPC_NOT_FOUND. The toast at trim.ts:80 prints the raw stored value (single path) which matches the DB but doesn't reflect the doubled stat path. Same latent failure in proceduresRepo.restoreFromOriginal (currently masked because Trim never succeeds).
+  artifacts:
+    - path: src/main/recorder/recorder.ts
+      issue: 'relativeVideoPath (lines 1255-1258) returns full userData-relative path; the column semantically wants filename-within-procedure-dir'
+    - path: src/main/recorder/trim.ts
+      issue: 'applyTrim path resolution (lines 75-83) blindly trusts procedure.videoPath is a filename; toast string matches DB but stat was against the doubled path'
+    - path: src/main/paths.ts
+      issue: 'videoFilePath (lines 47-52) assumes third arg is a procedure-relative filename — correct for one shape, wrong for the recorder shape'
+    - path: src/main/db/procedures-repo.ts
+      issue: 'restoreFromOriginal (lines 283-305) — second latent failure point of the same root cause'
+    - path: tests/main/recorder/trim.test.ts
+      issue: 'test fixture uses videoPath: "video.mp4" (filename) while production writes the full path — contract drift not guarded'
   missing:
-    - Verify recording finalize pipeline writes canonical video.mp4 to <userData>/data/media/patients/<id>/<procedureId>/video.mp4 on Stop (status='completed')
-    - Or: applyTrim should fall back to the partial mp4 if status='partial' and canonical is missing (with appropriate audit)
-    - Or: surface a clearer error indicating which paths were searched + what statuses the procedure row has + what files actually exist in the procedure dir
-- gap_id: G-05-7
-  truth: |
-    After a successful Trim, Restore original re-points <video> to video_path_original and the procedure plays the full original recording.
-  status: failed
-  reason: |
-    Test 7 blocked by Test 5 — videoPathOriginal was never populated because Trim never succeeded. Once G-05-5 is resolved, this test should re-run as part of the gap-closure verification.
-  severity: major
-  test: 7
-  artifacts: []
-  missing: []
-  blocked_by: G-05-5
+    - 'Pick one shape for procedures.video_path and apply everywhere — cleanest: change relativeVideoPath in recorder.ts:1255-1258 to return just the filename (video.mp4) so it matches paths.ts::videoFilePath contract and existing trim.test.ts fixture shape'
+    - 'Audit every other writer/reader of procedures.video_path: orphans.ts, restoreFromOriginal, the trimmed-rel returned by applyTrim at trim.ts:114-115 — ensure column stays filename-shaped end-to-end'
+    - 'Update tests/main/recorder/trim.test.ts bootstrap to insert the row with the recorder production shape and assert the resolver still finds the fixture — closes the contract-drift gap'
+    - 'Improve toast/error path: when source missing, list the searched paths + procedure status + actual files in procedure dir — helps future debugging'
+  debug_session: .planning/debug/trim-source-missing.md
 ```
+
+> **Note:** Test 7 is blocked (cascade from Test 5). Once G-05-5 is fixed, re-run Test 7. Test 7 itself is not in the Gaps section because blocked tests are not code issues — they're prerequisite gates.
