@@ -315,6 +315,60 @@ describe('applyTrim', () => {
   });
 });
 
+// G-05-11 — the trim spawn MUST match the recording spawn (recorder.ts:290)
+// and the concat spawn (recorder.ts:1045): Node's default Windows
+// command-line construction. Setting `windowsVerbatimArguments: true`
+// makes Node pass argv as a single space-joined string with NO quoting,
+// which truncates the userData path at the first space. ffmpeg's option
+// parser then sees a truncated path (e.g. `C:\Users\Hussien` instead of
+// `C:\Users\Hussien Essam\...`), Windows returns EACCES on the
+// directory, and ffmpeg reports "Permission denied". The bug was
+// invisible in the unit suite because spawn is mocked; these tests make
+// the OPTIONS a contract so any future reintroduction of the flag (or
+// the equally-bad `shell: true`) fails at CI time.
+describe('windowsVerbatimArguments regression guard (G-05-11)', () => {
+  it('applyTrim spawns ffmpeg WITHOUT windowsVerbatimArguments: true', async () => {
+    const { procedureId } = await bootstrap();
+    fakeSpawnSuccess();
+    const { applyTrim } = await import('../../../src/main/recorder/trim');
+    await applyTrim({ procedureId, inMs: 5_000, outMs: 25_000 });
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const callArgs = spawnMock.mock.calls[0];
+    const options = callArgs?.[2] as Record<string, unknown> | undefined;
+    expect(options).toBeDefined();
+    // The verbatim flag MUST NOT be present (its mere presence would
+    // override Node's default quoting, even if the value were false).
+    expect(options).not.toHaveProperty('windowsVerbatimArguments');
+  });
+
+  it('applyTrim spawn options match the recording spawn shape (recorder.ts:290)', async () => {
+    // Cross-spawn consistency: the trim spawn should look like the
+    // recording spawn minus the device-name argv, with the same options
+    // object shape. This is a structural guard — if a future refactor
+    // re-introduces the verbatim flag OR accidentally adds `shell: true`
+    // (which would re-introduce argv-splitting on Windows via a
+    // different path), this assertion catches both.
+    const { procedureId } = await bootstrap();
+    fakeSpawnSuccess();
+    const { applyTrim } = await import('../../../src/main/recorder/trim');
+    await applyTrim({ procedureId, inMs: 5_000, outMs: 25_000 });
+    const options = spawnMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    // stdio must be present (the trim relies on stderr capture).
+    expect(options.stdio).toEqual(['pipe', 'ignore', 'pipe']);
+    // shell must NOT be true (would re-introduce argv-splitting bugs).
+    expect(options.shell).not.toBe(true);
+    // The full input path must be a SINGLE argv element — Node's
+    // quoting handles embedding-in-spaces. If `windowsVerbatimArguments`
+    // were true, the path would be split on the space at argv-build
+    // time (this is the G-05-11 failure mode); the test ensures the
+    // path remains a single element with no caller-side quoting.
+    const argv = spawnMock.mock.calls[0]?.[1] as string[];
+    const inputArg = argv[argv.indexOf('-i') + 1];
+    expect(inputArg).toBeTypeOf('string');
+    expect(inputArg?.startsWith('"')).toBe(false);
+  });
+});
+
 // G-05-5 — the recorder's `relativeVideoPath` writer and the resolver's
 // `videoFilePath` reader MUST agree on the column shape: a FILENAME
 // within the procedure directory, NOT a userData-relative path. Before
