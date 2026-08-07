@@ -18,6 +18,9 @@
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
     "test:unit": "node scripts/run-vitest.cjs",
+    "test:integration:smoke": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
+    "test:integration:smoke:optin": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
+    "_integration_smoke_note": "The trim-smoke test is opt-in via RUN_SMOKE=1. Default runs skip; CI runs with RUN_SMOKE=1 npm run test:integration:smoke:optin (or set RUN_SMOKE in the CI env).",
     "postinstall": "node node_modules/electron/install.js && electron-rebuild && node scripts/fix-electron-path.cjs"
   },
   "dependencies": {

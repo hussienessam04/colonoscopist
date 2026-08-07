@@ -18,6 +18,7 @@ export default defineConfig({
       'tests/renderer/**/*.test.{ts,tsx}',
       'tests/shell/**/*.test.ts',
       'tests/integration/**/*.test.ts',
+      'tests/security/**/*.test.ts',
     ],
     environment: 'node',
     // Renderer tests opt into happy-dom via the per-file directive `// @vitest-environment happy-dom`.
