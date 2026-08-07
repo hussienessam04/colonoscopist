@@ -2,8 +2,10 @@
 status: passed
 phase: 05-screenshots-procedure-review-trim
 verified: 2026-08-07
-verifier: gsd-executor (Plan 05-04 self-verification)
+verifier: gsd-executor (Plan 05-04 self-verification, refreshed after gap-closure plans 05-05 + 05-06)
 ---
+
+> **Refreshed 2026-08-07** after gap-closure plans 05-05 + 05-06 shipped CORS fix (G-05-3) and trim path-shape fix (G-05-5). Test suite: 491/491 pass across 62 files (was 484/484 before gap closure; +7 contract-guard assertions). G-05-3 + G-05-5 unit-layer coverage confirmed by new tests; Windows hardware smoke (`05-UAT.md`) still required for end-to-end sign-off (clicking +Capture saves JPEG; Trim Apply runs ffmpeg against canonical mp4).
 
 # Phase 5 Verification — Screenshots + Procedure Review + Trim
 
@@ -42,6 +44,8 @@ phase_status: complete
 | 05-02 | Right-rail Polish | `d77c232`, `9e2b007` | 28 new tests (8 files) |
 | 05-03 | Trim end-to-end | `dc6181c`, `1324c25`, `fa38139` | 49 new tests (8 files) |
 | 05-04 | Integration hardening | `c0f51d3`, `b9e3863`, `165649e`, `3f1c28b`, `2067c90` | Range request support, security audit, 3 pre-existing test fixes |
+| 05-05 | Gap-closure (G-05-3) — CORS tainted-canvas | `3beafb7`, `e867d47` | CORS header on MediaServer + PreviewServer; `crossOrigin="anonymous"` on `<video>` + `<img>`; 4 new CORS-header assertions + 2 new `withCrossOriginSource` toBlob guards |
+| 05-06 | Gap-closure (G-05-5) — trim path-shape drift | `3faccd6`, `dffcfa1` | `relativeVideoPath` returns filename-only; trim error enrichment + paths.ts JSDoc; 3 new contract-guard tests |
 
 ## Security Hardening (T-05-22 + T-05-33..43)
 

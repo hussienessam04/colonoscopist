@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: partial
 phase: 05-screenshots-procedure-review-trim
-source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-UAT.md (hardware smoke)]
+source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-UAT.md (hardware smoke)]
 started: 2026-08-07T11:50:00.000Z
-updated: 2026-08-07T12:30:00.000Z
+updated: 2026-08-07T16:00:00.000Z
 ---
 
 ## Current Test
@@ -270,7 +270,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-3
   truth: |
     Clicking +Capture during playback successfully saves a JPEG screenshot from the current <video> frame to <userData>/data/media/patients/<id>/<procedureId>/screenshots/<ts>.jpg and the thumbnail appears in the timeline without errors.
-  status: failed
+  status: resolved
+  resolved_by: 05-05-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported."
   reason: |
     User reported: "Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported."
   severity: blocker
@@ -299,7 +303,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-5
   truth: |
     Clicking Apply in the Trim panel runs ffmpeg against the canonical mp4 path stored in procedures.video_path and produces a trimmed sibling file. video_path_original is preserved (first-trim-only COALESCE).
-  status: failed
+  status: resolved
+  resolved_by: 05-06-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: Source video missing at data/media/patients/88147c14-658c-440a-badf-e0707f52acb7/116315a0-355f-4f7f-8c88-75ed80510524/video.mp4"
   reason: |
     User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: Source video missing at data/media/patients/88147c14-658c-440a-badf-e0707f52acb7/116315a0-355f-4f7f-8c88-75ed80510524/video.mp4"
   severity: blocker
