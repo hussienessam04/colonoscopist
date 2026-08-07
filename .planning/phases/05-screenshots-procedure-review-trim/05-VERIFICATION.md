@@ -2,10 +2,10 @@
 status: passed
 phase: 05-screenshots-procedure-review-trim
 verified: 2026-08-07
-verifier: gsd-executor (Plan 05-04 self-verification, refreshed after gap-closure plans 05-05..05-11)
+verifier: gsd-executor (Plan 05-04 self-verification, refreshed after gap-closure plans 05-05..05-12)
 ---
 
-> **Refreshed 2026-08-07** after gap-closure plans 05-05..05-11 shipped:
+> **Refreshed 2026-08-07** after gap-closure plans 05-05..05-12 shipped:
 > - 05-05: CORS fix (G-05-3 — tainted canvas)
 > - 05-06: trim path-shape drift fix (G-05-5 — trim source missing)
 > - 05-07: gallery + delete discoverability + lightbox (G-05-8/9/10)
@@ -13,8 +13,9 @@ verifier: gsd-executor (Plan 05-04 self-verification, refreshed after gap-closur
 > - 05-09: trim UI visual timeline (G-05-12 — in-frame previews + tick scale + dot markers)
 > - 05-10: delete UX fix (G-05-13 — synchronous remove + IPC error surface)
 > - 05-11: lightbox full-size fix (G-05-14 — MediaServer subdir allow-list + lightbox URL composition)
+> - 05-12: timeline thumbnails fix (G-05-15 — `thumbnailSrc` prop wiring + shared `screenshotUrl` helper)
 >
-> Test suite: **515/515 pass across 64 files** (was 484/484 before any gap closure; +31 contract-guard assertions). All 7 Phase 5 requirements (SCRN-01/02 + REV-01..04) covered by both unit-layer and gap-closure contract-guard tests. Windows hardware smoke (`05-UAT.md`) still required for final end-to-end sign-off — re-run `/gsd-verify-work 5` to confirm all 7 UAT tests pass end-to-end.
+> Test suite: **520/520 pass across 65 files** (was 484/484 before any gap closure; +36 contract-guard assertions). All 7 Phase 5 requirements (SCRN-01/02 + REV-01..04) covered by both unit-layer and gap-closure contract-guard tests. Windows hardware smoke (`05-UAT.md`) required for final end-to-end sign-off — re-run `/gsd-verify-work 5` to confirm all 7 UAT tests pass with the actual captured JPEGs now visible in the timeline.
 
 # Phase 5 Verification — Screenshots + Procedure Review + Trim
 
@@ -60,6 +61,7 @@ phase_status: complete
 | 05-09 | Gap-closure (G-05-12) — trim UI visual | `96721c0`, `54f75c6`, `382b465` | Scrubber screenshot dot markers + tick scale (5s/10s); TrimControls in-frame/out-frame JPEG previews via `captureFrame`; 4 new test assertions |
 | 05-10 | Gap-closure (G-05-13) — delete UX | `d3f0da7`, `9423b15` | `remove(id)` action on `useScreenshotIntake` + `removeScreenshot(id)` on `useProcedures`; both delete handlers call synchronously before toast/IPC; IPC failures surface as `toast.error` via `subscribeCommitted` event; 7 new test assertions |
 | 05-11 | Gap-closure (G-05-14) — lightbox full-size | `6f2a620`, `7f5b0f3` | MediaServer `MEDIA_ROUTE_RE` extended with optional subdir capture group + `ALLOWED_SUBDIRS` allow-list (defense-in-depth); lightbox URL composition includes literal `screenshots/` segment; 4 new + 1 updated test assertions |
+| 05-12 | Gap-closure (G-05-15) — timeline thumbnails | `1ae0b5a`, `10559b1`, `a332ddf` | Shared `screenshotUrl` helper extracted from lightbox; ScreenshotTimeline `mediaBaseUrl` + `patientId` props wired to each thumbnailSrc; `<img>` `data-testid` added; both ProcedureReview + ProcedureRoom plumbed the new props; 5 new test assertions |
 
 ## Security Hardening (T-05-22 + T-05-33..43)
 

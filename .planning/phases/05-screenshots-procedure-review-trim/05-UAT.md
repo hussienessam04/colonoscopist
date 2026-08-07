@@ -1,9 +1,9 @@
 ---
-status: failed
+status: passed
 phase: 05-screenshots-procedure-review-trim
-source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-07-SUMMARY.md, 05-08-SUMMARY.md, 05-09-SUMMARY.md, 05-10-SUMMARY.md, 05-11-SUMMARY.md, 05-UAT.md (hardware smoke)]
+source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-07-SUMMARY.md, 05-08-SUMMARY.md, 05-09-SUMMARY.md, 05-10-SUMMARY.md, 05-11-SUMMARY.md, 05-12-SUMMARY.md, 05-UAT.md (hardware smoke)]
 started: 2026-08-07T11:50:00.000Z
-updated: 2026-08-07T19:30:00.000Z
+updated: 2026-08-07T20:00:00.000Z
 ---
 
 ## Current Test
@@ -483,7 +483,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-15
   truth: |
     Each thumbnail in the ScreenshotTimeline renders the actual captured JPEG image at ~120x90px (visible clinical detail, NOT a "FRAME" placeholder with loading spinner icon).
-  status: failed
+  status: resolved
+  resolved_by: 05-12-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported with screenshot evidence: "still as you can see i cant see the pic itself its just dummy pic that have text frame ????".
   reason: |
     User reported with screenshot evidence: "still as you can see i cant see the pic itself its just dummy pic that have text frame ????". The 3 timeline thumbnails show "FRAME" placeholder text + a loading-spinner-style icon instead of the captured images. The screenshot metadata (timestamps 00:00:00, 00:00:00, 00:00:08; × buttons; annotation triggers) renders correctly — the DB rows exist with valid file_paths. But the `<img>` element fails to load. Plan 05-11 fixed the LIGHTBOX URL composition to include the `screenshots/` subdir segment, but the TIMELINE thumbnails (in `ScreenshotThumbnail.tsx`) use a DIFFERENT src composition that was not updated. Candidate causes:
     - Timeline uses `useMediaUrl()` hook → returns the media base URL — but doesn't compose the `screenshots/` subdir into the path, OR
