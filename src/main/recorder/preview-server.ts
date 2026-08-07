@@ -208,6 +208,14 @@ export class PreviewServer {
   }
 
   private onHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+    // G-05-3 + D-01 cross-origin posture: the renderer's <img> loads the
+    // MJPEG stream from a different origin (localhost:vite / file:// vs
+    // 127.0.0.1:<random>). Without this header Chromium treats the load as
+    // opaque and any subsequent canvas.drawImage taints the canvas. The
+    // header MUST be set as the FIRST line of the handler — before any
+    // method check or early return — so every response path (200, 404, 405,
+    // and any future error branch) inherits it.
+    res.setHeader('Access-Control-Allow-Origin', '*');
     if (req.method !== 'GET') {
       res.statusCode = 405;
       res.setHeader('Allow', 'GET');
@@ -421,6 +429,14 @@ export class MediaServer {
   }
 
   private onHttpRequest(req: IncomingMessage, res: ServerResponse): void {
+    // G-05-3 + D-01 cross-origin posture: the renderer's <video> loads the
+    // mp4 from a different origin (localhost:vite / file:// vs
+    // 127.0.0.1:<random>). Without this header Chromium treats the load as
+    // cross-origin and any subsequent canvas.drawImage taints the canvas.
+    // The header MUST be set as the FIRST line of the handler — before any
+    // method check, range parse, regex match, existsSync, or early return —
+    // so EVERY response path (200, 206, 416, 404, 403, 405) carries it.
+    res.setHeader('Access-Control-Allow-Origin', '*');
     if (req.method !== 'GET' && req.method !== 'HEAD') {
       res.statusCode = 405;
       res.setHeader('Allow', 'GET, HEAD');

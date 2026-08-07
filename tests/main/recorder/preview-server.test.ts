@@ -230,6 +230,71 @@ describe('PreviewServer end-to-end', () => {
     });
     expect(status).toBe(404);
   });
+
+  it('serves /preview with Access-Control-Allow-Origin: * (G-05-3)', async () => {
+    // G-05-3 — the MJPEG stream must declare CORS so the renderer's live
+    // <img crossOrigin="anonymous"> can draw the frame onto a canvas
+    // without tainting. The header is set as the FIRST line of the
+    // handler body so it appears on the 200 multipart response. Use a
+    // raw socket + 1s watchdog to capture just the response headers —
+    // the server keeps the connection open for the long-lived stream
+    // (it never calls res.end()), so we destroy the socket after the
+    // header block lands.
+    const handle = await server.start();
+    const httpPort = Number(new URL(handle.httpUrl).port);
+    const headers = await new Promise<Record<string, string>>((resolve, reject) => {
+      const sock = connect(httpPort, '127.0.0.1', () => {
+        sock.write('GET /preview HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n');
+      });
+      const chunks: Buffer[] = [];
+      let settled = false;
+      sock.on('data', (c: Buffer) => {
+        if (settled) return;
+        chunks.push(c);
+        const raw = Buffer.concat(chunks);
+        const headerEnd = raw.indexOf('\r\n\r\n');
+        if (headerEnd < 0) return;
+        settled = true;
+        const headerText = raw.subarray(0, headerEnd).toString('utf8');
+        const out: Record<string, string> = {};
+        for (const line of headerText.split('\r\n').slice(1)) {
+          const idx = line.indexOf(':');
+          if (idx > 0) {
+            out[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+          }
+        }
+        sock.destroy();
+        resolve(out);
+      });
+      sock.on('error', (err) => {
+        if (settled) return;
+        settled = true;
+        reject(err);
+      });
+      setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        sock.destroy();
+        const raw = Buffer.concat(chunks);
+        const headerEnd = raw.indexOf('\r\n\r\n');
+        if (headerEnd < 0) {
+          reject(new Error('No HTTP headers in /preview response'));
+          return;
+        }
+        const headerText = raw.subarray(0, headerEnd).toString('utf8');
+        const out: Record<string, string> = {};
+        for (const line of headerText.split('\r\n').slice(1)) {
+          const idx = line.indexOf(':');
+          if (idx > 0) {
+            out[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+          }
+        }
+        resolve(out);
+      }, 1_000);
+    });
+    expect(headers['access-control-allow-origin']).toBe('*');
+    expect(headers['content-type']).toMatch(/^multipart\/x-mixed-replace/);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -331,6 +396,10 @@ describe('MediaServer', () => {
     expect(response.headers['content-type']).toBe('video/mp4');
     expect(response.headers['accept-ranges']).toBe('bytes');
     expect(response.headers['content-length']).toBe('2048');
+    // G-05-3 — CORS header is set unconditionally on every response path
+    // so the renderer's <video> cross-origin load is treated as CORS-clean
+    // and canvas.drawImage no longer taints the canvas.
+    expect(response.headers['access-control-allow-origin']).toBe('*');
     expect(response.body.length).toBe(2048);
   });
 
@@ -380,6 +449,51 @@ describe('MediaServer', () => {
         resolve();
       });
     });
+  });
+
+  it('serves /media/ error paths (404 / 405) with Access-Control-Allow-Origin: * (G-05-3)', async () => {
+    // G-05-3 — the CORS header is set as the FIRST line of the handler
+    // body, so it appears on EVERY response path including 404 and 405
+    // error returns. Chromium's CORS check happens before HTTP semantics,
+    // so a missing header on the error path would silently drop the
+    // request and confuse the doctor with a "no error" load.
+    const handle = await server.start();
+
+    // 404 path — file does not exist.
+    const notFound = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/missing.mp4',
+    );
+    expect(notFound.status).toBe(404);
+    expect(notFound.headers['access-control-allow-origin']).toBe('*');
+
+    // 405 path — POST is rejected.
+    const methodNotAllowed = await new Promise<{ status: number; headers: Record<string, string> }>(
+      (resolve, reject) => {
+        const sock = connect(handle.httpPort, '127.0.0.1', () => {
+          sock.write('POST /media/p1/proc1/video.mp4 HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+        });
+        const chunks: Buffer[] = [];
+        sock.on('data', (c: Buffer) => chunks.push(c));
+        sock.on('error', (err) => reject(err));
+        sock.on('close', () => {
+          const raw = Buffer.concat(chunks).toString('utf8');
+          const statusLine = raw.split('\r\n')[0] ?? '';
+          const m = statusLine.match(/^HTTP\/1\.[01] (\d+)/);
+          const status = m ? Number(m[1]) : 0;
+          const headers: Record<string, string> = {};
+          for (const line of raw.split('\r\n').slice(1)) {
+            const idx = line.indexOf(':');
+            if (idx > 0) {
+              headers[line.slice(0, idx).trim().toLowerCase()] = line.slice(idx + 1).trim();
+            }
+          }
+          resolve({ status, headers });
+        });
+      },
+    );
+    expect(methodNotAllowed.status).toBe(405);
+    expect(methodNotAllowed.headers['access-control-allow-origin']).toBe('*');
   });
 });
 
@@ -447,6 +561,9 @@ describe('MediaServer Range request handling (Plan 04)', () => {
     expect(response.status).toBe(206);
     expect(response.headers['content-range']).toBe('bytes 0-1023/4096');
     expect(response.headers['content-length']).toBe('1024');
+    // G-05-3 — CORS header is set on every response path, including the
+    // 206 Partial Content path that Chromium uses for <video> seeking.
+    expect(response.headers['access-control-allow-origin']).toBe('*');
     expect(response.body.length).toBe(1024);
   });
 
