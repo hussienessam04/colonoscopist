@@ -23,6 +23,10 @@ export type ScreenshotTimelineProps = {
   onCapture: () => void;
   onDelete?: (s: Screenshot) => void;
   onAnnotate?: (screenshot: Screenshot, annotation: string | null) => Promise<void>;
+  // Plan 07 / G-05-10 — when present, the timeline forwards onOpen to each
+  // ScreenshotThumbnail, which renders a dedicated expand affordance. The
+  // lightbox is owned by the parent page; the timeline itself is presentational.
+  onOpen?: (screenshot: Screenshot) => void;
   testId?: string;
 };
 
@@ -43,6 +47,7 @@ export function ScreenshotTimeline({
   onCapture,
   onDelete,
   onAnnotate,
+  onOpen,
   testId,
 }: ScreenshotTimelineProps): JSX.Element {
   const canCapture = captureAllowed(status);
@@ -60,6 +65,7 @@ export function ScreenshotTimeline({
           onSeek={onSeek}
           onDelete={onDelete}
           onAnnotate={onAnnotate}
+          onOpen={onOpen}
         />
       ))}
       <Button

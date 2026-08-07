@@ -7,13 +7,15 @@ import DeviceLostBanner from '@/components/device-lost-banner';
 import { RecordingControlsBar } from '@/components/RecordingControlsBar';
 import { RecIndicator } from '@/components/RecIndicator';
 import { FramingGuide } from '@/components/FramingGuide';
+import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
+import { screenshotToastStore } from '@/store/screenshot-toast';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { QualityPreset } from '@shared/ipc-contract';
+import type { QualityPreset, Screenshot } from '@shared/ipc-contract';
 
 export default function ProcedureRoom(): JSX.Element {
   const routeState = useRoute();
@@ -161,6 +163,24 @@ export default function ProcedureRoom(): JSX.Element {
     } else {
       toast.error('Failed to capture screenshot');
     }
+  }
+
+  // G-05-8 / Plan 07 — gallery delete uses the same Toast-undo store as
+  // ProcedureReview. The hook's `screenshots[]` stays in sync via the
+  // underlying IPC; the optimistic `void refresh` dance from
+  // ProcedureReview is unnecessary here because the gallery consumes the
+  // hook state directly (the row stays visible until the next list
+  // refresh, which the next page mount triggers — same UX as the
+  // review timeline).
+  function handleScreenshotDelete(s: Screenshot): void {
+    screenshotToastStore.enqueueDelete(s.id, s.procedureId);
+    toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
+      duration: 5_000,
+      action: {
+        label: 'Undo',
+        onClick: () => screenshotToastStore.undoDelete(s.id),
+      },
+    });
   }
 
   const timerLabel = useMemo(() => {
@@ -386,6 +406,35 @@ export default function ProcedureRoom(): JSX.Element {
                 lastLost={lastLost}
                 onDismiss={() => recordingStore.clearLastLost()}
               />
+              {isRecording || screenshotIntake.screenshots.length > 0 ? (
+                // G-05-8 / Plan 07 — mid-procedure gallery fed by the
+                // existing useScreenshotIntake.screenshots state. The same
+                // <ScreenshotTimeline> surface as ProcedureReview; onSeek
+                // is a no-op (no <video> to seek during recording) and
+                // onAnnotate is intentionally not passed (annotations are
+                // review-only). The +Capture button reuses the room's
+                // handleScreenshotCapture so the S hotkey and the
+                // timeline button are interchangeable.
+                <div
+                  className="flex flex-col gap-2"
+                  data-testid="procedure-room-gallery-section"
+                >
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Captured screenshots
+                  </h3>
+                  <ScreenshotTimeline
+                    procedureId={procedureId ?? ''}
+                    status={isRecording ? 'recording' : 'completed'}
+                    screenshots={screenshotIntake.screenshots}
+                    onSeek={() => undefined}
+                    onCapture={() => {
+                      void handleScreenshotCapture();
+                    }}
+                    onDelete={handleScreenshotDelete}
+                    testId="procedure-room-gallery"
+                  />
+                </div>
+              ) : null}
             </aside>
           ) : (
             <div className="flex items-start justify-end">

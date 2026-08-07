@@ -32,6 +32,11 @@ export type ScreenshotThumbnailProps = {
   // Plan 02 — when present, renders `<ScreenshotAnnotation>` above the
   // timestamp label. The parent wires this to the IPC updateAnnotation.
   onAnnotate?: (screenshot: Screenshot, annotation: string | null) => Promise<void>;
+  // Plan 07 / G-05-10 — when present, renders a dedicated expand affordance
+  // (lucide Maximize2 inline SVG, top-left) that fires onOpen(screenshot).
+  // Seek-on-click on the parent card is unchanged; the expand button calls
+  // e.stopPropagation() so the parent click handler does NOT also fire.
+  onOpen?: (screenshot: Screenshot) => void;
   testId?: string;
 };
 
@@ -41,6 +46,7 @@ function ScreenshotThumbnailImpl({
   onDelete,
   thumbnailSrc,
   onAnnotate,
+  onOpen,
   testId,
 }: ScreenshotThumbnailProps): JSX.Element {
   const [errored, setErrored] = useState(false);
@@ -48,6 +54,10 @@ function ScreenshotThumbnailImpl({
   const handleDelete = (e: MouseEvent<HTMLButtonElement>): void => {
     e.stopPropagation(); // do NOT trigger the seek click handler
     onDelete?.(screenshot);
+  };
+  const handleExpand = (e: MouseEvent<HTMLButtonElement>): void => {
+    e.stopPropagation(); // do NOT trigger the parent seek click handler
+    onOpen?.(screenshot);
   };
   return (
     <div
@@ -100,13 +110,48 @@ function ScreenshotThumbnailImpl({
         {formatDurationHHMMSS(screenshot.timestampInVideoMs)}
       </span>
       {onDelete ? (
+        // ponytail: 24×24 solid-red disc (was 20×20 translucent-black).
+        // The hit target is large enough for a gloved clinician to tap without
+        // a hover-reveal; the red is high-contrast against any captured
+        // frame; shadow-md + focus-visible:ring-2 make the affordance
+        // discoverable for keyboard users (T-05-58 mitigation).
         <button
           type="button"
           onClick={handleDelete}
           aria-label={`Delete screenshot at ${formatDurationHHMMSS(screenshot.timestampInVideoMs)}`}
-          className="absolute right-1 top-6 z-20 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white hover:bg-red-600"
+          className="absolute right-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-sm text-white shadow-md focus-visible:ring-2 focus-visible:ring-white hover:bg-red-700"
         >
           ×
+        </button>
+      ) : null}
+      {onOpen ? (
+        // ponytail: dedicated expand affordance — independent from the
+        // parent seek click. Inline Maximize2 SVG (no new dep). The
+        // e.stopPropagation() in handleExpand prevents the parent card
+        // from also seeking when the doctor opens the lightbox.
+        <button
+          type="button"
+          onClick={handleExpand}
+          aria-label={`Open full-size view of screenshot at ${formatDurationHHMMSS(screenshot.timestampInVideoMs)}`}
+          className="absolute left-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-slate-700/80 text-white shadow-md focus-visible:ring-2 focus-visible:ring-white hover:bg-slate-900"
+          data-testid="screenshot-thumbnail-expand"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            width="12"
+            height="12"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M3 8V5a2 2 0 0 1 2-2h3" />
+            <path d="M21 8V5a2 2 0 0 0-2-2h-3" />
+            <path d="M3 16v3a2 2 0 0 0 2 2h3" />
+            <path d="M21 16v3a2 2 0 0 1-2 2h-3" />
+          </svg>
         </button>
       ) : null}
     </div>
