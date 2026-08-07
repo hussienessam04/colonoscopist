@@ -13,12 +13,22 @@
 //
 // Inline status (not a modal) per UX-Pitfalls: Apply + Restore buttons
 // show a `Loader2` spinner during the IPC round-trip.
+//
+// Plan 09 / G-05-12 — adds optional `screenshots`, `videoRef`, and
+// `captureFrame` props so the right rail can show in-frame + out-frame
+// JPEG previews sourced via `captureScreenshot(videoRef.current)` at the
+// current inMs/outMs handles. The `captureFrame` seam lets the test
+// substitute a stub returning a fixed base64 string without spinning a
+// real <video> decode. All three props are OPTIONAL — the existing
+// 9 TrimControls tests don't supply them, and making them required
+// would break the suite compilation.
 
+import { useEffect, useRef, useState, type RefObject } from 'react';
 import { Loader2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import type { ProcedureStatus } from '@shared/ipc-contract';
+import type { ProcedureStatus, Screenshot } from '@shared/ipc-contract';
 
 // ponytail: 30 minutes is the cap we set for browser-side seek-by-keyframe
 // reliability. Above this, the trim handles drift and the doctor's cuts land
@@ -38,6 +48,12 @@ export type TrimControlsProps = {
   restoring: boolean;
   apply: () => Promise<void>;
   restore: () => Promise<void>;
+  // Plan 09 / G-05-12 — optional preview props. When omitted (the
+  // existing test surface never supplies them) the preview block is
+  // not rendered and the component degrades to its pre-Plan-09 form.
+  screenshots?: Screenshot[];
+  videoRef?: RefObject<HTMLVideoElement | null>;
+  captureFrame?: (video: HTMLVideoElement, atMs: number) => Promise<string | null>;
 };
 
 export function TrimControls({
@@ -52,6 +68,9 @@ export function TrimControls({
   restoring,
   apply,
   restore,
+  screenshots: _screenshots,
+  videoRef,
+  captureFrame,
 }: TrimControlsProps): JSX.Element {
   const overDurationCap = durationMs > MAX_TRIM_DURATION_MS;
   // D-13 — partial recordings disable Apply at the renderer so the
@@ -66,6 +85,48 @@ export function TrimControls({
   // D-09 — Restore only meaningful after a prior trim. The column is
   // null until the first trim lands (COALESCE'd on first trim).
   const restoreDisabled = restoring || videoPathOriginal === null;
+
+  // Plan 09 / G-05-12 — in-frame / out-frame JPEG data URLs. The previews
+  // render above the existing In/Out labels so the doctor sees the frame
+  // first, then the HH:MM:SS timestamp confirms.
+  const [inFrameDataUrl, setInFrameDataUrl] = useState<string | null>(null);
+  const [outFrameDataUrl, setOutFrameDataUrl] = useState<string | null>(null);
+  // ponytail: per-handle in-flight guard. Concurrent captures for the
+  // same handle are skipped until the prior Promise settles — the next
+  // effect run after settle picks up the latest inMs/outMs.
+  const captureInFlightRef = useRef<{ in: boolean; out: boolean }>({ in: false, out: false });
+
+  useEffect(() => {
+    if (!trimMode) {
+      setInFrameDataUrl(null);
+      setOutFrameDataUrl(null);
+      return;
+    }
+    const video = videoRef?.current;
+    if (!video || !captureFrame) return;
+    if (!captureInFlightRef.current.in) {
+      captureInFlightRef.current.in = true;
+      captureFrame(video, inMs)
+        .then((data) => {
+          captureInFlightRef.current.in = false;
+          if (data) setInFrameDataUrl(`data:image/jpeg;base64,${data}`);
+        })
+        .catch(() => {
+          captureInFlightRef.current.in = false;
+        });
+    }
+    if (!captureInFlightRef.current.out) {
+      captureInFlightRef.current.out = true;
+      captureFrame(video, outMs)
+        .then((data) => {
+          captureInFlightRef.current.out = false;
+          if (data) setOutFrameDataUrl(`data:image/jpeg;base64,${data}`);
+        })
+        .catch(() => {
+          captureInFlightRef.current.out = false;
+        });
+    }
+  }, [trimMode, inMs, outMs, videoRef, captureFrame]);
 
   return (
     <Card data-testid="trim-controls">
@@ -84,6 +145,46 @@ export function TrimControls({
       </CardHeader>
       {trimMode ? (
         <CardContent className="flex flex-col gap-2 text-sm">
+          {trimMode && (inFrameDataUrl || outFrameDataUrl) ? (
+            <div className="flex gap-2" data-testid="trim-previews">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                  In frame
+                </span>
+                {inFrameDataUrl ? (
+                  <img
+                    src={inFrameDataUrl}
+                    alt="Frame at in-point"
+                    data-testid="trim-in-preview"
+                    className="h-16 w-24 rounded border border-slate-300 object-cover"
+                  />
+                ) : (
+                  <div
+                    data-testid="trim-in-preview-placeholder"
+                    className="h-16 w-24 rounded border border-dashed border-slate-300"
+                  />
+                )}
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wide text-slate-500">
+                  Out frame
+                </span>
+                {outFrameDataUrl ? (
+                  <img
+                    src={outFrameDataUrl}
+                    alt="Frame at out-point"
+                    data-testid="trim-out-preview"
+                    className="h-16 w-24 rounded border border-slate-300 object-cover"
+                  />
+                ) : (
+                  <div
+                    data-testid="trim-out-preview-placeholder"
+                    className="h-16 w-24 rounded border border-dashed border-slate-300"
+                  />
+                )}
+              </div>
+            </div>
+          ) : null}
           <div className="text-xs text-slate-600" data-testid="trim-range-labels">
             In:{' '}
             <span className="font-mono" data-testid="trim-in-label">

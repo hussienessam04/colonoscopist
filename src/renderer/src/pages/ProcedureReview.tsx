@@ -48,6 +48,42 @@ function isInteractiveStatus(status: string): boolean {
   return status === 'recording' || status === 'completed' || status === 'partial';
 }
 
+// Plan 09 / G-05-12 — seek + capture helper for the TrimControls in/out
+// previews. Module-scope so its identity is stable across renders (the
+// TrimControls useEffect depends on it). Sets `video.currentTime`, waits
+// for the browser to fire `seeked`, then captures via the existing
+// `captureScreenshot` lib and returns the base64 bytes. Returns null on
+// timeout (1 second) or error so the preview slot stays empty.
+async function captureFrameForTrim(
+  video: HTMLVideoElement,
+  atMs: number,
+): Promise<string | null> {
+  if (video.readyState < 2) return null;
+  return new Promise<string | null>((resolve) => {
+    let settled = false;
+    const onSeeked = (): void => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('seeked', onSeeked);
+      void captureScreenshot(video).then(
+        (r) => resolve(r.base64),
+        () => resolve(null),
+      );
+    };
+    video.addEventListener('seeked', onSeeked, { once: true });
+    // 1-second timeout: if seeked never fires (e.g. trim handle out of
+    // bounds, video element mid-disposal), resolve null so the preview
+    // slot stays empty rather than spinning forever.
+    setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      video.removeEventListener('seeked', onSeeked);
+      resolve(null);
+    }, 1_000);
+    video.currentTime = atMs / 1000;
+  });
+}
+
 export default function ProcedureReview({
   procedureId: initialId,
 }: {
@@ -316,6 +352,7 @@ export default function ProcedureReview({
               currentMs={currentMs}
               onSeek={handleSeek}
               segments={segments}
+              screenshots={screenshots}
               trimMode={trim.trimMode}
               inMs={trim.inMs}
               outMs={trim.outMs}
@@ -354,6 +391,9 @@ export default function ProcedureReview({
               restoring={trim.restoring}
               apply={trim.apply}
               restore={trim.restore}
+              screenshots={screenshots}
+              videoRef={videoRef}
+              captureFrame={captureFrameForTrim}
             />
 
             <Card data-testid="procedure-review-metadata">
