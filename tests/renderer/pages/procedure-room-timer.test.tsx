@@ -639,6 +639,7 @@ describe('ProcedureRoom screenshot gallery (G-05-8)', () => {
     const gallery = await screen.findByTestId('procedure-room-gallery');
     const delBtn = within(gallery).getByLabelText(/Delete screenshot at/);
     fireEvent.click(delBtn);
+    expect(within(gallery).queryAllByTestId('screenshot-thumbnail')).toHaveLength(0);
     // Toast store now holds the pending delete entry.
     const pending = screenshotToastStore.__getState().pending;
     expect(pending).toHaveLength(1);

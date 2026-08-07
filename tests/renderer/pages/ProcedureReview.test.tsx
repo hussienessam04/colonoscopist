@@ -3,21 +3,33 @@
 // StatusBadge wiring. Plan 02 polish over the Plan 01 baseline.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '../setup';
 import { getApi, mockApi } from '../setup';
 import { setRoute } from '@/store/route';
 import { recordingStore } from '@/store/recording';
+import { screenshotToastStore } from '@/store/screenshot-toast';
 import ProcedureReview from '@/pages/ProcedureReview';
 import type {
   Patient,
   Procedure,
   ProcedureSegment,
   ProcedureStatus,
+  Screenshot,
 } from '@shared/ipc-contract';
 
+const toastMock = vi.hoisted(() =>
+  Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+  }),
+);
+vi.mock('sonner', () => ({ toast: toastMock }));
+
 afterEach(() => {
+  screenshotToastStore.reset();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -92,6 +104,30 @@ function setupApiForStatus(
     }),
   );
   api.patients.get.mockResolvedValue(patient);
+}
+
+const deleteScreenshots: Screenshot[] = [
+  {
+    id: 21,
+    procedureId: 'proc-1',
+    timestampInVideoMs: 1_000,
+    filePath: 'data/media/patients/pat-1/proc-1/screenshots/1000.jpg',
+    annotation: null,
+    createdAt: 1_000,
+  },
+  {
+    id: 22,
+    procedureId: 'proc-1',
+    timestampInVideoMs: 2_000,
+    filePath: 'data/media/patients/pat-1/proc-1/screenshots/2000.jpg',
+    annotation: null,
+    createdAt: 2_000,
+  },
+];
+
+function setupDeleteApi(): void {
+  setupApiForStatus('completed', 'data/media/video.mp4', 0);
+  getApi().screenshots.list.mockResolvedValue(deleteScreenshots);
 }
 
 describe('ProcedureReview', () => {
@@ -206,5 +242,61 @@ describe('ProcedureReview', () => {
       expect(screen.getByTestId('trim-controls')).toBeInTheDocument();
       expect(screen.getByTestId('trim-mode-toggle')).toBeInTheDocument();
     });
+  });
+});
+
+describe('ProcedureReview gallery delete (G-05-13)', () => {
+  beforeEach(() => {
+    setRoute({ name: 'procedure-review', procedureId: 'proc-1' });
+    recordingStore.reset();
+    screenshotToastStore.reset();
+    mockApi();
+    setupDeleteApi();
+  });
+
+  it('× click removes the thumbnail from the timeline DOM synchronously', async () => {
+    render(<ProcedureReview />);
+    await waitFor(() => expect(screen.getAllByTestId('screenshot-thumbnail')).toHaveLength(2));
+
+    fireEvent.click(screen.getAllByLabelText(/Delete screenshot at/)[0]!);
+
+    expect(screen.queryAllByTestId('screenshot-thumbnail')).toHaveLength(1);
+    expect(screen.queryByText('00:00:01')).not.toBeInTheDocument();
+  });
+
+  it('Undo restores the thumbnail', async () => {
+    render(<ProcedureReview />);
+    await waitFor(() => expect(screen.getAllByTestId('screenshot-thumbnail')).toHaveLength(2));
+
+    fireEvent.click(screen.getAllByLabelText(/Delete screenshot at/)[0]!);
+    expect(screen.queryAllByTestId('screenshot-thumbnail')).toHaveLength(1);
+
+    const deleteToast = toastMock.mock.calls.find(([message]) =>
+      String(message).startsWith('Screenshot deleted at'),
+    );
+    const options = deleteToast?.[1] as
+      | { action?: { label?: string; onClick?: () => void } }
+      | undefined;
+    expect(options?.action?.label).toBe('Undo');
+    act(() => options?.action?.onClick?.());
+
+    await waitFor(() => expect(screen.getAllByTestId('screenshot-thumbnail')).toHaveLength(2));
+  });
+
+  it('IPC failure fires toast.error', async () => {
+    render(<ProcedureReview />);
+    await waitFor(() => expect(screen.getAllByTestId('screenshot-thumbnail')).toHaveLength(2));
+    getApi().screenshots.delete.mockRejectedValueOnce(new Error('IPC unavailable'));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.useFakeTimers();
+
+    fireEvent.click(screen.getAllByLabelText(/Delete screenshot at/)[0]!);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    expect(toastMock.error).toHaveBeenCalledWith(
+      expect.stringMatching(/Failed to delete screenshot: IPC unavailable/),
+    );
   });
 });
