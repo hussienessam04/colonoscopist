@@ -4,11 +4,11 @@ milestone: v1.1
 milestone_name: milestone
 status: milestone_v1_1_phase_5_complete
 stopped_at: Phase 5 execution complete; milestone v1.1 has Phases 1–5 verified, Phases 6–8 pending
-last_updated: "2026-08-07T11:42:00.000Z"
+last_updated: "2026-08-07T12:27:16.094Z"
 progress:
-  total_phases: 8
-  completed_phases: 5
-  total_plans: 23
+  total_phases: 5
+  completed_phases: 4
+  total_plans: 25
   completed_plans: 23
 ---
 
@@ -134,6 +134,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-07T04:30:00.000Z
+**Last session:** 2026-08-07T12:27:16.064Z
 **Stopped at:** Completed 05-04-PLAN.md
 **Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-04-PLAN.md (Phase 5 fully shipped pending Windows hardware smoke per 05-UAT.md)
