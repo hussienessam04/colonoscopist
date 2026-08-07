@@ -124,10 +124,10 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 10/11 plans executed
+**Plans:** 11/11 plans executed
 
 - [x] 05-10-PLAN.md
-- [ ] 05-11-PLAN.md
+- [x] 05-11-PLAN.md
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)
@@ -143,6 +143,10 @@ Plans:
   - **Verification:** 501/501 tests across 63 files; 2 new contract-guard assertions (verbatim-flag absence + stdio array + shell !== true + single-argv input element); no regressions; G-05-11 closed end-to-end — trim spawn matches the canonical recording/concat pattern (recorder.ts:290 + recorder.ts:1045); UAT step 5 re-runnable on this user's machine; one-key production fix + comment rewrite; no new dependencies.
 - [x] 05-09-PLAN.md — Gap closure (G-05-12): Scrubber screenshot-position dot markers + tick scale (5s/10s) below the track when trimMode is on + TrimControls in-frame/out-frame JPEG previews via `captureScreenshot(videoRef)` at `inMs`/`outMs` + ProcedureReview wires `screenshots` + `videoRef` + `captureFrame` through (Wave 7)
   - **Verification:** 505/505 tests across 63 files; 4 new contract-guard assertions (2 in Scrubber.test.tsx + 2 in TrimControls.test.tsx); no regressions; G-05-12 closed end-to-end — trim UX now has frame-level visual feedback (one blue dot per captured screenshot + a tick scale below the track + in-frame/out-frame previews in the right rail); `videoRef` kept OPTIONAL on TrimControls so the existing 9 test fixtures stay green without changes; `captureFrame` is the test seam (production wires seek + capture round-trip; tests pass a synchronous async stub); module-scope `captureFrameForTrim` in ProcedureReview for stable identity across renders; no new dependencies.
+- [x] 05-10-PLAN.md — Gap closure (G-05-13): pure local-state `remove(id)` on useScreenshotIntake + useProcedures; event-driven re-sync via `screenshotToastStore.subscribeCommitted` → useProcedures `refresh()` on match; ProcedureRoom + ProcedureReview handlers call remove BEFORE enqueueDelete; `screenshotToastStore.commitDelete` now fires `toast.error` via dynamic `import('sonner')` on IPC failure; 7 new contract-guard tests across 3 files (Wave 8)
+  - **Verification:** 511/511 tests across 64 files; 7 new contract-guard assertions; no regressions; G-05-13 closed end-to-end — the × delete affordance is now genuinely observable (thumbnail disappears immediately, toast appears with Undo, Undo within 5s restores via refresh(), IPC failure surfaces as toast.error); no new dependencies.
+- [x] 05-11-PLAN.md — Gap closure (G-05-14): MediaServer `MEDIA_ROUTE_RE` extended with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` defense-in-depth allow-list (404 BEFORE filesystem access); handler joins `subdir = match[3] ?? ''` into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work — no regression to the `<video>` element); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion (Wave 8)
+  - **Verification:** 515/515 tests across 64 files; 4 new contract-guard assertions; no regressions; G-05-14 closed end-to-end — clicking expand now opens the lightbox and renders the captured JPEG at native ~1280×720 resolution via `/media/<p>/<proc>/screenshots/<file>`; flat URLs (`/media/<p>/<proc>/video.mp4`) continue to work; the `ALLOWED_SUBDIRS` allow-list rejects unknown subdirs with 404 (verified with the fixture present on disk — proves the rejection is intentional, not a missing-file fallback); Range requests against the new URL shape return 206 + Content-Range; no new dependencies.
 
 ---
 

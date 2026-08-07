@@ -4,22 +4,22 @@ milestone: v1.1
 milestone_name: milestone
 current_plan: 11 of 11
 status: paused
-stopped_at: Completed 05-10-PLAN.md
+stopped_at: Completed 05-11-PLAN.md
 paused_at: —
-last_updated: "2026-08-07T16:03:06.030Z"
+last_updated: "2026-08-07T19:15:00.000Z"
 last_activity: 2026-08-07
-last_activity_desc: Completed 05-10-PLAN.md (G-05-13 delete UX fix; 511/511 tests pass across 64 files)
+last_activity_desc: Completed 05-11-PLAN.md (G-05-14 lightbox full-size JPEG fix; 515/515 tests pass across 64 files)
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 30
-  completed_plans: 29
+  completed_plans: 30
 ---
 
 **Current Plan:** 11 of 11
 **Total Plans in Phase:** 11
 **Last Activity:** 2026-08-07
-**Last Activity Description:** Completed 05-10-PLAN.md (G-05-13 delete UX fix; 511/511 tests pass across 64 files)
+**Last Activity Description:** Completed 05-11-PLAN.md (G-05-14 lightbox full-size JPEG fix; 515/515 tests pass across 64 files)
 **Status:** Phase complete — ready for verification
 **Paused At:** —
 
@@ -36,7 +36,7 @@ progress:
 
 ## Current Focus
 
-**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 5 gap-closure plans (05-05/06/07/08/09) executed; 505/505 tests pass across 63 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
+**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 6 gap-closure plans (05-05/06/07/08/09/10/11) executed; 515/515 tests pass across 64 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
 
 - Mid-procedure screenshot capture via `S` hotkey + canvas snapshot from `<img>` MJPEG preview (SCRN-01)
 - Screenshots persisted under `<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg` + indexed in `screenshots` table with FK ON DELETE CASCADE; mid-procedure gallery in ProcedureRoom fed by useScreenshotIntake.screenshots (SCRN-02)
@@ -146,6 +146,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-07 | Gap closure (G-05-8/9/10): ProcedureRoom mid-procedure gallery in right aside + 24×24 solid-red × delete button at top-1 right-1 with focus-visible:ring-2 + dedicated expand affordance on ScreenshotThumbnail/ScreenshotTimeline via new onOpen prop + new ScreenshotLightbox modal via shadcn Dialog + existing /media/ route serving full-size JPEG + Toast-undo parity across gallery/timeline/lightbox | complete (499/499 tests pass across 63 files; 8 new contract-guard tests; no regressions) |
 | 05-08 | Gap closure (G-05-11): drop `windowsVerbatimArguments: true` from trim spawn so Node's default Windows quoting handles the userData path with embedded spaces (matching recorder.ts:290 + recorder.ts:1045 canonical pattern); rewrite stale header comment that falsely claimed the flag "mirrors concat.ts"; 2 contract-guard tests in trim.test.ts lock the spawn options shape (no verbatim flag + stdio array + shell !== true + single-argv input element) | complete (501/501 tests pass across 63 files; 2 new contract-guard assertions; no regressions) |
 | 05-09 | Gap closure (G-05-12): Scrubber accepts `screenshots?: Screenshot[]` prop + renders one blue dot per captured screenshot at `pctFor(s.timestampInVideoMs, durationMs)` left percent (z-1 + `bg-blue-500/70` distinguishes from slate pause markers); Scrubber wraps track in flex-col wrapper that renders a tick scale strip BELOW the track when `trimMode === true` + durationMs > 0 (5s interval ≤60s, 10s > 60s); TrimControls accepts OPTIONAL `screenshots` + `videoRef` + `captureFrame` props (captureFrame is the test seam — production wires seek + capture round-trip, tests pass synchronous async stub); when `trimMode === true` + captureFrame supplied, CardContent renders `<img data-testid='trim-in-preview'>` + `<img data-testid='trim-out-preview'>` above the existing In/Out labels; `captureInFlightRef` guards concurrent captures per handle; ProcedureReview defines `captureFrameForTrim` at module scope (1-second seeked timeout + resolve null on failure) and passes `screenshots={screenshots}` + `videoRef={videoRef}` + `captureFrame={captureFrameForTrim}` to `<TrimControls>`; 4 contract-guard tests | complete (505/505 tests pass across 63 files; 4 new contract-guard assertions; no regressions) |
+| 05-10 | Gap closure (G-05-13): pure local-state `remove(id)` on useScreenshotIntake + useProcedures; event-driven re-sync via `screenshotToastStore.subscribeCommitted` → useProcedures `refresh()` on match; ProcedureRoom + ProcedureReview handlers call remove BEFORE enqueueDelete (Undo triggers refresh); `screenshotToastStore.commitDelete` now fires `toast.error` via dynamic `import('sonner')` on IPC failure instead of silent `console.error`; 4 new contract-guard tests in useScreenshotIntake.test.ts (3) + procedure-room-timer.test.tsx (1) + ProcedureReview.test.tsx (3 new in dedicated `ProcedureReview gallery delete (G-05-13)` describe block — actually total 7 in 3 files) | complete (511/511 tests pass across 64 files; 7 new contract-guard assertions; no regressions) |
+| 05-11 | Gap closure (G-05-14): extend `MEDIA_ROUTE_RE` with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + add `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` allow-list defense-in-depth (404 BEFORE filesystem access); handler reads `subdir = match[3] ?? ''` and joins it into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment: `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion | complete (515/515 tests pass across 64 files; 4 new contract-guard assertions; no regressions) |
 
 ---
 *State last updated: 2026-08-07 after 05-09-PLAN.md completed (G-05-12 closed: trim visual timeline — Scrubber screenshot-position dots + tick scale below the track when trimMode is on + TrimControls in-frame + out-frame JPEG previews sourced via captureScreenshot(videoRef) at inMs/outMs; 4 contract-guard tests in Scrubber.test.tsx + TrimControls.test.tsx; 505/505 tests across 63 files)*
@@ -166,6 +168,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 05 P08 | 5 min | 2 tasks | 2 files (trim.ts + trim.test.ts; one-key production fix + 2 contract-guard tests) |
 | Phase 5 P9 | 8min | 3 tasks | 5 files (Scrubber.tsx + TrimControls.tsx + ProcedureReview.tsx + 2 test files) |
 | Phase 05 P10 | 8 min | 2 tasks | 8 files |
+| Phase 05 P11 | 6 min | 2 tasks | 5 files (preview-server.ts + ScreenshotLightbox.tsx + 3 test files) |
 
 ## Decisions
 
@@ -190,3 +193,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase ?]: G-05-13: pure local-state remove() on both screenshot-owning hooks — smallest correct fix; no IPC, no useReducer, just a setScreenshots filter
 - [Phase ?]: G-05-13: event-driven re-sync via screenshotToastStore.subscribeCommitted → useProcedures refresh() on match — success is a no-op refetch; failure restores the row
 - [Phase ?]: G-05-13: dynamic import('sonner') inside commitDelete's catch block keeps the store decoupled from the rendering layer at module init
+- [Phase ?]: G-05-14: optional capture group in MEDIA_ROUTE_RE (one source of truth for the route shape) — flat URLs continue to match (group 3 = undefined), subdir URLs match with it
+- [Phase ?]: G-05-14: ALLOWED_SUBDIRS as ReadonlySet<string> co-located with the regex — ReadonlySet prevents accidental mutation; co-location makes the subdir surface visible to anyone touching the route
+- [Phase ?]: G-05-14: 404 before filesystem access in the allow-list check — short-circuits the missing-file stat AND proves the rejection is intentional, not coincidental
+- [Phase ?]: G-05-14: no Content-Type fix for v1 — the <img> sniffs the bytes, so the cosmetic video/mp4 mismatch is a v1.1 follow-up if Chromium ever tightens MIME enforcement
