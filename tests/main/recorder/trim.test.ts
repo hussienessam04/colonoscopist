@@ -314,3 +314,126 @@ describe('applyTrim', () => {
     expect(5 * 60 * 1000).toBe(300_000);
   });
 });
+
+// G-05-5 — the recorder's `relativeVideoPath` writer and the resolver's
+// `videoFilePath` reader MUST agree on the column shape: a FILENAME
+// within the procedure directory, NOT a userData-relative path. Before
+// the fix, the writer stored `data/media/patients/<id>/<id>/video.mp4`
+// and the reader joined the procedure directory again, producing a
+// doubled path that `existsSync` rejected. This describe locks the
+// filename-only contract so the bug class cannot regress.
+describe('relativeVideoPath contract (G-05-5 guard)', () => {
+  it('returns just the filename "video.mp4" regardless of patientId/procedureId (regression test)', async () => {
+    const { __relativeVideoPathForTest: relativeVideoPath } = await import(
+      '../../../src/main/recorder/recorder'
+    );
+    expect(relativeVideoPath('p1', 'proc1')).toBe('video.mp4');
+    expect(relativeVideoPath('any-other-id', 'any-other-id')).toBe('video.mp4');
+    // The contract requires NO directory components in the returned value.
+    // If a future change reintroduces the userData-relative path, this
+    // assertion catches it before the resolver's `path.join` produces a
+    // doubled path at runtime.
+    expect(relativeVideoPath('p1', 'proc1')).not.toMatch(/[\/\\]/);
+    expect(relativeVideoPath('p1', 'proc1')).not.toContain('data');
+    expect(relativeVideoPath('p1', 'proc1')).not.toContain('patients');
+    expect(relativeVideoPath('p1', 'proc1')).not.toContain('media');
+  });
+
+  it('end-to-end: trim + restore round-trip on the production column shape (G-05-5)', async () => {
+    // Full contract exercise: bootstrap a completed procedure with the
+    // FILENAME shape, run applyTrim against it (which produces the
+    // trimmed-sibling rel path + populates video_path_original via
+    // COALESCE), then restoreFromOriginal re-points video_path back.
+    // Before the fix, this round-trip broke because the writer stored the
+    // userData-relative path and the resolver joined it again, producing a
+    // doubled absolute path that existsSync rejected at the trim IPC.
+    // ponytail: the spawn stub doesn't actually write the trimmed file
+    // (it just exits 0); we assert the contract on the rel paths, not the
+    // on-disk presence of video-trimmed.mp4. The integration smoke test
+    // (tests/integration/trim-smoke.test.ts) exercises the real ffmpeg
+    // binary.
+    const { procedureId, patientId } = await bootstrap();
+    const { applyTrim } = await import('../../../src/main/recorder/trim');
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { existsSync } = await import('node:fs');
+    fakeSpawnSuccess();
+
+    // Before trim: the row carries the canonical filename AND the source
+    // file exists at the resolver-derived absolute path. This is the bug
+    // gate — if the writer regressed to the userData-relative shape, the
+    // next assertion (existsSync) would fail because the resolver would
+    // join the procedure directory twice.
+    const before = proceduresRepo.get(procedureId);
+    expect(before?.videoPath).toBe('video.mp4');
+    const srcAbs = path.join(
+      tmpDir,
+      'data',
+      'media',
+      'patients',
+      patientId,
+      procedureId,
+      'video.mp4',
+    );
+    expect(existsSync(srcAbs)).toBe(true);
+
+    // Apply the trim (real ffmpeg-args wiring, stubbed spawn).
+    const result = await applyTrim({ procedureId, inMs: 0, outMs: 5_000 });
+    expect(result.trimmedVideoPath).toBe('video-trimmed.mp4');
+
+    // Persist the trim via the canonical repo call (matches the IPC handler).
+    const trimmed = proceduresRepo.updateVideoPath(
+      procedureId,
+      'video-trimmed.mp4',
+      'video.mp4',
+    );
+    expect(trimmed.videoPath).toBe('video-trimmed.mp4');
+    expect(trimmed.videoPathOriginal).toBe('video.mp4');
+
+    // Restore: the resolver reads video_path_original through videoFilePath
+    // and re-points video_path back to the original. Once the column shape
+    // is filename-only, this round-trips cleanly without touching the DB
+    // contract — the resolver call was always correct given the right shape.
+    const restored = proceduresRepo.restoreFromOriginal(procedureId);
+    expect(restored.videoPath).toBe('video.mp4');
+    expect(restored.videoPathOriginal).toBe('video.mp4');
+  });
+
+  it('source-missing error surfaces resolved path + procedure status + files in procedure dir (G-05-5 diagnostics)', async () => {
+    // Bootstrap a completed row then unlink the source file the bootstrap
+    // created. The applyTrim IPC will fail with the enriched error that
+    // lists the directory contents for fast debugging.
+    const { procedureId } = await bootstrap();
+    const { unlinkSync } = await import('node:fs');
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const proc = proceduresRepo.get(procedureId);
+    expect(proc?.patientId).toBeTruthy();
+    const srcAbs = path.join(
+      tmpDir,
+      'data',
+      'media',
+      'patients',
+      proc!.patientId,
+      procedureId,
+      proc!.videoPath,
+    );
+    unlinkSync(srcAbs);
+
+    const { applyTrim } = await import('../../../src/main/recorder/trim');
+    let caught: unknown = null;
+    try {
+      await applyTrim({ procedureId, inMs: 0, outMs: 5_000 });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).not.toBeNull();
+    const { IpcErrorException } = await import('../../../src/shared/errors');
+    expect(caught).toBeInstanceOf(IpcErrorException);
+    const ipc = (caught as InstanceType<typeof IpcErrorException>).ipc;
+    expect(ipc.code).toBe('IPC_NOT_FOUND');
+    // The enriched message must carry all three diagnostic fields.
+    expect(ipc.message).toContain(`procedure ${procedureId}`);
+    expect(ipc.message).toContain('status=completed');
+    expect(ipc.message).toContain('Column holds video.mp4');
+    expect(ipc.message).toContain('Files in procedure dir:');
+  });
+});

@@ -1263,6 +1263,13 @@ function relativeVideoPath(_patientId: string, _procedureId: string): string {
   return 'video.mp4';
 }
 
+// Exported for the contract-guard test in tests/main/recorder/trim.test.ts
+// (G-05-5 regression). The recorder's `outputRelPath` field is derived
+// from this function via the public `start()` path; this export gives
+// tests a direct hook to assert the filename-only contract without
+// standing up the full ffmpeg/preview-server pipeline.
+export const __relativeVideoPathForTest = relativeVideoPath;
+
 // ponytail: child_process import is lazy-loaded so tests can mock it via deps.
 let cachedSpawn: SpawnFn | null = null;
 export function defaultSpawn(): SpawnFn {
