@@ -124,11 +124,11 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 12/12 plans complete (pending 05-12 execution)
+**Plans:** 12/12 plans executed
 
 - [x] 05-10-PLAN.md
 - [x] 05-11-PLAN.md
-- [ ] 05-12-PLAN.md — Gap closure (G-05-15): new `screenshotUrl` helper extracted from `ScreenshotLightbox.tsx:62-72` (single source of truth for the `/media/<p>/<proc>/screenshots/<leaf>` URL composition); `ScreenshotTimeline.tsx` gains `mediaBaseUrl: string | null` + `patientId: string` props and composes each thumbnail's `thumbnailSrc` via the helper; `ScreenshotLightbox.tsx` canonicalized onto the same helper (no third copy); `ScreenshotThumbnail.tsx` `<img>` gains `data-testid="screenshot-thumbnail-img"`; `ProcedureReview.tsx` plumbs the new props (already has `useMediaUrl` + `procedure.patientId` in scope); `ProcedureRoom.tsx` gains a `useMediaUrl()` call + plumbs the new props (the room had no MediaServer URL — gallery was visually empty); 1 new contract-guard test in ScreenshotTimeline + 4 new helper tests in screenshot-url.test.tsx (Wave 9)
+- [x] 05-12-PLAN.md — Gap closure (G-05-15): new `screenshotUrl` helper extracted from `ScreenshotLightbox.tsx:62-72` (single source of truth for the `/media/<p>/<proc>/screenshots/<leaf>` URL composition); `ScreenshotTimeline.tsx` gains `mediaBaseUrl: string | null` + `patientId: string` props and composes each thumbnail's `thumbnailSrc` via the helper; `ScreenshotLightbox.tsx` canonicalized onto the same helper (no third copy); `ScreenshotThumbnail.tsx` `<img>` gains `data-testid="screenshot-thumbnail-img"`; `ProcedureReview.tsx` plumbs the new props (already has `useMediaUrl` + `procedure.patientId` in scope); `ProcedureRoom.tsx` gains a `useMediaUrl()` call + plumbs the new props (the room had no MediaServer URL — gallery was visually empty); 1 new contract-guard test in ScreenshotTimeline + 4 new helper tests in screenshot-url.test.tsx (Wave 9)
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)

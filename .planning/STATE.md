@@ -2,25 +2,25 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 11 of 11
+current_plan: Not started
 status: paused
-stopped_at: Completed 05-11-PLAN.md
+stopped_at: Completed 05-12-PLAN.md
 paused_at: —
-last_updated: "2026-08-07T16:17:27.306Z"
-last_activity: 2026-08-07
-last_activity_desc: Completed 05-11-PLAN.md (G-05-14 lightbox full-size JPEG fix; 515/515 tests pass across 64 files)
+last_updated: "2026-08-08T01:43:03.000Z"
+last_activity: 2026-08-08
+last_activity_desc: Phase 05 plan 12 complete (G-05-15 closed)
 progress:
   total_phases: 5
   completed_phases: 5
-  total_plans: 30
-  completed_plans: 30
+  total_plans: 32
+  completed_plans: 32
 ---
 
-**Current Plan:** 11 of 11
-**Total Plans in Phase:** 11
-**Last Activity:** 2026-08-07
-**Last Activity Description:** Completed 05-11-PLAN.md (G-05-14 lightbox full-size JPEG fix; 515/515 tests pass across 64 files)
-**Status:** Phase complete — ready for verification
+**Current Plan:** Completed 05-12-PLAN.md
+**Total Plans in Phase:** 12 (Phase 5)
+**Last Activity:** 2026-08-08
+**Last Activity Description:** Phase 05 plan 12 complete (G-05-15 closed: timeline thumbnails render the captured JPEGs at ~120×110px in both ProcedureReview and ProcedureRoom)
+**Status:** All phases complete
 **Paused At:** —
 
 **Progress:** [██████████] 100%
@@ -36,16 +36,16 @@ progress:
 
 ## Current Focus
 
-**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 6 gap-closure plans (05-05/06/07/08/09/10/11) executed; 515/515 tests pass across 64 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
+**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 7 gap-closure plans (05-05/06/07/08/09/10/11/12) executed; 520/520 tests pass across 65 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
 
 - Mid-procedure screenshot capture via `S` hotkey + canvas snapshot from `<img>` MJPEG preview (SCRN-01)
 - Screenshots persisted under `<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg` + indexed in `screenshots` table with FK ON DELETE CASCADE; mid-procedure gallery in ProcedureRoom fed by useScreenshotIntake.screenshots (SCRN-02)
 - Procedure Review screen with `<video>` + Scrubber (pointer events + setPointerCapture) + pause markers from `procedure_segments` (REV-01)
-- Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete; 24×24 solid-red × discoverability baseline; ScreenshotLightbox modal at native 1280-px resolution via the existing `/media/` route; seek-on-click + expand-icon are independent affordances (REV-02)
+- Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete; 24×24 solid-red × discoverability baseline; ScreenshotLightbox modal at native 1280-px resolution via the existing `/media/` route; seek-on-click + expand-icon are independent affordances; timeline thumbnails now render the actual captured JPEGs at ~120×110px in BOTH ProcedureReview and ProcedureRoom (G-05-15 closed: shared `screenshotUrl` helper + `mediaBaseUrl`/`patientId` prop wiring + ScreenshotLightbox URL composition canonicalized; the "FRAME" placeholder is gone) (REV-02)
 - Post-recording screenshot capture via `<video>` + canvas snapshot (`+Capture` button on ProcedureReview); `useProcedures` SWR-style hook + D-13 capture gate (REV-03)
 - Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04). The trim subprocess uses Node's default Windows command-line construction — the `windowsVerbatimArguments: true` flag that was incorrectly truncating userData paths at the first space (G-05-11) is removed; the spawn matches the recording + concat canonical pattern (recorder.ts:290 + recorder.ts:1045). 2 contract-guard tests lock the spawn options shape against regression. Trim UX now has frame-level visual feedback (G-05-12): Scrubber renders one blue dot per captured screenshot at its percent position + a tick scale (5s short, 10s long) below the track when trimMode is on; TrimControls renders in-frame + out-frame JPEG previews above the In/Out labels sourced via `captureScreenshot(videoRef)` at `inMs`/`outMs` via the `captureFrame` seam; 4 contract-guard tests lock the new visual surface.
 
-`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 515/515 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
+`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 520/520 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification — can reuse the new `screenshotUrl` helper from `@/lib/screenshot-url` for the PDF preview without composing a 4th copy of the URL shape.
 
 ## Project Reference
 
@@ -61,7 +61,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
 | 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | complete (4/4 plans; UAT 20/20 pass; +UI enhancements) |
-| 5 | Screenshots + Procedure Review + Trim | 6 | complete (4/4 plans; phase_status: complete pending Windows hardware smoke per 05-UAT.md) |
+| 5 | Screenshots + Procedure Review + Trim | 6 | complete (12/12 plans: 4 base + 8 gap-closure rounds 05-05..05-12; phase_status: complete pending Windows hardware smoke per 05-UAT.md) |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
 | 7 | Search & History + Audit UI + Backup/Restore + Arabic/RTL | 8 | pending |
 | 8 | Licensing (Ed25519 signed .lic + 14-day trial + activation) | 4 | pending |
@@ -110,6 +110,15 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - **Fix the test, not the hook.** The hook's release ordering is correct; the flake is in the test's wait pattern. Refactoring `release()` to be more "test-friendly" would have introduced churn for the sake of a flake that's better fixed at the test boundary.
 - **5s safety-net timeout retained.** Documented in `tests/renderer/pages/procedure-room.test.tsx` (commit `2b3add2`); the explicit `.then` await is the primary fix, but the timeout guarantees the test doesn't hang if a future refactor breaks the `.then` chain entirely.
 
+## Requirements traceability (Phase 5)
+
+- **SCRN-01**: 05-01 (migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey) + 05-05 (CORS header + crossOrigin='anonymous' on <video>/<img>)
+- **SCRN-02**: 05-01 (persistence under <userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg) + 05-07 (mid-procedure gallery in ProcedureRoom + delete discoverability) + 05-10 (pure local-state remove() + event-driven re-sync via screenshotToastStore.subscribeCommitted) + 05-12 (shared screenshotUrl helper + ScreenshotTimeline mediaBaseUrl/patientId wiring + ProcedureRoom useMediaUrl() so the gallery renders the captured JPEGs)
+- **REV-01**: 05-01 (Scrubber pointer events + setPointerCapture) + 05-02 (pause markers from procedure_segments) + 05-03 (trim handles + useMediaUrl hook) + 05-04 (HTTP Range request support + Scrubber clampCurrent guard)
+- **REV-02**: 05-01 (click-to-seek + per-thumbnail timestamp label + Toast-undo delete) + 05-02 (inline annotation input) + 05-07 (24×24 × discoverability + expand affordance + ScreenshotLightbox modal at native 1280-px resolution) + 05-11 (MediaServer route accepts literal `screenshots/` subdir segment + ScreenshotLightbox URL composition includes it) + 05-12 (timeline thumbnails render the captured JPEGs at ~120×110px in both ProcedureReview and ProcedureRoom — no more "FRAME" placeholder; shared screenshotUrl helper + ScreenshotLightbox canonicalized onto it)
+- **REV-03**: 05-01 (post-recording +Capture via <video> + canvas snapshot) + 05-02 (useProcedures SWR-style hook + StatusBadge) + 05-04 (DestructivePartialAlert + D-13 partial-status gate on +Capture)
+- **REV-04**: 05-03 (trim handles + ffmpeg subprocess + applyTrim + Restore + MediaServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + TrimControls + useTrim/useMediaUrl hooks) + 05-04 (HTTP Range request support + 9-case security audit + DestructivePartialAlert extraction + TrimControls 30-min cap + Scrubber clampCurrent + useMediaUrl retry()) + 05-08 (drop windowsVerbatimArguments: true from trim spawn) + 05-09 (Scrubber screenshot markers + tick scale + TrimControls in/out frame previews)
+
 ## Requirements traceability (Phase 3)
 
 - **CAPT-01**: 03-01 (enumerateDshowDevices) + 03-02 (renderer call) + 03-03 (devices.test.ts) + 03-04 (Patient List entry point for Settings → Capture dropdown) + 03-05 (SettingsHub page sidebar entry for Capture)
@@ -128,10 +137,11 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Continuity
 
-- Last commit: `test(05-03): update screenshots IPC trim/restore assertions for real handlers`
+- Last commit: `feat(05-12): production fix for G-05-15 timeline thumbnails (extract screenshotUrl helper + wire ScreenshotTimeline + canonicalize ScreenshotLightbox + plumb ProcedureReview/ProcedureRoom)`
 - Auto-chain flag: `workflow._auto_chain_active = false` (user-controlled; not auto-advancing).
 - All 8 Phase 3 plans have `*-SUMMARY.md`; phase-level verification can be re-run.
-- ROADMAP.md updated: Phase 3 "8/8 plans executed" with 03-07 + 03-08 added to checklist.
+- All 12 Phase 5 plans have `*-SUMMARY.md`; phase-level verification can be re-run. ROADMAP.md Phase 5 row updated to "12/12 plans executed" on next gsd-tools roadmap.update-plan-progress call.
+- 05-12 closed G-05-15 — the captured JPEGs now render in the timeline at ~120×110px in both ProcedureReview (post-recording review) and ProcedureRoom (mid-procedure gallery). UAT Test 3 (Capture 2 screenshots from playback) and Test 7 (mid-procedure gallery) become re-runnable end-to-end with the actual clinical images visible.
 
 ## Phase 5 sub-plans
 
@@ -148,14 +158,15 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-09 | Gap closure (G-05-12): Scrubber accepts `screenshots?: Screenshot[]` prop + renders one blue dot per captured screenshot at `pctFor(s.timestampInVideoMs, durationMs)` left percent (z-1 + `bg-blue-500/70` distinguishes from slate pause markers); Scrubber wraps track in flex-col wrapper that renders a tick scale strip BELOW the track when `trimMode === true` + durationMs > 0 (5s interval ≤60s, 10s > 60s); TrimControls accepts OPTIONAL `screenshots` + `videoRef` + `captureFrame` props (captureFrame is the test seam — production wires seek + capture round-trip, tests pass synchronous async stub); when `trimMode === true` + captureFrame supplied, CardContent renders `<img data-testid='trim-in-preview'>` + `<img data-testid='trim-out-preview'>` above the existing In/Out labels; `captureInFlightRef` guards concurrent captures per handle; ProcedureReview defines `captureFrameForTrim` at module scope (1-second seeked timeout + resolve null on failure) and passes `screenshots={screenshots}` + `videoRef={videoRef}` + `captureFrame={captureFrameForTrim}` to `<TrimControls>`; 4 contract-guard tests | complete (505/505 tests pass across 63 files; 4 new contract-guard assertions; no regressions) |
 | 05-10 | Gap closure (G-05-13): pure local-state `remove(id)` on useScreenshotIntake + useProcedures; event-driven re-sync via `screenshotToastStore.subscribeCommitted` → useProcedures `refresh()` on match; ProcedureRoom + ProcedureReview handlers call remove BEFORE enqueueDelete (Undo triggers refresh); `screenshotToastStore.commitDelete` now fires `toast.error` via dynamic `import('sonner')` on IPC failure instead of silent `console.error`; 4 new contract-guard tests in useScreenshotIntake.test.ts (3) + procedure-room-timer.test.tsx (1) + ProcedureReview.test.tsx (3 new in dedicated `ProcedureReview gallery delete (G-05-13)` describe block — actually total 7 in 3 files) | complete (511/511 tests pass across 64 files; 7 new contract-guard assertions; no regressions) |
 | 05-11 | Gap closure (G-05-14): extend `MEDIA_ROUTE_RE` with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + add `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` allow-list defense-in-depth (404 BEFORE filesystem access); handler reads `subdir = match[3] ?? ''` and joins it into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment: `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion | complete (515/515 tests pass across 64 files; 4 new contract-guard assertions; no regressions) |
+| 05-12 | Gap closure (G-05-15): extract shared `screenshotUrl({ mediaBaseUrl, patientId, procedureId, filePath })` helper at `src/renderer/src/lib/screenshot-url.ts` — single source of truth for the screenshot `<img>` src (leaf-filename regex + literal `screenshots/` subdir + `/media/` route shape) — returns `null` when `mediaBaseUrl` is `null` for graceful degrade; ScreenshotTimeline adds `mediaBaseUrl: string \| null` + `patientId: string` props and composes each thumbnail's `thumbnailSrc` via the helper (the `<img>` element mounts at ~120×110px — no more 'FRAME' placeholder); ScreenshotLightbox canonicalized onto the same helper (no third copy of the leaf-filename regex); ScreenshotThumbnail gains `data-testid="screenshot-thumbnail-img"` for the new contract-guard test seam; ProcedureRoom gains a `useMediaUrl()` hook call so the mid-procedure gallery is visually populated; 1 new contract-guard test (timeline `<img>` src composition) + 4 new helper tests (null-safety + happy-path + Windows backslash + forward-slash leaf extraction) | complete (520/520 tests pass across 65 files; 5 new contract-guard assertions; no regressions) |
 
 ---
-*State last updated: 2026-08-07 after 05-11-PLAN.md completed (G-05-14 closed: lightbox full-size JPEG — MediaServer route accepts the literal `screenshots/` subdir segment + ALLOWED_SUBDIRS allow-list defense-in-depth + ScreenshotLightbox URL composition updated; 4 contract-guard tests in preview-server.test.ts + range-request.test.ts + 1 updated assertion in ScreenshotLightbox.test.tsx; 515/515 tests across 64 files)*
+*State last updated: 2026-08-08 after 05-12-PLAN.md completed (G-05-15 closed: timeline thumbnails broken — `ScreenshotTimeline.tsx` was silently dropping `thumbnailSrc` since Plan 05-07 (placeholder fall-through was masking the missing wiring); Plan 12 extracted the URL composition into a shared `screenshotUrl` helper, wired `mediaBaseUrl` + `patientId` props through ScreenshotTimeline + ProcedureReview + ProcedureRoom, canonicalized ScreenshotLightbox onto the same helper (no third copy), added `data-testid="screenshot-thumbnail-img"` for the new contract-guard test, and gave ProcedureRoom its first `useMediaUrl()` call so the mid-procedure gallery is visually populated; 1 new ScreenshotTimeline contract-guard test + 4 new `screenshotUrl` helper tests; 520/520 tests across 65 files)*
 
 ## Session
 
-**Last session:** 2026-08-07T16:17:27.283Z
-**Stopped at:** Completed 05-11-PLAN.md
+**Last session:** 2026-08-08T01:43:03.000Z
+**Stopped at:** Completed 05-12-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
@@ -169,6 +180,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 5 P9 | 8min | 3 tasks | 5 files (Scrubber.tsx + TrimControls.tsx + ProcedureReview.tsx + 2 test files) |
 | Phase 05 P10 | 8 min | 2 tasks | 8 files |
 | Phase 05 P11 | 6 min | 2 tasks | 5 files (preview-server.ts + ScreenshotLightbox.tsx + 3 test files) |
+| Phase 05 P12 | 6 min | 3 tasks | 8 files (screenshot-url.ts [new] + ScreenshotTimeline.tsx + ScreenshotThumbnail.tsx + ScreenshotLightbox.tsx + ProcedureReview.tsx + ProcedureRoom.tsx + 2 test files; 1 new test file) |
 
 ## Decisions
 
@@ -197,3 +209,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase ?]: G-05-14: ALLOWED_SUBDIRS as ReadonlySet<string> co-located with the regex — ReadonlySet prevents accidental mutation; co-location makes the subdir surface visible to anyone touching the route
 - [Phase ?]: G-05-14: 404 before filesystem access in the allow-list check — short-circuits the missing-file stat AND proves the rejection is intentional, not coincidental
 - [Phase ?]: G-05-14: no Content-Type fix for v1 — the <img> sniffs the bytes, so the cosmetic video/mp4 mismatch is a v1.1 follow-up if Chromium ever tightens MIME enforcement
+- [Phase 5 P12]: G-05-15: Extract shared `screenshotUrl` helper (NOT inline composition in the timeline) — eliminates the third copy of the leaf-filename regex + `/media/` template + literal `screenshots/` subdir. The helper returns `null` when `mediaBaseUrl` is `null` (graceful degrade until `useMediaUrl` resolves) — same path the `<video>` element uses for missing-media-url. Phase 6's PDF preview reuses this without a 4th copy
+- [Phase 5 P12]: G-05-15: Coerce helper `null` → `undefined` at the timeline call site via `?? undefined` — preserves the existing `thumbnailSrc?: string` prop type without weakening the conditional render gate (`thumbnailSrc && !errored` correctly handles both null and undefined via the falsy check). No prop-signature change needed
+- [Phase 5 P12]: G-05-15: `data-testid="screenshot-thumbnail-img"` on the `<img>` element (not the placeholder div) — stable test seam for the contract-guard test, copy-independent (vs. the placeholder's `aria-label="Thumbnail pending"`), no-op for production users (React strips testids from production DOM via the standard JSX transform)
+- [Phase 5 P12]: G-05-15: ProcedureRoom gains ONE `useMediaUrl()` call (was missing entirely) — the hook stays bound across page transitions (existing design from Plan 05-03) so the IPC round-trip fires only once per app session. No new IPC, no new state
