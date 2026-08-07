@@ -252,6 +252,14 @@ export default function ProcedureReview({
                 <video
                   ref={videoRef}
                   controls
+                  // G-05-3 + D-01 — crossOrigin=anonymous tells Chromium to
+                  // issue a CORS-mode request. The server's
+                  // Access-Control-Allow-Origin: * header (set as the
+                  // first line of MediaServer.onHttpRequest) lets the
+                  // load succeed, and the resulting HTMLVideoElement is
+                  // not a tainted canvas source — ctx.drawImage + toBlob
+                  // works without throwing.
+                  crossOrigin="anonymous"
                   preload="metadata"
                   className="aspect-video w-full"
                   data-testid="procedure-review-video"

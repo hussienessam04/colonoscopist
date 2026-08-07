@@ -306,6 +306,15 @@ export default function ProcedureRoom(): JSX.Element {
                 <img
                   ref={previewImgRef}
                   src={previewUrl}
+                  // G-05-3 + D-01 — crossOrigin=anonymous tells Chromium
+                  // to issue a CORS-mode request. The server's
+                  // Access-Control-Allow-Origin: * header (set as the
+                  // first line of PreviewServer.onHttpRequest) lets the
+                  // load succeed, and the resulting HTMLImageElement is
+                  // not a tainted canvas source — the mid-procedure
+                  // `S` hotkey screenshot capture path works without
+                  // throwing DOMException for tainted canvases.
+                  crossOrigin="anonymous"
                   alt="Live capture preview"
                   aria-label="Live capture preview"
                   className="size-full object-contain"

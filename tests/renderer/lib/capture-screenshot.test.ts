@@ -125,3 +125,70 @@ describe('FakeCanvas (sanity check that mocks are wired)', () => {
     expect(c.toBlob(() => undefined, 'image/jpeg', 0.5)).toBeUndefined();
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// G-05-3 — tainted-canvas contract guard.
+//
+// The existing tests monkey-patch HTMLCanvasElement.prototype.toBlob to a
+// permissive stub (lines 57-61 above) so happy-dom can run the capture
+// pipeline. That stub is exactly what masked the production bug: the real
+// Chromium toBlob fires the callback with `null` when the canvas is tainted
+// by a cross-origin source. The pipeline rejects with the "canvas.toBlob
+// returned null" error in that case — but the test never exercised the
+// branch, so the CORS regression slipped through.
+//
+// These two tests install a STRICT toBlob that mimics Chromium's tainted-
+// canvas behaviour. They run OUTSIDE the permissive beforeEach above —
+// the beforeEach is global to the file, so we overwrite the prototype
+// here, do the work, then restore in afterEach via vi.restoreAllMocks().
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('withCrossOriginSource', () => {
+  it('captureScreenshot(<HTMLVideoElement with crossOrigin="anonymous">) returns a Blob', async () => {
+    // Strict toBlob: if the source carries crossOrigin="anonymous", the
+    // load is CORS-clean and toBlob resolves with a Blob. This mirrors
+    // the Chromium clean-load path.
+    const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
+    proto.toBlob = function (cb: BlobCallback, type?: string, _q?: number): void {
+      const buf = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+      setTimeout(() => cb(new Blob([buf], { type: type ?? 'image/jpeg' })), 0);
+    };
+
+    const { captureScreenshot } = await import('@/lib/capture-screenshot');
+    const video = makeFakeVideo(1280, 720);
+    // Per G-05-3 — the renderer MUST set crossOrigin="anonymous" on the
+    // <video> (and on the live MJPEG <img>). The strict toBlob is
+    // configured to mimic Chromium's clean-load behaviour, so a source
+    // WITHOUT crossOrigin would also pass this test (the strict stub
+    // can't tell the difference). The complementary test below covers
+    // the rejection path.
+    Object.defineProperty(video, 'crossOrigin', { value: 'anonymous', configurable: true });
+
+    const result = await captureScreenshot(video);
+    expect(result.blob).toBeInstanceOf(Blob);
+    expect(result.blob.type).toBe('image/jpeg');
+  });
+
+  it('captureScreenshot(<HTMLVideoElement WITHOUT crossOrigin>) rejects with toBlob-returned-null', async () => {
+    // Strict toBlob: if the source has NO crossOrigin, Chromium treats
+    // the load as opaque; the resulting canvas is tainted; toBlob
+    // fires the callback with `null`. captureScreenshot must surface
+    // this as a rejection so the renderer can toast the error.
+    const proto = HTMLCanvasElement.prototype as unknown as Record<string, unknown>;
+    proto.toBlob = function (cb: BlobCallback, _type?: string, _q?: number): void {
+      // ponytail: Chromium does NOT throw synchronously — it fires the
+      // callback with null. capture-screenshot.ts's canvasToBlob wraps
+      // that into a Promise rejection with "canvas.toBlob returned null".
+      setTimeout(() => cb(null), 0);
+    };
+
+    const { captureScreenshot } = await import('@/lib/capture-screenshot');
+    const video = makeFakeVideo(1280, 720);
+    // No crossOrigin set — default for an HTMLVideoElement is null
+    // ("no CORS mode"). The strict stub above mirrors Chromium's
+    // tainted-canvas null-return.
+    Object.defineProperty(video, 'crossOrigin', { value: null, configurable: true });
+
+    await expect(captureScreenshot(video)).rejects.toThrow(/canvas\.toBlob returned null/);
+  });
+});
