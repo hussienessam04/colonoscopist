@@ -167,6 +167,34 @@ None - no external service configuration required.
 - **Phase 5 status** — 12/12 plans executed (4 base + 8 gap-closure rounds 05-05 through 05-12). All 6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end. 520/520 tests pass across 65 files. No regressions.
 - **Recommended next step:** `/gsd-verify-work 5` for the Windows hardware smoke re-test (UAT Test 3 + Test 7 with the actual captured JPEGs visible in the timeline), then `/gsd-plan-phase 6` to begin the Doctor Profile + Report Editor + PDF plan.
 
+## Self-Check: PASSED
+
+- **Files created exist on disk:**
+  - `src/renderer/src/lib/screenshot-url.ts` — ✓ FOUND (1,968 bytes, committed in `a332ddf`)
+  - `tests/renderer/lib/screenshot-url.test.tsx` — ✓ FOUND (2,957 bytes, committed in `1ae0b5a`)
+  - `.planning/phases/05-screenshots-procedure-review-trim/05-12-SUMMARY.md` — ✓ FOUND (this file, committed in `ed7037f`)
+- **Files modified exist on disk:**
+  - `src/renderer/src/components/ScreenshotTimeline.tsx` — ✓ modified in `a332ddf`
+  - `src/renderer/src/components/ScreenshotThumbnail.tsx` — ✓ modified in `a332ddf`
+  - `src/renderer/src/components/ScreenshotLightbox.tsx` — ✓ modified in `a332ddf`
+  - `src/renderer/src/pages/ProcedureReview.tsx` — ✓ modified in `a332ddf`
+  - `src/renderer/src/pages/ProcedureRoom.tsx` — ✓ modified in `a332ddf`
+  - `tests/renderer/components/ScreenshotTimeline.test.tsx` — ✓ extended in `1ae0b5a` (1 new G-05-15 contract-guard test)
+- **Commits exist in git history:** ✓ `1ae0b5a`, `10559b1`, `a332ddf`, `ed7037f`
+- **Acceptance criteria pass:**
+  - Wave 0 test #1 (`renders each thumbnail's <img> with the subdir-aware URL when mediaBaseUrl + patientId are supplied — G-05-15 contract guard`) — ✓ PASS after Task 3 commit `a332ddf`
+  - Wave 0 test #2 (4 helper tests in `screenshotUrl`) — ✓ PASS after Task 3 commit `a332ddf`
+  - Helper module exists at the expected path — ✓ FOUND
+  - ScreenshotTimeline accepts `mediaBaseUrl` + `patientId` props and composes each thumbnailSrc via the shared helper — ✓ FOUND in `a332ddf`
+  - ScreenshotThumbnail `<img>` carries `data-testid="screenshot-thumbnail-img"` — ✓ FOUND in `a332ddf`
+  - ScreenshotLightbox URL composition canonicalized onto the shared helper — ✓ FOUND in `a332ddf`
+  - ProcedureReview passes `mediaBaseUrl={mediaUrl.url}` + `patientId={procedure?.patientId ?? ''}` to timeline mount — ✓ FOUND in `a332ddf`
+  - ProcedureRoom gains `useMediaUrl()` call + passes `mediaBaseUrl={mediaUrl.url}` + `patientId={patientIdFromRoute}` to gallery mount — ✓ FOUND in `a332ddf`
+  - All 515 pre-existing tests still pass — ✓ PASS (520 total = 515 baseline + 5 new)
+  - `npm run typecheck:node && npm run typecheck:web` — ✓ PASS (no errors)
+- **No regressions** — ✓ 520/520 tests pass across 65 test files
+- **No new dependencies added** — ✓ package.json unchanged
+
 ---
 
 *Phase: 05-screenshots-procedure-review-trim*
