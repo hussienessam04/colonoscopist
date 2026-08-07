@@ -124,16 +124,19 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 5/6 plans executed
+**Plans:** 6/6 plans executed
 
 - [x] 05-05-PLAN.md
-- [ ] 05-06-PLAN.md
+- [x] 05-06-PLAN.md
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)
 - [x] 05-03-PLAN.md — Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + MediaServer + TrimControls + useTrim/useMediaUrl hooks (Wave 3, depends_on: 01, 02)
 - [x] 05-04-PLAN.md — Integration hardening: PreviewServer HTTP Range request support + 9-case security audit + DestructivePartialAlert extraction + TrimControls 30-min cap + Scrubber clampCurrent + useMediaUrl retry() + ProcedureReview placeholder Card + 3 pre-existing test cascade-pollution fixes + VERIFICATION.md + Windows hardware smoke UAT.md (Wave 4, depends_on: 01, 02, 03)
   - **Verification:** 484/484 tests across 62 files; `phase_status: complete` (pending Windows hardware smoke per 05-UAT.md); VERIFICATION.md per-requirement score sheet ready; deferred items documented (TRIM-02 multi-segment trim, audio playback, exact-cut re-encode, 30-min browser seek cap).
+- [x] 05-05-PLAN.md — Gap closure (G-05-3): CORS header on MediaServer + PreviewServer + crossOrigin='anonymous' on `<video>`/`<img>` + strict toBlob stub + tests for access-control-allow-origin (Wave 5)
+- [x] 05-06-PLAN.md — Gap closure (G-05-5): recorder writer returns filename-only shape + trim error enriched + contract-guard test + end-to-end trim/restore round-trip + JSDoc on videoFilePath + restoreFromOriginal (Wave 6)
+  - **Verification:** 491/491 tests across 62 files; 3 new contract-guard tests; no regressions; G-05-5 closed end-to-end without touching the resolver (Option B from the debug doc); full unit suite green.
 
 ---
 

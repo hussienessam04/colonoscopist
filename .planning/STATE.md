@@ -128,14 +128,16 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-02 | Right-rail polish: pause markers on scrubber (D-11) + inline annotation + Notes accordion (D-09) + StatusBadge + useProcedures SWR hook | complete (Plan 02 tests + Plan 01 regression = 67 tests pass) |
 | 05-03 | Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + MediaServer + TrimControls + useTrim/useMediaUrl hooks | complete (49 new unit tests pass; trim-smoke opt-in via RUN_SMOKE=1) |
 | 05-04 | Integration hardening: MediaServer HTTP Range request support + 9-case security audit + DestructivePartialAlert extraction + TrimControls 30-min cap + Scrubber clampCurrent + useMediaUrl retry() + ProcedureReview placeholder Card + 3 pre-existing test cascade-pollution fixes + VERIFICATION.md + Windows hardware smoke UAT.md | complete (484/484 tests pass across 62 files; phase_status: complete pending Windows hardware smoke per UAT.md) |
+| 05-05 | Gap closure (G-05-3): CORS header on MediaServer + PreviewServer + crossOrigin='anonymous' on <video>/<img> + tests for access-control-allow-origin + strict toBlob stub | complete |
+| 05-06 | Gap closure (G-05-5): relativeVideoPath returns filename only (writer side fix) + trim error enriched with resolved stat path + procedure status + dir listing + contract-guard test + end-to-end trim/restore round-trip test + JSDoc on videoFilePath + restoreFromOriginal | complete (491/491 tests pass across 62 files; 3 new contract-guard tests; no regressions) |
 
 ---
-*State last updated: 2026-08-07 after 05-04-PLAN.md completed (all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke)*
+*State last updated: 2026-08-07 after 05-06-PLAN.md completed (G-05-5 closed: procedures.video_path is filename-only end-to-end; all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke re-run per 05-UAT.md)*
 
 ## Session
 
-**Last session:** 2026-08-07T12:36:07.390Z
-**Stopped at:** Completed 05-05-PLAN.md
+**Last session:** 2026-08-07T15:51:00.000Z
+**Stopped at:** Completed 05-06-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
@@ -143,9 +145,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 05 P05 | 5 min | 2 tasks | 5 files |
+| Phase 05 P06 | 7 min | 2 tasks | 5 files (recorder.ts + trim.ts + paths.ts + procedures-repo.ts + trim.test.ts) |
 
 ## Decisions
 
 - [Phase ?]: G-05-3: CORS header (Access-Control-Allow-Origin: *) on every MediaServer + PreviewServer response path via a single setHeader call as the FIRST line of each onHttpRequest handler — covers 200/206/416/404/403/405
 - [Phase ?]: G-05-3: capture-screenshot test contract guard — strict toBlob stub in withCrossOriginSource block mimics Chromium's tainted-canvas null-return so a future re-permissive-monkey-patch regression fails the suite
 - [Phase ?]: G-05-3: crossOrigin='anonymous' on the <video> in ProcedureReview + the live MJPEG <img> in ProcedureRoom; pair with the server header so Chromium issues CORS-mode requests and canvas.drawImage does not taint
+- [Phase 5 P06]: G-05-5: Fix the writer (recorder.relativeVideoPath returns 'video.mp4'), NOT the resolver — keeps the contract surface explicit and avoids a defensive resolver that masks contract drift
+- [Phase 5 P06]: G-05-5: Export `__relativeVideoPathForTest` for direct contract assertion — minimum code for maximum assertion strength vs standing up the full Recorder.start() pipeline with stubs
+- [Phase 5 P06]: G-05-5: Enriched source-missing error keeps raw stored value separate from resolved stat path — future debugging sees both halves of the contract-drift symptom immediately
