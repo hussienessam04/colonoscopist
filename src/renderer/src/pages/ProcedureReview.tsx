@@ -248,15 +248,44 @@ export default function ProcedureReview({
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-3" data-testid="procedure-review-left">
             <div className="overflow-hidden rounded-lg bg-slate-900">
-              <video
-                ref={videoRef}
-                controls
-                preload="metadata"
-                className="aspect-video w-full"
-                data-testid="procedure-review-video"
-                aria-label="Procedure recording playback"
-                src={videoSrc ?? undefined}
-              />
+              {mediaUrl.url && videoSrc ? (
+                <video
+                  ref={videoRef}
+                  controls
+                  preload="metadata"
+                  className="aspect-video w-full"
+                  data-testid="procedure-review-video"
+                  aria-label="Procedure recording playback"
+                  src={videoSrc ?? undefined}
+                />
+              ) : null}
+              {!mediaUrl.url ? (
+                <Card
+                  data-testid="procedure-review-video-unavailable"
+                  className="border-slate-700 bg-slate-100"
+                >
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm text-slate-700">
+                      Video unavailable
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="flex flex-col gap-2 text-sm text-slate-600">
+                    <p data-testid="procedure-review-video-unavailable-message">
+                      Media server not ready — the localhost HTTP bridge hasn&apos;t
+                      accepted connections yet.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => mediaUrl.retry()}
+                      data-testid="procedure-review-video-retry"
+                      className="self-start"
+                    >
+                      Retry
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : null}
               {procedure && !isInteractiveStatus(procedure.status) ? (
                 <div className="bg-slate-100 p-6 text-center text-sm text-slate-500">
                   Playback unavailable — procedure status is {procedure.status}.
@@ -303,6 +332,7 @@ export default function ProcedureReview({
               videoPathOriginal={procedure?.videoPathOriginal ?? null}
               inMs={trim.inMs}
               outMs={trim.outMs}
+              durationMs={durationMs}
               trimMode={trim.trimMode}
               setTrimMode={trim.setTrimMode}
               applying={trim.applying}

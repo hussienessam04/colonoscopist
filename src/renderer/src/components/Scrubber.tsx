@@ -38,6 +38,14 @@ function pctFor(ms: number, durationMs: number): number {
   return Math.max(0, Math.min(100, pct));
 }
 
+// ponytail: clamp the visible currentMs into [0, durationMs] so a brief
+// overshoot (e.g. when currentTime ticks past the canvas at the end of
+// a paused session) doesn't render progress bar past the right edge.
+function clampCurrent(ms: number, durationMs: number): number {
+  if (durationMs <= 0) return 0;
+  return Math.max(0, Math.min(durationMs, ms));
+}
+
 function msFromClientX(clientX: number, rect: DOMRect, durationMs: number): number {
   if (rect.width <= 0) return 0;
   const ratio = (clientX - rect.left) / rect.width;
@@ -101,7 +109,7 @@ export function Scrubber({
     dragPointerIdRef.current = null;
   }
 
-  const fillPct = pctFor(currentMs, durationMs);
+  const fillPct = pctFor(clampCurrent(currentMs, durationMs), durationMs);
 
   // ponytail: memoize the markers list so a re-render driven by currentMs
   // doesn't allocate a new array (PITFALLS §4 — sibling re-renders).
