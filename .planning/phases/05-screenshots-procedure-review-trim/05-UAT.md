@@ -1,14 +1,20 @@
 ---
-status: diagnosed
+status: testing
 phase: 05-screenshots-procedure-review-trim
-source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-UAT.md (hardware smoke)]
+source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-07-SUMMARY.md, 05-08-SUMMARY.md, 05-09-SUMMARY.md, 05-UAT.md (hardware smoke)]
 started: 2026-08-07T11:50:00.000Z
-updated: 2026-08-07T17:00:00.000Z
+updated: 2026-08-07T18:00:00.000Z
 ---
 
 ## Current Test
 
-[testing complete — 5 new gaps diagnosed, awaiting plan-phase --gaps round 3]
+number: 5
+name: Trim 5s–25s (re-test after G-05-11 + G-05-12 fixes)
+expected: |
+  Click Trim button (scissors icon) in right rail. Two handles + red-shaded cut region appear on scrubber. Drag in-handle to 5s, out-handle to 25s. Right rail labels: "In: 00:00:05 · Out: 00:00:25". Cut region is shaded red. **NEW (G-05-12 fix):** Scrubber shows blue dot markers at every captured screenshot position + a tick scale (every 5s for <60s, every 10s for >60s). **NEW (G-05-12 fix):** TrimControls shows in-frame JPEG preview at the in-handle + out-frame JPEG preview at the out-handle, above the In/Out labels. Click Apply. Spinner replaces Apply button for ~1–5s. On completion: toast "Trim applied" appears, <video> reloads to trimmed clip (~20s long), procedure.videoPath points to trimmed sibling, videoPathOriginal preserved (first-trim-only COALESCE guard).
+  **G-05-11 was fixed in plan 05-08** — `windowsVerbatimArguments: true` removed from trim spawn (was truncating path at first space → ffmpeg tried to open `C:\Users\Hussien` directory → EACCES).
+  **G-05-12 was fixed in plan 05-09** — Scrubber dot markers + tick scale + TrimControls in/out frame previews.
+awaiting: user response
 
 ## Tests
 
@@ -46,27 +52,23 @@ result: pass
 
 ### 5. Trim 5s–25s
 expected: |
-  Click Trim button (scissors icon) in right rail. Two handles + red-shaded cut region appear on scrubber. Drag in-handle to 5s, out-handle to 25s. Right rail labels: "In: 00:00:05 · Out: 00:00:25". Cut region is shaded red. Click Apply. Spinner replaces Apply button for ~1–5s. On completion: toast "Trim applied" appears, <video> reloads to trimmed clip (~20s long), procedure.videoPath points to trimmed sibling, videoPathOriginal preserved (first-trim-only COALESCE guard).
-result: issue
-reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
-severity: blocker
-note: After G-05-5 fix, the file IS found (path resolves correctly now), but ffmpeg cannot open the input. Likely: file is held open by another process (MediaServer's createReadStream for /media/ HTTP serving, or Windows file lock from antivirus). Could also be MAX_PATH issue or Windows-shell quoting problem (path shows truncated at "C:\Users\Hussien.").
+  Click Trim button (scissors icon) in right rail. Two handles + red-shaded cut region appear on scrubber. Drag in-handle to 5s, out-handle to 25s. Right rail labels: "In: 00:00:05 · Out: 00:00:25". Cut region is shaded red. **NEW (G-05-12 fix):** Scrubber shows blue dot markers at every captured screenshot position + a tick scale (every 5s for <60s, every 10s for >60s). **NEW (G-05-12 fix):** TrimControls shows in-frame JPEG preview at the in-handle + out-frame JPEG preview at the out-handle, above the In/Out labels. Click Apply. Spinner replaces Apply button for ~1–5s. On completion: toast "Trim applied" appears, <video> reloads to trimmed clip (~20s long), procedure.videoPath points to trimmed sibling, videoPathOriginal preserved (first-trim-only COALESCE guard).
+  **G-05-11 was fixed in plan 05-08** — `windowsVerbatimArguments: true` removed from trim spawn (was truncating path at first space → ffmpeg tried to open `C:\Users\Hussien` directory → EACCES).
+  **G-05-12 was fixed in plan 05-09** — Scrubber dot markers + tick scale + TrimControls in/out frame previews.
+result: [pending]
+previous_result: issue (G-05-11 + G-05-12 both fixed in 05-08 + 05-09)
 
 ### 6. Verify the trimmed mp4 plays
 expected: |
   Right rail shows Restore original enabled (videoPathOriginal populated). Click Play. Video plays the trimmed 20s segment (5s–25s of original, ±500ms tolerance per -ss before -i -c copy tradeoff). No "mp4 won't play" error. Trimmed clip ends before original would have ended.
-result: blocked
-blocked_by: prior-test
-reason: "still cant run this test because of the error"
-note: Cascading from Test 5 (G-05-11: trim ffmpeg Permission denied).
+result: [pending]
+previous_result: blocked (cascade from Test 5, now fixed in 05-08 + 05-09)
 
 ### 7. Restore and verify the original
 expected: |
   Click Restore original. Spinner replaces Restore button briefly. <video> reloads to original (untrimmed) recording at videoPathOriginal. Click Play. Video plays the full 30-second original. restoreFromOriginal is idempotent — calling again is a no-op. videoPathOriginal column preserved against future trims.
-result: blocked
-blocked_by: prior-test
-reason: "the same i cant test"
-note: Cascading from Test 5 (G-05-11: trim ffmpeg Permission denied).
+result: [pending]
+previous_result: blocked (cascade from Test 5, now fixed in 05-08 + 05-09)
 
 ## Automated Coverage (not presented to user — already verified by test suite)
 
@@ -254,10 +256,10 @@ ref: tests/main/db/migrations.test.ts + tests/main/db/migrations/0002_procedures
 
 total: 7
 passed: 4
-issues: 4
-pending: 0
+issues: 0
+pending: 3
 skipped: 0
-blocked: 1
+blocked: 0
 
 coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests across 62 files)
 
@@ -331,7 +333,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-8
   truth: |
     During a procedure, the doctor can capture screenshots with the S hotkey OR the Camera button (ProcedureRoom) AND see the captured screenshots in a gallery panel with delete (Toast-undo) support — so the doctor can review what they've captured mid-procedure and delete accidental captures without waiting until post-recording review.
-  status: failed
+  status: resolved
+  resolved_by: 05-07-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "its works but i still need to see the screensshoots in the romm procudere with delete option"
   reason: |
     User reported: "its works but i still need to see the screensshoots in the romm procudere with delete option"
     Test 3 (post-recording +Capture) passes after G-05-3 fix. But the mid-procedure screenshot experience is incomplete: capturing via S/Camera saves the screenshot + returns success toast (per useScreenshotIntake hook, Plan 01), but the captured screenshot is NOT visible in ProcedureRoom. The doctor has no way to see or delete mid-procedure captures during the procedure. The screenshot timeline + Toast-undo delete are only available in ProcedureReview (post-recording). Phase 5's stated goal "Doctor can capture screenshots during OR AFTER a procedure" implies the doctor should see their captures during the procedure too.
@@ -347,7 +353,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-9
   truth: |
     Each thumbnail in the ScreenshotTimeline has a clearly discoverable delete affordance (× button always visible, NOT hover-only) so the doctor can quickly remove accidental screenshots without learning a hidden interaction.
-  status: failed
+  status: resolved
+  resolved_by: 05-07-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "i need to be able to delete them" after Test 4 (seek).
   reason: |
     User reported: "i need to be able to delete them" after Test 4 (seek). Plan 02 shipped a placeholder × button in Plan 01 + wired the delete + Toast-undo in Plan 02, but the visibility/affordance is insufficient — either the × is hover-only (hidden by default) or otherwise not discoverable in the timeline. Audit: confirm ScreenshotThumbnail.tsx renders the × button by default (not on hover) at sufficient size + contrast, with proper aria-label.
   severity: major
@@ -361,7 +371,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-10
   truth: |
     Clicking a thumbnail in the ScreenshotTimeline opens a full-size lightbox/modal view of the screenshot so the doctor can see the actual clinical detail (not just the ~120x90px thumbnail) — useful for verifying a capture before finalizing the procedure report.
-  status: failed
+  status: resolved
+  resolved_by: 05-07-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "the photos are thumbnail i cant see the real image"
   reason: |
     User reported: "the photos are thumbnail i cant see the real image". Currently ScreenshotTimeline + ScreenshotThumbnail render the screenshot at ~120x90px in the timeline; clicking the thumbnail seeks the <video> (Test 4) but does NOT open a full-size view. Phase 5 ships a 1280px maxLongEdge JPEG (per D-04) but there's no UI surface to view it at that resolution.
   severity: major
@@ -376,7 +390,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-11
   truth: |
     Clicking Apply on a non-partial completed procedure runs ffmpeg against the canonical mp4 successfully (no Permission Denied) and produces the trimmed sibling file.
-  status: diagnosed
+  status: resolved
+  resolved_by: 05-08-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
   reason: |
     User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
     Root cause confirmed by debugger: `src/main/recorder/trim.ts:137-140` sets `windowsVerbatimArguments: true` on the spawn. With that flag, Node passes the argv array as a single space-joined string with NO quoting/escaping. ffmpeg's parser splits on whitespace, so the path `C:\Users\Hussien Essam\AppData\Roaming\colonoscopist\data\media\patients\<id>\<id>\video.mp4` is truncated at the first space and arrives at ffmpeg as `C:\Users\Hussien` (the user's HOME directory, not a file). ffmpeg tries to open a directory → EACCES → "Permission denied". The trim subprocess is the only spawn in the codebase with this flag — recorder.ts:290 and recorder.ts:1045 use Node's default Windows quoting and work fine, which is why the recording itself succeeds on this user's machine.
@@ -401,7 +419,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-12
   truth: |
     When the doctor enables Trim mode, the right rail + scrubber show a clear visual representation of the trim range (cut region shaded, in-frame + out-frame thumbnails preview, current playhead relative to the trim window) so they can visually confirm exactly what they're trimming.
-  status: failed
+  status: resolved
+  resolved_by: 05-09-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "we need to add the timeline in the trim line so i understand exactly the timmming i trim"
   reason: |
     User reported: "we need to add the timeline in the trim line so i understand exactly the timmming i trim". Current TrimControls only shows text labels ("In: 00:00:05 · Out: 00:00:25") and the Scrubber shows two drag handles with a red-shaded cut region between them. But there's no frame-level visual preview — the doctor has to read numeric timestamps + scrub to find what each end of the cut corresponds to in the actual procedure.
   severity: major
