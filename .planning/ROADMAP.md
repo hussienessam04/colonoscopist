@@ -136,9 +136,10 @@ Plans:
   - **Verification:** 491/491 tests across 62 files; 3 new contract-guard tests; no regressions; G-05-5 closed end-to-end without touching the resolver (Option B from the debug doc); full unit suite green.
 - [x] 05-07-PLAN.md — Gap closure (G-05-8/9/10): ProcedureRoom mid-procedure gallery + 24×24 solid-red × delete button + dedicated expand affordance + new `<ScreenshotLightbox>` modal via existing `/media/` route; Toast-undo reused (Wave 7)
   - **Verification:** 499/499 tests across 63 files; 8 new contract-guard tests (2 in procedure-room-timer + 3 in ScreenshotTimeline + 3 in ScreenshotLightbox); no regressions; G-05-8/9/10 closed end-to-end; all 6 SCRN/REV requirements now have a discoverability baseline + a lightbox affordance; shadcn Dialog + lucide icons reused — no new dependencies.
-- [ ] 05-08-PLAN.md — Gap closure (G-05-11): remove `windowsVerbatimArguments: true` from trim spawn + rewrite stale header comment + contract-guard test asserting the flag stays absent (Wave 7)
+- [x] 05-08-PLAN.md — Gap closure (G-05-11): remove `windowsVerbatimArguments: true` from trim spawn + rewrite stale header comment + 2 contract-guard tests locking the spawn options shape (Wave 7)
+  - **Verification:** 501/501 tests across 63 files; 2 new contract-guard assertions (verbatim-flag absence + stdio array + shell !== true + single-argv input element); no regressions; G-05-11 closed end-to-end — trim spawn matches the canonical recording/concat pattern (recorder.ts:290 + recorder.ts:1045); UAT step 5 re-runnable on this user's machine; one-key production fix + comment rewrite; no new dependencies.
 - [ ] 05-09-PLAN.md — Gap closure (G-05-12): Scrubber screenshot-position dot markers + tick scale (5s/10s) below the track when trimMode is on + TrimControls in-frame/out-frame JPEG previews via `captureScreenshot(videoRef)` at `inMs`/`outMs` + ProcedureReview wires `screenshots` + `videoRef` + `captureFrame` through (Wave 7)
-  - **Wave 7 note:** 05-07 shipped in round 1; 05-08 and 05-09 are independent of 05-07 (no cross-file dependencies) and run in subsequent gap-closure rounds.
+  - **Wave 7 note:** 05-07 shipped in round 1; 05-08 shipped in round 3; 05-09 is independent of both (no cross-file dependencies) and runs in a subsequent gap-closure round.
 
 ---
 

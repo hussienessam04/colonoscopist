@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: milestone_v1_1_phase_5_complete
-stopped_at: Completed 05-07-PLAN.md
-last_updated: "2026-08-07T19:55:00.000Z"
+stopped_at: Completed 05-08-PLAN.md
+last_updated: "2026-08-07T16:53:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 5
@@ -30,9 +30,9 @@ progress:
 - Procedure Review screen with `<video>` + Scrubber (pointer events + setPointerCapture) + pause markers from `procedure_segments` (REV-01)
 - Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete; 24×24 solid-red × discoverability baseline; ScreenshotLightbox modal at native 1280-px resolution via the existing `/media/` route; seek-on-click + expand-icon are independent affordances (REV-02)
 - Post-recording screenshot capture via `<video>` + canvas snapshot (`+Capture` button on ProcedureReview); `useProcedures` SWR-style hook + D-13 capture gate (REV-03)
-- Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04)
+- Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04). The trim subprocess uses Node's default Windows command-line construction — the `windowsVerbatimArguments: true` flag that was incorrectly truncating userData paths at the first space (G-05-11) is removed; the spawn matches the recording + concat canonical pattern (recorder.ts:290 + recorder.ts:1045). 2 contract-guard tests lock the spawn options shape against regression.
 
-`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 499/499 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 05-08 (G-05-11: trim windowsVerbatimArguments) and 05-09 (G-05-12: trim visual timeline) remain as separate gap-closure plans for Wave 7. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
+`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 501/501 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 05-09 (G-05-12: trim visual timeline) remains as a separate gap-closure plan for Wave 7. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
 
 ## Project Reference
 
@@ -131,14 +131,15 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-05 | Gap closure (G-05-3): CORS header on MediaServer + PreviewServer + crossOrigin='anonymous' on <video>/<img> + tests for access-control-allow-origin + strict toBlob stub | complete |
 | 05-06 | Gap closure (G-05-5): relativeVideoPath returns filename only (writer side fix) + trim error enriched with resolved stat path + procedure status + dir listing + contract-guard test + end-to-end trim/restore round-trip test + JSDoc on videoFilePath + restoreFromOriginal | complete (491/491 tests pass across 62 files; 3 new contract-guard tests; no regressions) |
 | 05-07 | Gap closure (G-05-8/9/10): ProcedureRoom mid-procedure gallery in right aside + 24×24 solid-red × delete button at top-1 right-1 with focus-visible:ring-2 + dedicated expand affordance on ScreenshotThumbnail/ScreenshotTimeline via new onOpen prop + new ScreenshotLightbox modal via shadcn Dialog + existing /media/ route serving full-size JPEG + Toast-undo parity across gallery/timeline/lightbox | complete (499/499 tests pass across 63 files; 8 new contract-guard tests; no regressions) |
+| 05-08 | Gap closure (G-05-11): drop `windowsVerbatimArguments: true` from trim spawn so Node's default Windows quoting handles the userData path with embedded spaces (matching recorder.ts:290 + recorder.ts:1045 canonical pattern); rewrite stale header comment that falsely claimed the flag "mirrors concat.ts"; 2 contract-guard tests in trim.test.ts lock the spawn options shape (no verbatim flag + stdio array + shell !== true + single-argv input element) | complete (501/501 tests pass across 63 files; 2 new contract-guard assertions; no regressions) |
 
 ---
-*State last updated: 2026-08-07 after 05-07-PLAN.md completed (G-05-8/9/10 closed: mid-procedure gallery + 24×24 solid-red × discoverability + ScreenshotLightbox via shadcn Dialog; all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke re-run per 05-UAT.md; 05-08 + 05-09 still open as separate gap-closure plans)*
+*State last updated: 2026-08-07 after 05-08-PLAN.md completed (G-05-11 closed: trim `windowsVerbatimArguments` flag removed + stale header comment rewritten + 2 contract-guard tests lock the spawn options shape; UAT step 5 re-runnable end-to-end; 05-09 still open as separate gap-closure plan for trim visual timeline)*
 
 ## Session
 
-**Last session:** 2026-08-07T19:55:00.000Z
-**Stopped at:** Completed 05-07-PLAN.md
+**Last session:** 2026-08-07T16:53:00.000Z
+**Stopped at:** Completed 05-08-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
@@ -148,6 +149,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 05 P05 | 5 min | 2 tasks | 5 files |
 | Phase 05 P06 | 7 min | 2 tasks | 5 files (recorder.ts + trim.ts + paths.ts + procedures-repo.ts + trim.test.ts) |
 | Phase 05 P07 | 25 min | 3 tasks | 6 files (ScreenshotThumbnail.tsx + ScreenshotTimeline.tsx + ProcedureRoom.tsx + ScreenshotLightbox.tsx [new] + ProcedureReview.tsx + 2 test files; 1 new test file) |
+| Phase 05 P08 | 5 min | 2 tasks | 2 files (trim.ts + trim.test.ts; one-key production fix + 2 contract-guard tests) |
 
 ## Decisions
 
@@ -162,3 +164,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase 5 P07]: G-05-8: Mid-procedure gallery surfaces WITHOUT a ProcedureRoom page-level state change — the existing useScreenshotIntake hook already populates `screenshots[]`; the gallery is just a consumer of existing state. No new IPC, no new hook surface
 - [Phase 5 P07]: G-05-8: handleScreenshotDelete in ProcedureRoom mirrors ProcedureReview.handleDelete but drops the `void refresh().then(...)` — the room's gallery re-renders from the hook's local state directly, so the toast store's pending entry is the source of truth for "deleted" from the user's POV
 - [Phase 5 P07]: G-05-9/10: Test guard for discoverability uses className.contains() for the discoverable tokens (h-6 w-6 bg-red-600) — DOM presence alone is insufficient; a 16×16 grey glyph would still be in the DOM and pass a button-exists test
+- [Phase 5 P08]: G-05-11: Match recorder.ts:290 (recording) + recorder.ts:1045 (concat) instead of inventing a new spawn options shape — trim joins them as a third canonical spawn with the same `{ stdio: [...] }` options
+- [Phase 5 P08]: G-05-11: Contract-guard test reads `spawnMock.mock.calls[0][2]` (the third arg to spawn = the options object) — catches regressions that the argv-only assertions miss. Asserts verbatim-flag absence + stdio array + shell !== true + single-argv input element (no caller-side pre-quoting)
+- [Phase 5 P08]: G-05-11: Drop `expect(inputArg).toContain(' ')` from the second contract-guard test — the assertion locks the G-05-11 failure mode (caller-side pre-quoting) without coupling the test to the host's tmp-dir shape (CI runners typically have no spaces in their usernames)
