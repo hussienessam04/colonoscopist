@@ -1,11 +1,20 @@
 // applyTrim — one-shot ffmpeg subprocess that produces a sibling trimmed
 // mp4 from the canonical recording. Per D-07 + D-08 + RESEARCH §Pattern 1.
 //
-// Mirrors Phase 4 concat.ts: pure argv via buildTrimArgs(), then a child
-// spawn via defaultFfmpegPath() with windowsVerbatimArguments for the
-// Windows path-quoting quirk (PITFALLS §10). The original mp4 is NEVER
-// overwritten — the trimmed file lives at `<basename>-trimmed.mp4` and
-// the IPC handler updates procedures.video_path + video_path_original
+// Pure argv via buildTrimArgs(), then a child spawn via
+// defaultFfmpegPath(). The spawn options match recorder.ts:290 (recording)
+// and recorder.ts:1045 (concat): Node's default Windows command-line
+// construction wraps argv entries with embedded spaces in literal
+// quotes, so the userData path arrives at ffmpeg intact. (Earlier
+// versions incorrectly set `windowsVerbatimArguments: true` here —
+// that flag was intended for the device-name form `video="<name>"`
+// used by the recording subprocess only, where the device name is
+// pre-quoted in ffmpeg-args.ts:51; it truncates arbitrary path args
+// at the first space, surfacing as EACCES on Windows when the userData
+// path contains a space. Removed in G-05-11 — locked by the
+// windowsVerbatimArguments regression guard test.) The original mp4 is
+// NEVER overwritten — the trimmed file lives at `<basename>-trimmed.mp4`
+// and the IPC handler updates procedures.video_path + video_path_original
 // (only the FIRST trim populates video_path_original; the COALESCE guard
 // in proceduresRepo.updateVideoPath is the canonical lock).
 //
@@ -135,7 +144,6 @@ export async function applyTrim(input: ApplyTrimInput): Promise<ApplyTrimResult>
 function runFfmpegTrim(args: readonly string[]): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const child: ChildProcess = spawn(defaultFfmpegPath(), args as string[], {
-      windowsVerbatimArguments: true,
       stdio: ['pipe', 'ignore', 'pipe'],
     });
     let timedOut = false;
