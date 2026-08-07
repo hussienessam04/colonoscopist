@@ -285,6 +285,45 @@ describe('ScreenshotTimeline', () => {
     );
     expect(screen.queryAllByTestId('screenshot-thumbnail-expand')).toHaveLength(0);
   });
+
+  // Plan 12 / G-05-15 — the placeholder fall-through in ScreenshotThumbnail.tsx:93
+  // (the 'frame' div) was masking the missing thumbnailSrc wiring since
+  // Plan 05-07. This test asserts the timeline actually populates the
+  // <img> src when mediaBaseUrl + patientId are supplied. Without this
+  // guard, the regression slips through again. The test is RED against
+  // the unfixed production code: the props are silently dropped, the
+  // timeline's screenshots.map never passes thumbnailSrc, and the
+  // placeholder div is what renders. Task 3 ships the prop surface +
+  // the <img data-testid="screenshot-thumbnail-img"> testid; this test
+  // turns GREEN at the same commit.
+  it('renders each thumbnail\'s <img> with the subdir-aware URL when mediaBaseUrl + patientId are supplied — G-05-15 contract guard', () => {
+    render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        patientId="p1"
+        mediaBaseUrl="http://127.0.0.1:51731"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    const imgs = screen.getAllByTestId('screenshot-thumbnail-img');
+    expect(imgs).toHaveLength(2);
+    // First fixture row: filePath 'data/media/p1/screenshots/5000.jpg'
+    // → leaf '5000.jpg' → URL ends with /media/p1/p1/screenshots/5000.jpg
+    expect(imgs[0]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/5000.jpg',
+    );
+    // Second row: filePath 'data/media/p1/screenshots/10000.jpg'
+    // → leaf '10000.jpg' → URL ends with /media/p1/p1/screenshots/10000.jpg
+    expect(imgs[1]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg',
+    );
+    // The placeholder div must NOT render anymore (the bug is that it
+    // always does). Assert the absence.
+    expect(screen.queryByLabelText('Thumbnail pending')).toBeNull();
+  });
 });
 
 describe('Scrubber pointer events (companion)', () => {
