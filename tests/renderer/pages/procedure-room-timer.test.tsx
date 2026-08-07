@@ -16,6 +16,8 @@ const dshowList = [
   { deviceId: 'EasyCap USB Video', rawName: 'EasyCap USB Video', index: 0, type: 'dshow' as const },
 ];
 
+const realDateNow = Date.now;
+
 function makeEmptyMediaMock(): void {
   Object.defineProperty(globalThis.navigator, 'mediaDevices', {
     value: { getUserMedia: vi.fn(), enumerateDevices: vi.fn().mockResolvedValue([]) },
@@ -29,6 +31,19 @@ beforeEach(() => {
   api.capture.getDefaultDevice.mockResolvedValue('EasyCap USB Video');
   api.capture.getPreset.mockResolvedValue({ preset: 'sd' });
   api.capture.noDeviceAudit.mockResolvedValue({ ok: true });
+  // Plan 05-04 — ProcedureRoom's useScreenshotIntake hook calls
+  // window.api.screenshots.list on mount; supply the safe empty default so
+  // the test doesn't blow up in the .then() chain (Rule 1 from Plan 03's
+  // pre-existing cascade pollution).
+  api.screenshots.list.mockResolvedValue([]);
+  api.screenshots.add.mockResolvedValue({
+    id: 1,
+    procedureId: 'proc-1',
+    timestampInVideoMs: 0,
+    filePath: 'data/x.jpg',
+    annotation: null,
+    createdAt: 0,
+  });
   api.recording.start.mockResolvedValue({
     procedureId: 'proc-1',
     startedAt: Date.now(),
@@ -64,6 +79,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // Plan 05-04 — "Timer freezes when paused; advances when resumed"
+  // patches Date.now at runtime and only restores it on the happy-path
+  // branch. A failing assertion in the middle leaves Date.now patched
+  // for the rest of the file; the next test sees a clock-skew + the
+  // next React render's setInterval reads it, cascading the dreaded
+  // "Should not already be working" act() error. Restore here is a
+  // one-line safety net for the patched-globals footgun.
+  if (Date.now !== realDateNow) Date.now = realDateNow;
   vi.restoreAllMocks();
   recordingStore.reset();
 });

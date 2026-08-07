@@ -74,7 +74,7 @@ describe('db migrations', () => {
       id: number;
       name: string;
     }[];
-    expect(migrations).toHaveLength(2);
+    expect(migrations).toHaveLength(3);
     expect(migrations[0].id).toBe(1);
 
     closeDb();
@@ -85,13 +85,13 @@ describe('db migrations', () => {
 
     // First open
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(2);
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(3);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(2);
+    expect(count).toBe(3);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(

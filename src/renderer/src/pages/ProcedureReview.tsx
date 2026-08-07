@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import DeviceLostBanner from '@/components/device-lost-banner';
+import { DestructivePartialAlert } from '@/components/DestructivePartialAlert';
 import { Scrubber } from '@/components/Scrubber';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
@@ -336,6 +337,13 @@ export default function ProcedureReview({
               </CardContent>
             </Card>
 
+            {procedure?.status === 'partial' ? (
+              <DestructivePartialAlert
+                status={procedure.status}
+                videoPath={procedure.videoPath}
+                lastKnownTimestampMs={lastLost?.lastKnownTimestampMs ?? null}
+              />
+            ) : null}
             {procedure?.status === 'partial' && procedure.videoPath.endsWith('.partial.mp4') ? (
               <DeviceLostBanner
                 lastLost={lastLost}

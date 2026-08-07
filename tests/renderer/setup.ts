@@ -91,23 +91,23 @@ export function mockApi(): MockApi {
       resetPin: vi.fn(),
     },
     patients: {
-      list: vi.fn(),
-      get: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
+      get: vi.fn().mockResolvedValue(null),
       create: vi.fn(),
       update: vi.fn(),
       softDelete: vi.fn(),
       restore: vi.fn(),
     },
     audit: {
-      list: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
     },
     capture: {
-      listDevices: vi.fn(),
-      getDefaultDevice: vi.fn(),
+      listDevices: vi.fn().mockResolvedValue([]),
+      getDefaultDevice: vi.fn().mockResolvedValue(null),
       setDefaultDevice: vi.fn(),
-      getPreset: vi.fn(),
+      getPreset: vi.fn().mockResolvedValue(null),
       setPreset: vi.fn(),
-      noDeviceAudit: vi.fn(),
+      noDeviceAudit: vi.fn().mockResolvedValue({ ok: true }),
     },
     procedures: {
       create: vi.fn(),
@@ -120,21 +120,32 @@ export function mockApi(): MockApi {
     },
     procedureNotes: {
       create: vi.fn(),
-      list: vi.fn(),
+      list: vi.fn().mockResolvedValue([]),
     },
     recording: {
       start: vi.fn(),
-      stop: vi.fn(),
-      pause: vi.fn(),
-      resume: vi.fn(),
+      stop: vi.fn().mockResolvedValue(undefined),
+      pause: vi.fn().mockResolvedValue(undefined),
+      resume: vi.fn().mockResolvedValue(undefined),
       forceCleanup: vi.fn().mockResolvedValue(undefined),
       onStatus: vi.fn(),
       getMediaUrl: vi.fn().mockResolvedValue('http://127.0.0.1:0'),
     },
+    // Plan 05-04 — defaults that resolve to [] / a minimal Screenshot so
+    // renderer pages can render without their useEffects throwing
+    // "Cannot read properties of undefined (reading 'then')". Tests that
+    // need different behavior override per-test.
     screenshots: {
-      add: vi.fn(),
-      list: vi.fn(),
-      delete: vi.fn(),
+      add: vi.fn().mockResolvedValue({
+        id: 1,
+        procedureId: '',
+        timestampInVideoMs: 0,
+        filePath: '',
+        annotation: null,
+        createdAt: 0,
+      }),
+      list: vi.fn().mockResolvedValue([]),
+      delete: vi.fn().mockResolvedValue(undefined),
       updateAnnotation: vi.fn(),
     },
   };
