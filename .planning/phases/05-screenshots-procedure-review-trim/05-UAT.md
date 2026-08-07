@@ -429,7 +429,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-13
   truth: |
     Clicking the × delete button on a screenshot thumbnail invokes the screenshots.delete IPC, removes the row from the database, unlinks the JPEG file from disk, removes the thumbnail from the timeline UI, AND shows a "Screenshot deleted" toast with an Undo affordance that re-creates the screenshot row within 5 seconds.
-  status: diagnosed
+  status: resolved
+  resolved_by: 05-10-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "delete btn show toast msg but dont remove them"
   reason: |
     User reported: "delete btn show toast msg but dont remove them".
   reason: |
@@ -451,7 +455,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
 - gap_id: G-05-14
   truth: |
     Clicking the expand affordance on a screenshot thumbnail opens a lightbox modal that displays the FULL-SIZE screenshot at its native resolution (~1280x720 per D-04), NOT the small ~120x90px thumbnail.
-  status: diagnosed
+  status: resolved
+  resolved_by: 05-11-PLAN.md
+  resolved_at: 2026-08-07
+  reason: |
+    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot"
   reason: |
     User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot"
   reason: |
