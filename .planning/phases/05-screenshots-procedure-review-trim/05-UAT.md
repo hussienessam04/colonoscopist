@@ -8,13 +8,7 @@ updated: 2026-08-07T18:00:00.000Z
 
 ## Current Test
 
-number: 5
-name: Trim 5s–25s (re-test after G-05-11 + G-05-12 fixes)
-expected: |
-  Click Trim button (scissors icon) in right rail. Two handles + red-shaded cut region appear on scrubber. Drag in-handle to 5s, out-handle to 25s. Right rail labels: "In: 00:00:05 · Out: 00:00:25". Cut region is shaded red. **NEW (G-05-12 fix):** Scrubber shows blue dot markers at every captured screenshot position + a tick scale (every 5s for <60s, every 10s for >60s). **NEW (G-05-12 fix):** TrimControls shows in-frame JPEG preview at the in-handle + out-frame JPEG preview at the out-handle, above the In/Out labels. Click Apply. Spinner replaces Apply button for ~1–5s. On completion: toast "Trim applied" appears, <video> reloads to trimmed clip (~20s long), procedure.videoPath points to trimmed sibling, videoPathOriginal preserved (first-trim-only COALESCE guard).
-  **G-05-11 was fixed in plan 05-08** — `windowsVerbatimArguments: true` removed from trim spawn (was truncating path at first space → ffmpeg tried to open `C:\Users\Hussien` directory → EACCES).
-  **G-05-12 was fixed in plan 05-09** — Scrubber dot markers + tick scale + TrimControls in/out frame previews.
-awaiting: user response
+[testing complete — 2 new gaps (G-05-13, G-05-14) reported at end of session, awaiting plan-phase --gaps round 4]
 
 ## Tests
 
@@ -55,20 +49,18 @@ expected: |
   Click Trim button (scissors icon) in right rail. Two handles + red-shaded cut region appear on scrubber. Drag in-handle to 5s, out-handle to 25s. Right rail labels: "In: 00:00:05 · Out: 00:00:25". Cut region is shaded red. **NEW (G-05-12 fix):** Scrubber shows blue dot markers at every captured screenshot position + a tick scale (every 5s for <60s, every 10s for >60s). **NEW (G-05-12 fix):** TrimControls shows in-frame JPEG preview at the in-handle + out-frame JPEG preview at the out-handle, above the In/Out labels. Click Apply. Spinner replaces Apply button for ~1–5s. On completion: toast "Trim applied" appears, <video> reloads to trimmed clip (~20s long), procedure.videoPath points to trimmed sibling, videoPathOriginal preserved (first-trim-only COALESCE guard).
   **G-05-11 was fixed in plan 05-08** — `windowsVerbatimArguments: true` removed from trim spawn (was truncating path at first space → ffmpeg tried to open `C:\Users\Hussien` directory → EACCES).
   **G-05-12 was fixed in plan 05-09** — Scrubber dot markers + tick scale + TrimControls in/out frame previews.
-result: [pending]
-previous_result: issue (G-05-11 + G-05-12 both fixed in 05-08 + 05-09)
+result: pass
 
 ### 6. Verify the trimmed mp4 plays
 expected: |
   Right rail shows Restore original enabled (videoPathOriginal populated). Click Play. Video plays the trimmed 20s segment (5s–25s of original, ±500ms tolerance per -ss before -i -c copy tradeoff). No "mp4 won't play" error. Trimmed clip ends before original would have ended.
-result: [pending]
-previous_result: blocked (cascade from Test 5, now fixed in 05-08 + 05-09)
+result: pass
 
 ### 7. Restore and verify the original
 expected: |
   Click Restore original. Spinner replaces Restore button briefly. <video> reloads to original (untrimmed) recording at videoPathOriginal. Click Play. Video plays the full 30-second original. restoreFromOriginal is idempotent — calling again is a no-op. videoPathOriginal column preserved against future trims.
-result: [pending]
-previous_result: blocked (cascade from Test 5, now fixed in 05-08 + 05-09)
+result: pass
+note: User also reported 2 new issues at end of session (delete toast but no removal; lightbox not showing full-size). Logged as G-05-13 + G-05-14 below — these are NEW runtime bugs discovered AFTER Plan 05-07 shipped, not regressions of the unit suite (which was green at 499/499).
 
 ## Automated Coverage (not presented to user — already verified by test suite)
 
@@ -255,9 +247,9 @@ ref: tests/main/db/migrations.test.ts + tests/main/db/migrations/0002_procedures
 ## Summary
 
 total: 7
-passed: 4
-issues: 0
-pending: 3
+passed: 7
+issues: 2
+pending: 0
 skipped: 0
 blocked: 0
 
@@ -434,6 +426,52 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
     - Out-frame preview thumbnail: same for the out-handle
     - Visual timestamp scale below the scrubber with major ticks (every 5s/10s) when in trim mode
     - Optionally: a mini-timeline showing where the captured screenshots fall relative to the trim window (so the doctor can confirm the salient part of the procedure is included)
+- gap_id: G-05-13
+  truth: |
+    Clicking the × delete button on a screenshot thumbnail invokes the screenshots.delete IPC, removes the row from the database, unlinks the JPEG file from disk, removes the thumbnail from the timeline UI, AND shows a "Screenshot deleted" toast with an Undo affordance that re-creates the screenshot row within 5 seconds.
+  status: diagnosed
+  reason: |
+    User reported: "delete btn show toast msg but dont remove them".
+  reason: |
+    User reported: "delete btn show toast msg but dont remove them". After Plan 05-07 shipped the gallery + delete discoverability + Toast-undo plumbing, the × button click DOES fire (toast appears), but the screenshot remains visible in the timeline. Candidate causes:
+    - The handleScreenshotDelete function in ProcedureRoom OR ProcedureReview fires the toast BEFORE the IPC call returns, and a silent IPC failure leaves the screenshot in the gallery state.
+    - The gallery state (in useScreenshotIntake hook) is append-only — there's no `remove(screenshotId)` action wired to the delete handler.
+    - The Toast-undo store's enqueueDelete callback fires a 5-second windowed deletion but the actual removal happens on the timeout; if the IPC fails, the screenshot stays in local state but the row is gone from DB → inconsistent UI.
+    - The IPC `screenshots.delete` may be failing silently — the IPC_NOT_FOUND or IPC_VALIDATION paths aren't surfaced.
+    - Test masking: the gallery tests in plan 05-07 used mock-resolved IPC; real IPC behavior (success/error paths, state mutation) not exercised end-to-end.
+  severity: major
+  test: 7
+  artifacts: []
+  missing:
+    - Verify IPC screenshots.delete actually fires + returns success before the toast appears (not just toast first then IPC)
+    - Verify gallery state in useScreenshotIntake removes the screenshot from its local list on successful delete
+    - Verify Toast-undo behavior: if user clicks Undo, the row is re-inserted (current screenshotsRepo.delete is hard delete — may need a soft-delete path for undo)
+    - Surface IPC errors as a toast (currently silent on failure)
+    - Unit test: mock IPC rejecting + assert the screenshot is NOT removed from gallery state (or remains + error toast appears)
+- gap_id: G-05-14
+  truth: |
+    Clicking the expand affordance on a screenshot thumbnail opens a lightbox modal that displays the FULL-SIZE screenshot at its native resolution (~1280x720 per D-04), NOT the small ~120x90px thumbnail.
+  status: diagnosed
+  reason: |
+    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot"
+  reason: |
+    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot". Plan 05-07 shipped the lightbox component via shadcn Dialog (commit 9465012) + the URL composition `${mediaBaseUrl}/media/${patientId}/${procedureId}/${fileName}`. But the user reports the lightbox still shows the thumbnail, not the full-size. Candidate causes:
+    - The expand affordance never wires to onClick — user clicks the expand icon but nothing happens (state not propagating)
+    - The lightbox opens but renders the same thumbnail src (`<img src={httpUrl} />` where httpUrl points to a different file or the thumbnail-sized version)
+    - The lightbox URL composition is wrong — filePath includes the userData prefix (`data/media/patients/.../screenshots/<ts>.jpg`) and gets concatenated incorrectly to the media URL
+    - The screenshot.filePath stored is relative to userData but the MediaServer expects a URL path under `/media/<patientId>/<procedureId>/<fileName>` — the fileName extraction is broken
+    - The MediaServer serves the file but the lightbox CSS constraints force the <img> to a small width
+    - Test masking: tests in plan 05-07 used mock-resolved URL + mock ref; real URL composition not exercised
+  severity: major
+  test: 7
+  artifacts: []
+  missing:
+    - Verify the expand-icon onClick actually sets lightboxScreenshot state (test in DOM)
+    - Verify the lightbox <img> src is the FULL path composed correctly (not the thumbnail src)
+    - Verify the lightbox CSS allows the <img> to render at full size (max-w-7xl or similar, not constrained)
+    - Verify the URL composition matches the MediaServer's `/media/` route shape
+    - Verify the fileName extraction (`screenshot.filePath.replace(/^.*[\\/]/, '')`) handles Windows backslashes
+    - Unit test: assert lightbox <img> src === `${mediaBaseUrl}/media/${patientId}/${procedureId}/${fileName}` (full URL, not thumbnail)
 ```
 
 > **Note:** Test 7 is blocked (cascade from Test 5). Once G-05-11 is fixed, re-run Tests 6 + 7.
