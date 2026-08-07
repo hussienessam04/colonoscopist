@@ -233,6 +233,24 @@ Acceptance criteria (per plan frontmatter):
 
 None - no external service configuration required.
 
+## Self-Check
+
+**Status: PASSED**
+
+- **SUMMARY.md exists:** FOUND at `.planning/phases/05-screenshots-procedure-review-trim/05-06-SUMMARY.md`
+- **Per-task commits exist:**
+  - `3faccd6` — fix(05-06): relativeVideoPath returns filename only (G-05-5)
+  - `dffcfa1` — test(05-06): contract-guard test for production video_path shape (G-05-5)
+  - `84017c1` — docs(05-06): complete plan 06 - trim path-shape fix (G-05-5)
+- **Modified files all exist and contain the expected changes:**
+  - `src/main/recorder/recorder.ts` — `relativeVideoPath` body returns `'video.mp4'`; `__relativeVideoPathForTest` export added
+  - `src/main/recorder/trim.ts` — `readdirSync` import added; source-missing error enriched with procedure id, status, resolved stat path, raw stored value, dir listing
+  - `src/main/paths.ts` — `videoFilePath` JSDoc rewritten to document filename-only contract (cites D-07 + G-05-5)
+  - `src/main/db/procedures-repo.ts` — `restoreFromOriginal` JSDoc note added citing the contract
+  - `tests/main/recorder/trim.test.ts` — new `describe('relativeVideoPath contract (G-05-5 guard)')` block with 3 tests
+- **Final test run:** PASS — `npm run test:unit -- --run tests/main/recorder/trim.test.ts tests/main/db/procedures-repo.test.ts tests/main/ipc/procedures.test.ts` reports 23/23 tests pass on gap-relevant files. Full suite: 491/491 across 62 files (488 baseline + 3 new contract-guard tests, no regressions).
+- **Typecheck:** PASS — both `npm run typecheck:node` and `npm run typecheck:web` complete without errors.
+
 ---
 
 *Phase: 05-screenshots-procedure-review-trim*
