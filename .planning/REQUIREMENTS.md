@@ -159,12 +159,12 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | CAPT-08 | Phase 4 | Pending |
 | CAPT-09 | Phase 4 | Pending |
 | CAPT-10 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
-| SCRN-01 | Phase 5 | Done (05-01: migration 0003 + screenshots IPC + repo + preload bridge) |
+| SCRN-01 | Phase 5 | Done (05-01: migration 0003 + screenshots IPC + repo + preload bridge; 05-04: DestructivePartialAlert for partial recordings) |
 | SCRN-02 | Phase 5 | Done (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey) |
-| REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture; 05-02: pause markers from procedure_segments; 05-03: PreviewServer /media/ route) |
+| REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture; 05-02: pause markers from procedure_segments; 05-03: PreviewServer /media/ route; 05-04: HTTP Range request support + 9-case security audit) |
 | REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete; 05-02: per-thumbnail inline ScreenshotAnnotation) |
 | REV-03 | Phase 5 | Done (05-01: ProcedureReview real impl with video left + scrubber + timeline + bare metadata sidebar; 05-02: useProcedures SWR hook + D-13 capture gate) |
-| REV-04 | Phase 5 | Pending (lands in 05-03 trim handles + PROCEDURES_TRIM/RESTORE handlers) |
+| REV-04 | Phase 5 | Done (05-03: trim handles + PROCEDURES_TRIM/RESTORE handlers + applyTrim + Restore; 05-04: HTTP Range request support + 9-case security audit + 30-min trim cap + media URL fallback) |
 | RPT-01 | Phase 6 | Pending |
 | RPT-02 | Phase 6 | Pending |
 | RPT-03 | Phase 6 | Pending |

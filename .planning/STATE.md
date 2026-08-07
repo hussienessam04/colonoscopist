@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_5_plan_03_complete
-stopped_at: Completed 05-03-PLAN.md
-last_updated: "2026-08-06T23:53:00.000Z"
+status: phase_5_plan_04_complete
+stopped_at: Completed 05-04-PLAN.md
+last_updated: "2026-08-07T04:30:00.000Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 20
-  completed_plans: 22
+  completed_plans: 23
 ---
 
 # State: Colonoscopist
@@ -57,7 +57,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2 | Database + Migrations + Patient CRUD + Audit + Auth | 10 | complete |
 | 3 | Capture Device Enumeration + Live Preview + Quality Presets | 6 | complete (8/8 plans; UAT 29/29 pass) |
 | 4 | Recording (ffmpeg child + timer + device-lost handling) | 6 | complete (4/4 plans; UAT 20/20 pass; +UI enhancements) |
-| 5 | Screenshots + Procedure Review + Trim | 6 | in_progress (3/4 plans) |
+| 5 | Screenshots + Procedure Review + Trim | 6 | complete (4/4 plans; phase_status: complete pending Windows hardware smoke per 05-UAT.md) |
 | 6 | Doctor Profile + Report Editor + PDF Generation | 9 | pending |
 | 7 | Search & History + Audit UI + Backup/Restore + Arabic/RTL | 8 | pending |
 | 8 | Licensing (Ed25519 signed .lic + 14-day trial + activation) | 4 | pending |
@@ -136,12 +136,13 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-01 | Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement | complete (39/39 unit tests pass) |
 | 05-02 | Right-rail polish: pause markers on scrubber (D-11) + inline annotation + Notes accordion (D-09) + StatusBadge + useProcedures SWR hook | complete (Plan 02 tests + Plan 01 regression = 67 tests pass) |
 | 05-03 | Trim handles on scrubber + ffmpeg trim subprocess + applyTrim + Restore + PreviewServer `/media/` route + PROCEDURES_TRIM/RESTORE handlers + MediaServer + TrimControls + useTrim/useMediaUrl hooks | complete (49 new unit tests pass; trim-smoke opt-in via RUN_SMOKE=1) |
+| 05-04 | Integration hardening: MediaServer HTTP Range request support + 9-case security audit + DestructivePartialAlert extraction + TrimControls 30-min cap + Scrubber clampCurrent + useMediaUrl retry() + ProcedureReview placeholder Card + 3 pre-existing test cascade-pollution fixes + VERIFICATION.md + Windows hardware smoke UAT.md | complete (484/484 tests pass across 62 files; phase_status: complete pending Windows hardware smoke per UAT.md) |
 
 ---
-*State last updated: 2026-08-06 after 05-03-PLAN.md completed (all 6 SCRN/REV requirements shipped — REV-04 complete)*
+*State last updated: 2026-08-07 after 05-04-PLAN.md completed (all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke)*
 
 ## Session
 
-**Last session:** 2026-08-06T23:53:00.000Z
-**Stopped at:** Completed 05-03-PLAN.md
-**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-04-PLAN.md
+**Last session:** 2026-08-07T04:30:00.000Z
+**Stopped at:** Completed 05-04-PLAN.md
+**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-04-PLAN.md (Phase 5 fully shipped pending Windows hardware smoke per 05-UAT.md)
