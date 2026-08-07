@@ -1,9 +1,9 @@
 ---
-status: testing
+status: failed
 phase: 05-screenshots-procedure-review-trim
-source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-07-SUMMARY.md, 05-08-SUMMARY.md, 05-09-SUMMARY.md, 05-UAT.md (hardware smoke)]
+source: [05-01-SUMMARY.md, 05-02-SUMMARY.md, 05-03-SUMMARY.md, 05-04-SUMMARY.md, 05-05-SUMMARY.md, 05-06-SUMMARY.md, 05-07-SUMMARY.md, 05-08-SUMMARY.md, 05-09-SUMMARY.md, 05-10-SUMMARY.md, 05-11-SUMMARY.md, 05-UAT.md (hardware smoke)]
 started: 2026-08-07T11:50:00.000Z
-updated: 2026-08-07T18:00:00.000Z
+updated: 2026-08-07T19:30:00.000Z
 ---
 
 ## Current Test
@@ -480,6 +480,24 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
     - Verify the URL composition matches the MediaServer's `/media/` route shape
     - Verify the fileName extraction (`screenshot.filePath.replace(/^.*[\\/]/, '')`) handles Windows backslashes
     - Unit test: assert lightbox <img> src === `${mediaBaseUrl}/media/${patientId}/${procedureId}/${fileName}` (full URL, not thumbnail)
-```
+- gap_id: G-05-15
+  truth: |
+    Each thumbnail in the ScreenshotTimeline renders the actual captured JPEG image at ~120x90px (visible clinical detail, NOT a "FRAME" placeholder with loading spinner icon).
+  status: failed
+  reason: |
+    User reported with screenshot evidence: "still as you can see i cant see the pic itself its just dummy pic that have text frame ????". The 3 timeline thumbnails show "FRAME" placeholder text + a loading-spinner-style icon instead of the captured images. The screenshot metadata (timestamps 00:00:00, 00:00:00, 00:00:08; × buttons; annotation triggers) renders correctly — the DB rows exist with valid file_paths. But the `<img>` element fails to load. Plan 05-11 fixed the LIGHTBOX URL composition to include the `screenshots/` subdir segment, but the TIMELINE thumbnails (in `ScreenshotThumbnail.tsx`) use a DIFFERENT src composition that was not updated. Candidate causes:
+    - Timeline uses `useMediaUrl()` hook → returns the media base URL — but doesn't compose the `screenshots/` subdir into the path, OR
+    - Timeline uses a different hook / different src path that also drops the subdir, OR
+    - CORS issue from G-05-3 fix only applied to the LIGHTBOX but not the thumbnails (unlikely — the server-side MediaServer headers apply globally), OR
+    - The thumbnail `<img>` is correctly loading but the response is a wrong/broken MIME type, OR
+    - The `<img>` is loading from a different endpoint that doesn't have the CORS fix applied
+  severity: blocker
+  test: 3
+  artifacts: []
+  missing:
+    - Audit the `<img>` src composition in ScreenshotThumbnail.tsx and the useMediaUrl hook — does it include the `screenshots/` subdir segment?
+    - Audit ALL renderer code that composes a JPEG URL — the MediaServer URL composition pattern is the bug; both the lightbox AND the thumbnails (and any other consumer like the PDF preview in Phase 6) need to include `screenshots/`
+    - Add a contract-guard test that asserts the timeline thumbnail `<img>` src === `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}` (same as the lightbox fix in Plan 05-11)
+    - Add a contract-guard test that asserts the thumbnail `<img>` src includes the `screenshots/` segment — closing the test-mask gap that let this slip through Plan 05-11 verification
 
 > **Note:** Test 7 is blocked (cascade from Test 5). Once G-05-11 is fixed, re-run Tests 6 + 7.
