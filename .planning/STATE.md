@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: milestone_v1_1_phase_5_complete
-stopped_at: Phase 5 execution complete; milestone v1.1 has Phases 1–5 verified, Phases 6–8 pending
-last_updated: "2026-08-07T12:27:16.094Z"
+stopped_at: Completed 05-05-PLAN.md
+last_updated: "2026-08-07T12:36:07.411Z"
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 25
-  completed_plans: 23
+  completed_plans: 24
 ---
 
 # State: Colonoscopist
@@ -134,6 +134,18 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-07T12:27:16.064Z
-**Stopped at:** Completed 05-04-PLAN.md
-**Resume file:** .planning/phases/05-screenshots-procedure-review-trim/05-04-PLAN.md (Phase 5 fully shipped pending Windows hardware smoke per 05-UAT.md)
+**Last session:** 2026-08-07T12:36:07.390Z
+**Stopped at:** Completed 05-05-PLAN.md
+**Resume file:** None
+
+## Performance Metrics
+
+| Plan | Duration | Tasks | Files |
+|------|----------|-------|-------|
+| Phase 05 P05 | 5 min | 2 tasks | 5 files |
+
+## Decisions
+
+- [Phase ?]: G-05-3: CORS header (Access-Control-Allow-Origin: *) on every MediaServer + PreviewServer response path via a single setHeader call as the FIRST line of each onHttpRequest handler — covers 200/206/416/404/403/405
+- [Phase ?]: G-05-3: capture-screenshot test contract guard — strict toBlob stub in withCrossOriginSource block mimics Chromium's tainted-canvas null-return so a future re-permissive-monkey-patch regression fails the suite
+- [Phase ?]: G-05-3: crossOrigin='anonymous' on the <video> in ProcedureReview + the live MJPEG <img> in ProcedureRoom; pair with the server header so Chromium issues CORS-mode requests and canvas.drawImage does not taint
