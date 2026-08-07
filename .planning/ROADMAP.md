@@ -124,7 +124,7 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 9 plans total (8 shipped + 1 pending gap-closure execution)
+**Plans:** 9/9 plans executed
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)
@@ -138,8 +138,8 @@ Plans:
   - **Verification:** 499/499 tests across 63 files; 8 new contract-guard tests (2 in procedure-room-timer + 3 in ScreenshotTimeline + 3 in ScreenshotLightbox); no regressions; G-05-8/9/10 closed end-to-end; all 6 SCRN/REV requirements now have a discoverability baseline + a lightbox affordance; shadcn Dialog + lucide icons reused — no new dependencies.
 - [x] 05-08-PLAN.md — Gap closure (G-05-11): remove `windowsVerbatimArguments: true` from trim spawn + rewrite stale header comment + 2 contract-guard tests locking the spawn options shape (Wave 7)
   - **Verification:** 501/501 tests across 63 files; 2 new contract-guard assertions (verbatim-flag absence + stdio array + shell !== true + single-argv input element); no regressions; G-05-11 closed end-to-end — trim spawn matches the canonical recording/concat pattern (recorder.ts:290 + recorder.ts:1045); UAT step 5 re-runnable on this user's machine; one-key production fix + comment rewrite; no new dependencies.
-- [ ] 05-09-PLAN.md — Gap closure (G-05-12): Scrubber screenshot-position dot markers + tick scale (5s/10s) below the track when trimMode is on + TrimControls in-frame/out-frame JPEG previews via `captureScreenshot(videoRef)` at `inMs`/`outMs` + ProcedureReview wires `screenshots` + `videoRef` + `captureFrame` through (Wave 7)
-  - **Wave 7 note:** 05-07 shipped in round 1; 05-08 shipped in round 3; 05-09 is independent of both (no cross-file dependencies) and runs in a subsequent gap-closure round.
+- [x] 05-09-PLAN.md — Gap closure (G-05-12): Scrubber screenshot-position dot markers + tick scale (5s/10s) below the track when trimMode is on + TrimControls in-frame/out-frame JPEG previews via `captureScreenshot(videoRef)` at `inMs`/`outMs` + ProcedureReview wires `screenshots` + `videoRef` + `captureFrame` through (Wave 7)
+  - **Verification:** 505/505 tests across 63 files; 4 new contract-guard assertions (2 in Scrubber.test.tsx + 2 in TrimControls.test.tsx); no regressions; G-05-12 closed end-to-end — trim UX now has frame-level visual feedback (one blue dot per captured screenshot + a tick scale below the track + in-frame/out-frame previews in the right rail); `videoRef` kept OPTIONAL on TrimControls so the existing 9 test fixtures stay green without changes; `captureFrame` is the test seam (production wires seek + capture round-trip; tests pass a synchronous async stub); module-scope `captureFrameForTrim` in ProcedureReview for stable identity across renders; no new dependencies.
 
 ---
 

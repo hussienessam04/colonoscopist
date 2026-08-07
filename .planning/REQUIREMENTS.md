@@ -43,7 +43,7 @@ Requirements for initial release. Each maps to a roadmap phase.
 - [x] **REV-01**: Doctor can open a finished procedure and see the recorded video with a scrubber and play/pause controls. _(Plan 05-01, 05-02, 05-03)_
 - [x] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp. _(Plan 05-01, 05-02, 05-07)_
 - [x] **REV-03**: Doctor can take additional screenshots from playback (same path as in-procedure screenshots). _(Plan 05-01, 05-02)_
-- [x] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04, 05-06, 05-08)_
+- [x] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04, 05-06, 05-08, 05-09)_
 
 ### Reports
 
@@ -164,7 +164,7 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture; 05-02: pause markers from procedure_segments; 05-03: PreviewServer /media/ route; 05-04: HTTP Range request support + 9-case security audit) |
 | REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete; 05-02: per-thumbnail inline ScreenshotAnnotation; 05-07: ScreenshotLightbox modal at native 1280-px resolution + dedicated expand affordance independent of seek-on-click) |
 | REV-03 | Phase 5 | Done (05-01: ProcedureReview real impl with video left + scrubber + timeline + bare metadata sidebar; 05-02: useProcedures SWR hook + D-13 capture gate) |
-| REV-04 | Phase 5 | Done (05-03: trim handles + PROCEDURES_TRIM/RESTORE handlers + applyTrim + Restore; 05-04: HTTP Range request support + 9-case security audit + 30-min trim cap + media URL fallback; 05-06: G-05-5 path-shape contract fix — recorder writer returns filename-only shape, enriched source-missing error, contract-guard test + end-to-end trim/restore round-trip; 05-08: G-05-11 windowsVerbatimArguments spawn flag fix — trim uses Node's default Windows quoting (matching recorder.ts:290 + recorder.ts:1045) so userData paths with embedded spaces arrive at ffmpeg intact; 2 contract-guard tests lock the spawn options shape against regression) |
+| REV-04 | Phase 5 | Done (05-03: trim handles + PROCEDURES_TRIM/RESTORE handlers + applyTrim + Restore; 05-04: HTTP Range request support + 9-case security audit + 30-min trim cap + media URL fallback; 05-06: G-05-5 path-shape contract fix — recorder writer returns filename-only shape, enriched source-missing error, contract-guard test + end-to-end trim/restore round-trip; 05-08: G-05-11 windowsVerbatimArguments spawn flag fix — trim uses Node's default Windows quoting (matching recorder.ts:290 + recorder.ts:1045) so userData paths with embedded spaces arrive at ffmpeg intact; 2 contract-guard tests lock the spawn options shape against regression; 05-09: G-05-12 trim visual timeline — Scrubber screenshot position dots + tick scale (5s/10s) below the track when trimMode is on; TrimControls in-frame + out-frame JPEG previews above the In/Out labels sourced via captureScreenshot(videoRef) at inMs/outMs; ProcedureReview wires screenshots + videoRef + captureFrameForTrim helper (module-scope, 1-second seeked timeout); 4 contract-guard tests) |
 | RPT-01 | Phase 6 | Pending |
 | RPT-02 | Phase 6 | Pending |
 | RPT-03 | Phase 6 | Pending |
