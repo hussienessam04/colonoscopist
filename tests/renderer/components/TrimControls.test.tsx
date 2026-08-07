@@ -89,4 +89,66 @@ describe('TrimControls', () => {
     fireEvent.click(screen.getByTestId('trim-mode-toggle'));
     expect(setTrimMode).toHaveBeenCalledWith(true);
   });
+
+  // Plan 09 / G-05-12 — in-frame + out-frame JPEG previews sourced via
+  // the `captureFrame` seam. The test uses a synchronous stub so RTL's
+  // `findBy*` resolves immediately after the useEffect's Promise.then
+  // microtask. The `videoRef` is a minimal stub (no jsdom video
+  // decoding) — the seam contract is "captureFrame takes a video-like
+  // object + ms and returns a base64 string", nothing more.
+  it('renders in-frame + out-frame previews when trimMode=true + captureFrame supplied (G-05-12)', async () => {
+    const fakeVideo = {
+      readyState: 4,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      currentTime: 0,
+    } as unknown as HTMLVideoElement;
+    const videoRef = { current: fakeVideo };
+    const captureFrame = vi.fn(async () => 'AAAA');
+    render(
+      <TrimControls
+        {...baseProps}
+        inMs={5_000}
+        outMs={25_000}
+        videoRef={videoRef}
+        captureFrame={captureFrame}
+        screenshots={[]}
+      />,
+    );
+    const inPreview = await screen.findByTestId('trim-in-preview');
+    const outPreview = await screen.findByTestId('trim-out-preview');
+    expect(inPreview.getAttribute('src')).toBe('data:image/jpeg;base64,AAAA');
+    expect(outPreview.getAttribute('src')).toBe('data:image/jpeg;base64,AAAA');
+    // captureFrame fires once per handle on the initial mount effect.
+    expect(captureFrame).toHaveBeenCalledTimes(2);
+  });
+
+  // Plan 09 / G-05-12 — when trimMode=false the preview block is NOT
+  // rendered (back-compat with the higher-level trimMode-off gate at
+  // line 79-84 + cleanup of the data URLs).
+  it('does not render the previews when trimMode=false (G-05-12 back-compat)', () => {
+    const fakeVideo = {
+      readyState: 4,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      currentTime: 0,
+    } as unknown as HTMLVideoElement;
+    const videoRef = { current: fakeVideo };
+    const captureFrame = vi.fn(async () => 'AAAA');
+    render(
+      <TrimControls
+        {...baseProps}
+        trimMode={false}
+        videoRef={videoRef}
+        captureFrame={captureFrame}
+        screenshots={[]}
+      />,
+    );
+    expect(screen.queryByTestId('trim-in-preview')).toBeNull();
+    expect(screen.queryByTestId('trim-out-preview')).toBeNull();
+    expect(screen.queryByTestId('trim-previews')).toBeNull();
+    // captureFrame is NOT invoked when trimMode is off — the effect's
+    // early-return guard at the top of the useEffect body skips it.
+    expect(captureFrame).not.toHaveBeenCalled();
+  });
 });

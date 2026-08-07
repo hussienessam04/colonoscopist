@@ -177,4 +177,59 @@ describe('Scrubber', () => {
     fireEvent.pointerDown(outHandle, { pointerId: 2, clientX: 20, button: 0 });
     expect(onTrim).toHaveBeenCalledWith({ inMs: 5_000, outMs: 6_000 });
   });
+
+  // Plan 09 / G-05-12 — screenshot position dots on the track.
+  it('renders one screenshot marker per row at the expected left percent (G-05-12)', () => {
+    const onSeek = vi.fn();
+    const screenshots = [
+      { id: 1, procedureId: 'p1', timestampInVideoMs: 5_000, filePath: '/x.jpg', annotation: null, createdAt: 1 },
+      { id: 2, procedureId: 'p1', timestampInVideoMs: 20_000, filePath: '/y.jpg', annotation: null, createdAt: 2 },
+    ];
+    render(
+      <Scrubber
+        durationMs={30_000}
+        currentMs={0}
+        onSeek={onSeek}
+        screenshots={screenshots}
+      />,
+    );
+    const markers = screen.getAllByTestId('scrubber-screenshot-marker');
+    expect(markers).toHaveLength(2);
+    // 5_000 / 30_000 * 100 = 16.666...%
+    expect(parseFloat((markers[0] as HTMLElement).style.left)).toBeCloseTo(16.666, 1);
+    // 20_000 / 30_000 * 100 = 66.666...%
+    expect(parseFloat((markers[1] as HTMLElement).style.left)).toBeCloseTo(66.666, 1);
+    // aria-label carries the formatted HH:MM:SS timestamp.
+    expect(markers[0]?.getAttribute('aria-label')).toBe('Screenshot at 00:00:05');
+    expect(markers[1]?.getAttribute('aria-label')).toBe('Screenshot at 00:00:20');
+  });
+
+  // Plan 09 / G-05-12 — tick scale strip rendered below the track.
+  it('renders the tick scale ONLY when trimMode === true (G-05-12)', () => {
+    const onSeek = vi.fn();
+
+    // (a) trimMode=false — the wrapper carries no testid (to avoid
+    // duplicate `scrubber-track` matches against the inner track), and
+    // the tick scale div is absent.
+    const { rerender } = render(
+      <Scrubber durationMs={30_000} currentMs={0} onSeek={onSeek} trimMode={false} />,
+    );
+    expect(screen.queryByTestId('scrubber-tick-scale')).toBeNull();
+    expect(screen.queryByTestId('scrubber-with-ticks')).toBeNull();
+
+    // (b) trimMode=true — the wrapper carries `scrubber-with-ticks`,
+    // the tick scale div is present, and 7 ticks render at 5s intervals
+    // (0s, 5s, 10s, 15s, 20s, 25s, 30s) for a 30-second recording.
+    rerender(<Scrubber durationMs={30_000} currentMs={0} onSeek={onSeek} trimMode={true} />);
+    expect(screen.getByTestId('scrubber-with-ticks')).toBeInTheDocument();
+    expect(screen.getByTestId('scrubber-tick-scale')).toBeInTheDocument();
+    const shortTicks = screen.getAllByTestId('scrubber-tick');
+    expect(shortTicks).toHaveLength(7);
+
+    // (c) trimMode=true + durationMs > 60_000 — 10s interval; a 120s
+    // recording renders 13 ticks (0s, 10s, 20s, …, 120s).
+    rerender(<Scrubber durationMs={120_000} currentMs={0} onSeek={onSeek} trimMode={true} />);
+    const longTicks = screen.getAllByTestId('scrubber-tick');
+    expect(longTicks).toHaveLength(13);
+  });
 });
