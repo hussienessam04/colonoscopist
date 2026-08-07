@@ -6,12 +6,12 @@ current_plan: 11 of 11
 status: paused
 stopped_at: Completed 05-11-PLAN.md
 paused_at: —
-last_updated: "2026-08-07T19:15:00.000Z"
+last_updated: "2026-08-07T16:17:27.306Z"
 last_activity: 2026-08-07
 last_activity_desc: Completed 05-11-PLAN.md (G-05-14 lightbox full-size JPEG fix; 515/515 tests pass across 64 files)
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 30
   completed_plans: 30
 ---
@@ -23,7 +23,7 @@ progress:
 **Status:** Phase complete — ready for verification
 **Paused At:** —
 
-**Progress:** [██████████] 97%
+**Progress:** [██████████] 100%
 
 # State: Colonoscopist
 
@@ -45,7 +45,7 @@ progress:
 - Post-recording screenshot capture via `<video>` + canvas snapshot (`+Capture` button on ProcedureReview); `useProcedures` SWR-style hook + D-13 capture gate (REV-03)
 - Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04). The trim subprocess uses Node's default Windows command-line construction — the `windowsVerbatimArguments: true` flag that was incorrectly truncating userData paths at the first space (G-05-11) is removed; the spawn matches the recording + concat canonical pattern (recorder.ts:290 + recorder.ts:1045). 2 contract-guard tests lock the spawn options shape against regression. Trim UX now has frame-level visual feedback (G-05-12): Scrubber renders one blue dot per captured screenshot at its percent position + a tick scale (5s short, 10s long) below the track when trimMode is on; TrimControls renders in-frame + out-frame JPEG previews above the In/Out labels sourced via `captureScreenshot(videoRef)` at `inMs`/`outMs` via the `captureFrame` seam; 4 contract-guard tests lock the new visual surface.
 
-`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 505/505 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
+`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 515/515 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
 
 ## Project Reference
 
@@ -150,12 +150,12 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-11 | Gap closure (G-05-14): extend `MEDIA_ROUTE_RE` with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + add `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` allow-list defense-in-depth (404 BEFORE filesystem access); handler reads `subdir = match[3] ?? ''` and joins it into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment: `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion | complete (515/515 tests pass across 64 files; 4 new contract-guard assertions; no regressions) |
 
 ---
-*State last updated: 2026-08-07 after 05-09-PLAN.md completed (G-05-12 closed: trim visual timeline — Scrubber screenshot-position dots + tick scale below the track when trimMode is on + TrimControls in-frame + out-frame JPEG previews sourced via captureScreenshot(videoRef) at inMs/outMs; 4 contract-guard tests in Scrubber.test.tsx + TrimControls.test.tsx; 505/505 tests across 63 files)*
+*State last updated: 2026-08-07 after 05-11-PLAN.md completed (G-05-14 closed: lightbox full-size JPEG — MediaServer route accepts the literal `screenshots/` subdir segment + ALLOWED_SUBDIRS allow-list defense-in-depth + ScreenshotLightbox URL composition updated; 4 contract-guard tests in preview-server.test.ts + range-request.test.ts + 1 updated assertion in ScreenshotLightbox.test.tsx; 515/515 tests across 64 files)*
 
 ## Session
 
-**Last session:** 2026-08-07T16:01:10.384Z
-**Stopped at:** Completed 05-10-PLAN.md
+**Last session:** 2026-08-07T16:17:27.283Z
+**Stopped at:** Completed 05-11-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
