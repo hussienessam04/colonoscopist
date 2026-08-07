@@ -22,6 +22,7 @@ import DeviceLostBanner from '@/components/device-lost-banner';
 import { DestructivePartialAlert } from '@/components/DestructivePartialAlert';
 import { Scrubber } from '@/components/Scrubber';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
+import { ScreenshotLightbox } from '@/components/ScreenshotLightbox';
 import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TrimControls } from '@/components/TrimControls';
@@ -206,6 +207,11 @@ export default function ProcedureReview({
     [updateAnnotation],
   );
 
+  // Plan 07 / G-05-10 — lightbox state. `null` means closed; a row from
+  // `screenshots[]` opens the modal. The lightbox lives in a Dialog
+  // portal so its DOM position is independent of the page layout.
+  const [lightboxScreenshot, setLightboxScreenshot] = useState<Screenshot | null>(null);
+
   // ponytail: subscribe to the toast store so its listeners stay wired
   // (mirrors Plan 01). The subscription is otherwise unused.
   const toasts = useScreenshotToasts();
@@ -326,6 +332,7 @@ export default function ProcedureReview({
               onCapture={handleCapture}
               onDelete={handleDelete}
               onAnnotate={handleAnnotate}
+              onOpen={setLightboxScreenshot}
             />
           </div>
 
@@ -400,6 +407,18 @@ export default function ProcedureReview({
             ) : null}
           </aside>
         </section>
+        {/* Plan 07 / G-05-10 — lightbox mounts at the page root so the
+            Dialog portal sits outside the grid layout. The defensive
+            empty-string patientId/procedureId keeps the modal null-safe
+            during the initial procedure === null loading render. */}
+        <ScreenshotLightbox
+          screenshot={lightboxScreenshot}
+          patientId={procedure?.patientId ?? ''}
+          procedureId={procedure?.id ?? ''}
+          mediaBaseUrl={mediaUrl.url}
+          onClose={() => setLightboxScreenshot(null)}
+          onDelete={handleDelete}
+        />
       </div>
     </main>
   );
