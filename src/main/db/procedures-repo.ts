@@ -280,6 +280,12 @@ export const proceduresRepo = {
   // original file still exists on disk (defensive against backup-restore
   // paths that dropped the original mp4). When all three pass, re-points
   // video_path to video_path_original in-place.
+  //
+  // G-05-5 — both `video_path` and `video_path_original` are FILENAMES
+  // within the procedure directory (NOT userData-relative paths). The
+  // resolver `videoFilePath` joins the userData root at read time, so
+  // this call yields the correct absolute path as long as the recorder's
+  // `relativeVideoPath` writes just the filename (which it does).
   restoreFromOriginal(id: string): Procedure {
     const row = stmts().getIncludingDeleted.get(id) as ProcedureRow | undefined;
     if (!row) {

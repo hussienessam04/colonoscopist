@@ -37,13 +37,16 @@ export function screenshotsDir(patientId: string, procedureId: string): string {
   return path.join(procedureMediaDir(patientId, procedureId), 'screenshots');
 }
 
-// Phase 5 / D-07 — canonical resolver for the procedures.video_path column.
-// The DB stores the path as a userData-relative form per Anti-Pattern 2;
-// both the trim subprocess (applyTrim) and the PreviewServer /media/ route
-// route absolute resolution through this helper so the path derivation
-// stays in one place. Lazy mkdir is intentionally absent — the caller is
-// expected to already have a procedure directory on disk (either via a
-// prior recording stop or a prior trim).
+// Phase 5 / D-07 + G-05-5 — canonical resolver for the procedures.video_path
+// column. `videoRel` MUST be a FILENAME within the procedure directory
+// (e.g. `video.mp4`, `video-trimmed.mp4`, `video-seg0.mp4.partial.mp4`).
+// It is NOT a userData-relative path; the recorder's `relativeVideoPath`
+// stores just the filename and this helper joins the procedure directory
+// at READ time. The trim subprocess (applyTrim) and
+// `proceduresRepo.restoreFromOriginal` route resolution through here so
+// the path derivation stays in one place. Lazy mkdir is intentionally
+// absent — the caller is expected to already have a procedure directory
+// on disk (either via a prior recording stop or a prior trim).
 export function videoFilePath(
   patientId: string,
   procedureId: string,

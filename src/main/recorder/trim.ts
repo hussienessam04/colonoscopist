@@ -15,7 +15,7 @@
 // the DB pointing at a torn file).
 
 import { spawn, type ChildProcess } from 'node:child_process';
-import { closeSync, existsSync, fsyncSync, openSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, openSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { IpcErrorException, ipcError } from '@shared/errors';
 import { proceduresRepo } from '../db/procedures-repo';
@@ -74,10 +74,27 @@ export async function applyTrim(input: ApplyTrimInput): Promise<ApplyTrimResult>
   // still no overwrite).
   const inputAbs = videoFilePath(procedure.patientId, input.procedureId, procedure.videoPath);
   if (!existsSync(inputAbs)) {
+    // G-05-5 — surface the resolved stat path, the procedure status, the
+    // raw stored value, AND a list of files actually in the procedure
+    // directory. The prior toast only printed the raw stored value, which
+    // matched the DB but didn't reflect the doubled stat path the resolver
+    // produces when the contract drifts. Listing the directory files makes
+    // future debugging fast — the doctor sees the canonical mp4 sitting
+    // next to a sibling without having to open a shell.
+    const procDir = path.dirname(inputAbs);
+    let dirFiles: string[] = [];
+    try {
+      dirFiles = readdirSync(procDir);
+    } catch {
+      // directory unreadable / removed — fall back to empty list
+    }
     throw new IpcErrorException(
       ipcError(
         'IPC_NOT_FOUND',
-        `Source video missing at ${procedure.videoPath}`,
+        `Source video missing for procedure ${procedure.id} (status=${procedure.status}): ` +
+          `resolved ${inputAbs} not found. ` +
+          `Column holds ${procedure.videoPath}. ` +
+          `Files in procedure dir: [${dirFiles.join(', ')}].`,
       ),
     );
   }

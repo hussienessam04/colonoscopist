@@ -1252,9 +1252,15 @@ function joinPath(...parts: string[]): string {
   return require('node:path').join(...parts);
 }
 
-function relativeVideoPath(patientId: string, procedureId: string): string {
-  // Stored relative to userData per Anti-Pattern 2.
-  return `data/media/patients/${patientId}/${procedureId}/video.mp4`;
+function relativeVideoPath(_patientId: string, _procedureId: string): string {
+  // G-05-5 — `procedures.video_path` is a FILENAME within the procedure
+  // directory (e.g. `video.mp4`). NOT a userData-relative path. The
+  // resolver `paths.ts::videoFilePath` joins the userData root at READ
+  // time; the writer side stores just the filename. Args retained for
+  // API symmetry but unused — see D-07.
+  void _patientId;
+  void _procedureId;
+  return 'video.mp4';
 }
 
 // ponytail: child_process import is lazy-loaded so tests can mock it via deps.
