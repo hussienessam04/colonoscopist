@@ -14,7 +14,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/styles/scrubber.css';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import { clampHandle } from '@/lib/trim-clamp';
-import type { ProcedureSegment } from '@shared/ipc-contract';
+import type { ProcedureSegment, Screenshot } from '@shared/ipc-contract';
 
 export type ScrubberProps = {
   durationMs: number;
@@ -22,6 +22,9 @@ export type ScrubberProps = {
   onSeek: (ms: number) => void;
   // D-11 — pause markers. When undefined or empty, the track renders clean.
   segments?: ProcedureSegment[];
+  // Plan 09 / G-05-12 — screenshot position dots. When supplied, renders
+  // one blue marker per row at `s.timestampInVideoMs / durationMs * 100%`.
+  screenshots?: Screenshot[];
   // Plan 03 — trim mode. When true + inMs/outMs supplied, renders two
   // draggable handles + a red-shaded region between them.
   trimMode?: boolean;
@@ -57,6 +60,7 @@ export function Scrubber({
   currentMs,
   onSeek,
   segments,
+  screenshots,
   trimMode = false,
   inMs,
   outMs,
@@ -122,6 +126,30 @@ export function Scrubber({
     });
   }, [segments, durationMs]);
 
+  // Plan 09 / G-05-12 — screenshot position dots. Memoized for the same
+  // reason as `markers` (PITFALLS §4). Rendered AFTER pause markers in DOM
+  // order so the blue markers visually layer over the slate pause markers.
+  const screenshotMarkers = useMemo(() => {
+    if (!screenshots || screenshots.length === 0 || durationMs <= 0) return [];
+    return screenshots.map((s) => {
+      const left = pctFor(s.timestampInVideoMs, durationMs);
+      const label = `Screenshot at ${formatDurationHHMMSS(s.timestampInVideoMs)}`;
+      return { key: s.id, left, label };
+    });
+  }, [screenshots, durationMs]);
+
+  // Plan 09 / G-05-12 — tick scale strip rendered BELOW the track when
+  // trimMode is on. 5s interval for short recordings (≤60s), 10s for long.
+  const ticks = useMemo(() => {
+    if (!trimMode || durationMs <= 0) return [];
+    const intervalMs = durationMs > 60_000 ? 10_000 : 5_000;
+    const result: Array<{ ms: number; label: string }> = [];
+    for (let t = 0; t <= durationMs; t += intervalMs) {
+      result.push({ ms: t, label: formatDurationHHMMSS(t) });
+    }
+    return result;
+  }, [trimMode, durationMs]);
+
   // Plan 03 — trim handles. Only rendered when trimMode is on AND both
   // inMs/outMs are provided. The handles are simple <div> elements with
   // their own pointer-event drag — see <TrimHandle> below.
@@ -133,63 +161,101 @@ export function Scrubber({
 
   return (
     <div
-      ref={trackRef}
-      role="slider"
-      tabIndex={0}
-      aria-label={ariaLabel}
-      aria-valuemin={0}
-      aria-valuemax={Math.max(0, durationMs)}
-      aria-valuenow={Math.max(0, Math.min(durationMs, currentMs))}
-      data-testid={testId}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
-      className="scrubber-track relative h-8 cursor-pointer select-none touch-none rounded bg-slate-200"
+      // Plan 09 / G-05-12 — when in trim mode the wrapper carries
+      // `scrubber-with-ticks` so tests can assert on the wrapper + tick
+      // strip BELOW the track. When NOT in trim mode the wrapper has no
+      // testid so `screen.getByTestId('scrubber-track')` still resolves to
+      // the inner track (avoids duplicate-id match errors in RTL).
+      className="flex flex-col gap-1"
+      data-testid={trimMode ? 'scrubber-with-ticks' : undefined}
     >
       <div
-        className="scrubber-progress absolute inset-y-0 left-0 rounded bg-slate-500"
-        style={{ width: `${fillPct}%` }}
-        data-testid="scrubber-fill"
-      />
-      {markers.map((m) => (
+        ref={trackRef}
+        role="slider"
+        tabIndex={0}
+        aria-label={ariaLabel}
+        aria-valuemin={0}
+        aria-valuemax={Math.max(0, durationMs)}
+        aria-valuenow={Math.max(0, Math.min(durationMs, currentMs))}
+        data-testid={testId}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        className="scrubber-track relative h-8 cursor-pointer select-none touch-none rounded bg-slate-200"
+      >
         <div
-          key={m.key}
-          className="scrubber-pause-marker absolute inset-y-0 w-0.5 bg-slate-700/40"
-          style={{ left: `${m.left}%` }}
-          aria-label={m.pauseLabel}
-          title={m.pauseLabel}
-          data-testid="scrubber-pause-marker"
+          className="scrubber-progress absolute inset-y-0 left-0 rounded bg-slate-500"
+          style={{ width: `${fillPct}%` }}
+          data-testid="scrubber-fill"
         />
-      ))}
-      {renderTrimHandles ? (
-        <>
-          {/* The red-shaded cut region. Sits BEHIND the handles (z=0) but ABOVE the progress fill so the doctor sees the cut clearly. */}
+        {markers.map((m) => (
           <div
-            className="pointer-events-none absolute inset-y-0 z-0 bg-red-300/50"
-            style={{
-              left: `${inPct}%`,
-              width: `${Math.max(0, outPct - inPct)}%`,
-            }}
-            data-testid="scrubber-trim-region"
+            key={m.key}
+            className="scrubber-pause-marker absolute inset-y-0 w-0.5 bg-slate-700/40"
+            style={{ left: `${m.left}%` }}
+            aria-label={m.pauseLabel}
+            title={m.pauseLabel}
+            data-testid="scrubber-pause-marker"
           />
-          <TrimHandle
-            side="in"
-            left={inPct}
-            otherMs={outMs as number}
-            durationMs={durationMs}
-            onTrim={onTrim}
-            isInHandle={true}
+        ))}
+        {screenshotMarkers.map((m) => (
+          <div
+            key={`shot-${m.key}`}
+            className="absolute inset-y-0 z-[1] w-1 bg-blue-500/70"
+            style={{ left: `${m.left}%` }}
+            aria-label={m.label}
+            title={m.label}
+            data-testid="scrubber-screenshot-marker"
           />
-          <TrimHandle
-            side="out"
-            left={outPct}
-            otherMs={inMs as number}
-            durationMs={durationMs}
-            onTrim={onTrim}
-            isInHandle={false}
-          />
-        </>
+        ))}
+        {renderTrimHandles ? (
+          <>
+            {/* The red-shaded cut region. Sits BEHIND the handles (z=0) but ABOVE the progress fill so the doctor sees the cut clearly. */}
+            <div
+              className="pointer-events-none absolute inset-y-0 z-0 bg-red-300/50"
+              style={{
+                left: `${inPct}%`,
+                width: `${Math.max(0, outPct - inPct)}%`,
+              }}
+              data-testid="scrubber-trim-region"
+            />
+            <TrimHandle
+              side="in"
+              left={inPct}
+              otherMs={outMs as number}
+              durationMs={durationMs}
+              onTrim={onTrim}
+              isInHandle={true}
+            />
+            <TrimHandle
+              side="out"
+              left={outPct}
+              otherMs={inMs as number}
+              durationMs={durationMs}
+              onTrim={onTrim}
+              isInHandle={false}
+            />
+          </>
+        ) : null}
+      </div>
+      {trimMode ? (
+        <div
+          className="scrubber-ticks relative h-4 text-[10px] text-slate-500"
+          data-testid="scrubber-tick-scale"
+          aria-hidden="false"
+        >
+          {ticks.map((t) => (
+            <span
+              key={t.ms}
+              className="absolute -translate-x-1/2 whitespace-nowrap"
+              style={{ left: `${pctFor(t.ms, durationMs)}%` }}
+              data-testid="scrubber-tick"
+            >
+              {t.label}
+            </span>
+          ))}
+        </div>
       ) : null}
     </div>
   );
