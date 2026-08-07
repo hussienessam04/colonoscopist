@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: milestone_v1_1_phase_5_complete
-stopped_at: Completed 05-05-PLAN.md
-last_updated: "2026-08-07T12:36:07.411Z"
+stopped_at: Completed 05-07-PLAN.md
+last_updated: "2026-08-07T19:55:00.000Z"
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 25
-  completed_plans: 24
+  completed_plans: 25
 ---
 
 # State: Colonoscopist
@@ -23,16 +23,16 @@ progress:
 
 ## Current Focus
 
-**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans executed; 484/484 tests pass across 62 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
+**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 3 gap-closure plans (05-05/06/07) executed; 499/499 tests pass across 63 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
 
 - Mid-procedure screenshot capture via `S` hotkey + canvas snapshot from `<img>` MJPEG preview (SCRN-01)
-- Screenshots persisted under `<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg` + indexed in `screenshots` table with FK ON DELETE CASCADE (SCRN-02)
+- Screenshots persisted under `<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg` + indexed in `screenshots` table with FK ON DELETE CASCADE; mid-procedure gallery in ProcedureRoom fed by useScreenshotIntake.screenshots (SCRN-02)
 - Procedure Review screen with `<video>` + Scrubber (pointer events + setPointerCapture) + pause markers from `procedure_segments` (REV-01)
-- Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete (REV-02)
+- Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete; 24×24 solid-red × discoverability baseline; ScreenshotLightbox modal at native 1280-px resolution via the existing `/media/` route; seek-on-click + expand-icon are independent affordances (REV-02)
 - Post-recording screenshot capture via `<video>` + canvas snapshot (`+Capture` button on ProcedureReview); `useProcedures` SWR-style hook + D-13 capture gate (REV-03)
 - Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04)
 
-`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 484/484 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
+`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 499/499 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 05-08 (G-05-11: trim windowsVerbatimArguments) and 05-09 (G-05-12: trim visual timeline) remain as separate gap-closure plans for Wave 7. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
 
 ## Project Reference
 
@@ -130,14 +130,15 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-04 | Integration hardening: MediaServer HTTP Range request support + 9-case security audit + DestructivePartialAlert extraction + TrimControls 30-min cap + Scrubber clampCurrent + useMediaUrl retry() + ProcedureReview placeholder Card + 3 pre-existing test cascade-pollution fixes + VERIFICATION.md + Windows hardware smoke UAT.md | complete (484/484 tests pass across 62 files; phase_status: complete pending Windows hardware smoke per UAT.md) |
 | 05-05 | Gap closure (G-05-3): CORS header on MediaServer + PreviewServer + crossOrigin='anonymous' on <video>/<img> + tests for access-control-allow-origin + strict toBlob stub | complete |
 | 05-06 | Gap closure (G-05-5): relativeVideoPath returns filename only (writer side fix) + trim error enriched with resolved stat path + procedure status + dir listing + contract-guard test + end-to-end trim/restore round-trip test + JSDoc on videoFilePath + restoreFromOriginal | complete (491/491 tests pass across 62 files; 3 new contract-guard tests; no regressions) |
+| 05-07 | Gap closure (G-05-8/9/10): ProcedureRoom mid-procedure gallery in right aside + 24×24 solid-red × delete button at top-1 right-1 with focus-visible:ring-2 + dedicated expand affordance on ScreenshotThumbnail/ScreenshotTimeline via new onOpen prop + new ScreenshotLightbox modal via shadcn Dialog + existing /media/ route serving full-size JPEG + Toast-undo parity across gallery/timeline/lightbox | complete (499/499 tests pass across 63 files; 8 new contract-guard tests; no regressions) |
 
 ---
-*State last updated: 2026-08-07 after 05-06-PLAN.md completed (G-05-5 closed: procedures.video_path is filename-only end-to-end; all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke re-run per 05-UAT.md)*
+*State last updated: 2026-08-07 after 05-07-PLAN.md completed (G-05-8/9/10 closed: mid-procedure gallery + 24×24 solid-red × discoverability + ScreenshotLightbox via shadcn Dialog; all 6 SCRN/REV requirements shipped end-to-end; phase_status: complete pending Windows hardware smoke re-run per 05-UAT.md; 05-08 + 05-09 still open as separate gap-closure plans)*
 
 ## Session
 
-**Last session:** 2026-08-07T15:51:00.000Z
-**Stopped at:** Completed 05-06-PLAN.md
+**Last session:** 2026-08-07T19:55:00.000Z
+**Stopped at:** Completed 05-07-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
@@ -146,6 +147,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 |------|----------|-------|-------|
 | Phase 05 P05 | 5 min | 2 tasks | 5 files |
 | Phase 05 P06 | 7 min | 2 tasks | 5 files (recorder.ts + trim.ts + paths.ts + procedures-repo.ts + trim.test.ts) |
+| Phase 05 P07 | 25 min | 3 tasks | 6 files (ScreenshotThumbnail.tsx + ScreenshotTimeline.tsx + ProcedureRoom.tsx + ScreenshotLightbox.tsx [new] + ProcedureReview.tsx + 2 test files; 1 new test file) |
 
 ## Decisions
 
@@ -155,3 +157,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase 5 P06]: G-05-5: Fix the writer (recorder.relativeVideoPath returns 'video.mp4'), NOT the resolver — keeps the contract surface explicit and avoids a defensive resolver that masks contract drift
 - [Phase 5 P06]: G-05-5: Export `__relativeVideoPathForTest` for direct contract assertion — minimum code for maximum assertion strength vs standing up the full Recorder.start() pipeline with stubs
 - [Phase 5 P06]: G-05-5: Enriched source-missing error keeps raw stored value separate from resolved stat path — future debugging sees both halves of the contract-drift symptom immediately
+- [Phase 5 P07]: G-05-8/9/10: Inline SVG Maximize2 instead of lucide-react Maximize2 import — saves a new dep for a 4-path icon used in exactly one place (ponytail: stdlib first)
+- [Phase 5 P07]: G-05-9: expand affordance on top-LEFT, × on top-RIGHT — two independent affordances visually separated (red=destructive, slate=expand) so a gloved clinician can target them without ambiguity
+- [Phase 5 P07]: G-05-8: Mid-procedure gallery surfaces WITHOUT a ProcedureRoom page-level state change — the existing useScreenshotIntake hook already populates `screenshots[]`; the gallery is just a consumer of existing state. No new IPC, no new hook surface
+- [Phase 5 P07]: G-05-8: handleScreenshotDelete in ProcedureRoom mirrors ProcedureReview.handleDelete but drops the `void refresh().then(...)` — the room's gallery re-renders from the hook's local state directly, so the toast store's pending entry is the source of truth for "deleted" from the user's POV
+- [Phase 5 P07]: G-05-9/10: Test guard for discoverability uses className.contains() for the discoverable tokens (h-6 w-6 bg-red-600) — DOM presence alone is insufficient; a 16×16 grey glyph would still be in the DOM and pass a button-exists test

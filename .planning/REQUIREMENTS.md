@@ -39,9 +39,9 @@ Requirements for initial release. Each maps to a roadmap phase.
 ### Screenshots & Procedure Review
 
 - [x] **SCRN-01**: Doctor can take a screenshot during a procedure; screenshot is rendered from the current `<video>` preview frame to JPEG. _(Plan 05-01)_
-- [x] **SCRN-02**: Screenshots are persisted under `<userData>/data/media/patients/<patientId>/<procedureId>/screenshots/<timestamp>.jpg` and indexed in the `screenshots` table. _(Plan 05-01)_
+- [x] **SCRN-02**: Screenshots are persisted under `<userData>/data/media/patients/<patientId>/<procedureId>/screenshots/<timestamp>.jpg` and indexed in the `screenshots` table. _(Plan 05-01, 05-07)_
 - [x] **REV-01**: Doctor can open a finished procedure and see the recorded video with a scrubber and play/pause controls. _(Plan 05-01, 05-02, 05-03)_
-- [x] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp. _(Plan 05-01, 05-02)_
+- [x] **REV-02**: Review screen shows a clickable screenshot timeline; clicking a thumbnail seeks the video to that screenshot's timestamp. _(Plan 05-01, 05-02, 05-07)_
 - [x] **REV-03**: Doctor can take additional screenshots from playback (same path as in-procedure screenshots). _(Plan 05-01, 05-02)_
 - [x] **REV-04**: Doctor can trim the procedure (set start + end points); trim produces a new mp4 (the original is never overwritten) via ffmpeg `-ss` / `-t` with stream copy. _(Plans 05-03, 05-04, 05-06)_
 
@@ -160,9 +160,9 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | CAPT-09 | Phase 4 | Pending |
 | CAPT-10 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
 | SCRN-01 | Phase 5 | Done (05-01: migration 0003 + screenshots IPC + repo + preload bridge; 05-04: DestructivePartialAlert for partial recordings) |
-| SCRN-02 | Phase 5 | Done (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey) |
+| SCRN-02 | Phase 5 | Done (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey; 05-07: ProcedureRoom mid-procedure gallery + 24×24 solid-red × discoverability + ScreenshotLightbox via shadcn Dialog) |
 | REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture; 05-02: pause markers from procedure_segments; 05-03: PreviewServer /media/ route; 05-04: HTTP Range request support + 9-case security audit) |
-| REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete; 05-02: per-thumbnail inline ScreenshotAnnotation) |
+| REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete; 05-02: per-thumbnail inline ScreenshotAnnotation; 05-07: ScreenshotLightbox modal at native 1280-px resolution + dedicated expand affordance independent of seek-on-click) |
 | REV-03 | Phase 5 | Done (05-01: ProcedureReview real impl with video left + scrubber + timeline + bare metadata sidebar; 05-02: useProcedures SWR hook + D-13 capture gate) |
 | REV-04 | Phase 5 | Done (05-03: trim handles + PROCEDURES_TRIM/RESTORE handlers + applyTrim + Restore; 05-04: HTTP Range request support + 9-case security audit + 30-min trim cap + media URL fallback; 05-06: G-05-5 path-shape contract fix — recorder writer returns filename-only shape, enriched source-missing error, contract-guard test + end-to-end trim/restore round-trip) |
 | RPT-01 | Phase 6 | Pending |

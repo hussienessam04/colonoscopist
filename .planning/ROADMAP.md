@@ -124,10 +124,7 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 6/6 plans executed
-
-- [x] 05-05-PLAN.md
-- [x] 05-06-PLAN.md
+**Plans:** 9 plans total (7 shipped + 2 pending gap-closure execution)
 
 - [x] 05-01-PLAN.md — Screenshot capture pipeline: migration 0003 + screenshots IPC + capture lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey + ProcedureReview replacement (Wave 1)
 - [x] 05-02-PLAN.md — Pause markers on scrubber + Notes accordion + annotation panel + StatusBadge + useProcedures hook + PROCEDURES_LIST_SEGMENTS (Wave 2, depends_on: 01)
@@ -137,6 +134,11 @@ Plans:
 - [x] 05-05-PLAN.md — Gap closure (G-05-3): CORS header on MediaServer + PreviewServer + crossOrigin='anonymous' on `<video>`/`<img>` + strict toBlob stub + tests for access-control-allow-origin (Wave 5)
 - [x] 05-06-PLAN.md — Gap closure (G-05-5): recorder writer returns filename-only shape + trim error enriched + contract-guard test + end-to-end trim/restore round-trip + JSDoc on videoFilePath + restoreFromOriginal (Wave 6)
   - **Verification:** 491/491 tests across 62 files; 3 new contract-guard tests; no regressions; G-05-5 closed end-to-end without touching the resolver (Option B from the debug doc); full unit suite green.
+- [x] 05-07-PLAN.md — Gap closure (G-05-8/9/10): ProcedureRoom mid-procedure gallery + 24×24 solid-red × delete button + dedicated expand affordance + new `<ScreenshotLightbox>` modal via existing `/media/` route; Toast-undo reused (Wave 7)
+  - **Verification:** 499/499 tests across 63 files; 8 new contract-guard tests (2 in procedure-room-timer + 3 in ScreenshotTimeline + 3 in ScreenshotLightbox); no regressions; G-05-8/9/10 closed end-to-end; all 6 SCRN/REV requirements now have a discoverability baseline + a lightbox affordance; shadcn Dialog + lucide icons reused — no new dependencies.
+- [ ] 05-08-PLAN.md — Gap closure (G-05-11): remove `windowsVerbatimArguments: true` from trim spawn + rewrite stale header comment + contract-guard test asserting the flag stays absent (Wave 7)
+- [ ] 05-09-PLAN.md — Gap closure (G-05-12): Scrubber screenshot-position dot markers + tick scale (5s/10s) below the track when trimMode is on + TrimControls in-frame/out-frame JPEG previews via `captureScreenshot(videoRef)` at `inMs`/`outMs` + ProcedureReview wires `screenshots` + `videoRef` + `captureFrame` through (Wave 7)
+  - **Wave 7 note:** 05-07 shipped in round 1; 05-08 and 05-09 are independent of 05-07 (no cross-file dependencies) and run in subsequent gap-closure rounds.
 
 ---
 
