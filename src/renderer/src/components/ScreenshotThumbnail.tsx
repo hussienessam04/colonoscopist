@@ -97,6 +97,7 @@ function ScreenshotThumbnailImpl({
           className={`size-full object-cover ${onAnnotate ? 'pt-5 pb-5' : 'pb-5'}`}
           onError={() => setErrored(true)}
           draggable={false}
+          data-testid="screenshot-thumbnail-img"
         />
       ) : (
         <div

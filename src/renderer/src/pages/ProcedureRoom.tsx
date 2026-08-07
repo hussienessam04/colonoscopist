@@ -9,6 +9,7 @@ import { RecIndicator } from '@/components/RecIndicator';
 import { FramingGuide } from '@/components/FramingGuide';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
+import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
 import { useRoute } from '@/store/route';
@@ -150,6 +151,12 @@ export default function ProcedureRoom(): JSX.Element {
     isRecording,
     startedAt: recordingState.startedAt,
   });
+  // Plan 12 / G-05-15 — the room's gallery thumbnails need a
+  // MediaServer URL to compose each <img> src. The hook is the same
+  // one ProcedureReview uses (line 106); the URL stays bound across
+  // page transitions so the IPC round-trip fires only once per app
+  // session.
+  const mediaUrl = useMediaUrl();
   // ponytail: 250 ms debounce against key auto-repeat so holding S
   // doesn't fire dozens of captures per second (D-02).
   const lastCaptureAtRef = useRef(0);
@@ -423,6 +430,8 @@ export default function ProcedureRoom(): JSX.Element {
                   </h3>
                   <ScreenshotTimeline
                     procedureId={procedureId ?? ''}
+                    patientId={patientIdFromRoute}
+                    mediaBaseUrl={mediaUrl.url}
                     status={isRecording ? 'recording' : 'completed'}
                     screenshots={screenshotIntake.screenshots}
                     onSeek={() => undefined}

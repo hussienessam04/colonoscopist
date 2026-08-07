@@ -31,6 +31,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Trash2, X } from 'lucide-react';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { screenshotUrl } from '@/lib/screenshot-url';
 import type { Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotLightboxProps = {
@@ -56,20 +57,18 @@ export function ScreenshotLightbox({
   testId,
 }: ScreenshotLightboxProps): JSX.Element {
   const open = screenshot !== null;
-  // ponytail: same fileName extraction as ProcedureReview's video src —
-  // we only pass the leaf filename to the /media/ route, so the server's
-  // path-escape regex (T-05-08) already protects this surface.
-  const fileName = screenshot?.filePath.replace(/^.*[\\/]/, '') ?? '';
-  // G-05-14 — include the literal `screenshots/` subdir segment so the
-  // MediaServer route resolves the actual on-disk path
-  // (`<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg`).
-  // The server-side `MEDIA_ROUTE_RE` was extended to accept this
-  // shape; the server-side `ALLOWED_SUBDIRS` allow-list rejects
-  // unknown subdirs with 404.
-  const src =
-    mediaBaseUrl && screenshot
-      ? `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`
-      : null;
+  // G-05-15 — canonicalize onto the shared helper. The lightbox owns
+  // no URL composition logic; it just calls the helper and trusts the
+  // URL. The leaf-filename regex + the literal `screenshots/` subdir
+  // + the /media/ route shape all live in `screenshotUrl` now.
+  const src = screenshot
+    ? screenshotUrl({
+        mediaBaseUrl,
+        patientId,
+        procedureId,
+        filePath: screenshot.filePath,
+      })
+    : null;
   const testIdPrefix = testId ?? 'screenshot-lightbox';
   return (
     <Dialog

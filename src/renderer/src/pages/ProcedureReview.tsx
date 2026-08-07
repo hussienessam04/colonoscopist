@@ -373,6 +373,8 @@ export default function ProcedureReview({
             />
             <ScreenshotTimeline
               procedureId={procedureId}
+              patientId={procedure?.patientId ?? ''}
+              mediaBaseUrl={mediaUrl.url}
               status={procedure?.status}
               screenshots={screenshots}
               onSeek={handleSeek}
