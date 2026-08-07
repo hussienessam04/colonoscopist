@@ -50,8 +50,13 @@ describe('ScreenshotLightbox', () => {
       />,
     );
     const img = screen.getByTestId('screenshot-lightbox-img');
-    // fileName extracted from "data/media/p1/screenshots/5000.jpg" -> "5000.jpg"
-    expect(img.getAttribute('src')).toBe('http://127.0.0.1:51731/media/p1/proc1/5000.jpg');
+    // G-05-14 — URL includes the literal `screenshots/` subdir segment
+    // that matches the on-disk layout (paths.ts::screenshotsDir writes
+    // to <userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg).
+    // fileName extracted from "data/media/p1/screenshots/5000.jpg" -> "5000.jpg".
+    expect(img.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/proc1/screenshots/5000.jpg',
+    );
   });
 
   it('clicking the close button calls onClose', () => {

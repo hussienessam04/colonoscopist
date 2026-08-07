@@ -215,4 +215,41 @@ describe('MediaServer security audit (Phase 5 / Plan 04 task 3)', () => {
     expect([403, 404]).toContain(response.status);
     expect(response.body.length).toBeLessThan(1024);
   });
+
+  // G-05-14 — Range request support for the new `/media/<p>/<proc>/screenshots/<file>`
+  // URL shape + allow-list defense. The screenshots subdir lives one
+  // level below the procedure directory; Range requests must continue
+  // to work against the deeper URL shape (Chromium's <img> doesn't
+  // Range-request, but the route surface is shared with the <video>
+  // path and a future <img loading='lazy'> Range re-quest is plausible).
+  it('10. Range request against /media/<p>/<proc>/screenshots/<file> serves 206 (G-05-14)', async () => {
+    writeMp4('data/media/patients/p1/proc1/screenshots/5000.jpg', 4096);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/screenshots/5000.jpg',
+      'GET',
+      'bytes=0-1023',
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 0-1023/4096');
+    expect(response.headers['content-length']).toBe('1024');
+    expect(response.body.length).toBe(1024);
+  });
+
+  it('11. Range request against an unknown subdir returns 404 (allow-list defense-in-depth — G-05-14)', async () => {
+    // Seed the fixture so a missing-file 404 is NOT what's being
+    // asserted. The allow-list check must reject before the Range parse
+    // even runs, so the response is a plain 404 — not a 206 (Range
+    // parsed), not a 416 (Range parsed but invalid), and not a 200.
+    writeMp4('data/media/patients/p1/proc1/garbage/5000.jpg', 4096);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/garbage/5000.jpg',
+      'GET',
+      'bytes=0-1023',
+    );
+    expect(response.status).toBe(404);
+  });
 });

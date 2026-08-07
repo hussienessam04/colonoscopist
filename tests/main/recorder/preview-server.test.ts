@@ -495,6 +495,46 @@ describe('MediaServer', () => {
     expect(methodNotAllowed.status).toBe(405);
     expect(methodNotAllowed.headers['access-control-allow-origin']).toBe('*');
   });
+
+  // G-05-14 — MediaServer subdir route contract guard. Screenshots live
+  // under a literal `screenshots/` subdir on disk (per paths.ts::
+  // screenshotsDir + screenshots.ts:add). The route now accepts an
+  // optional subdir segment between procedureId and file. The two tests
+  // below lock the route surface + the allow-list defense so a future
+  // refactor cannot silently regress the lightbox path.
+  it('serves a file under the screenshots/ subdir with the literal segment in the URL (G-05-14)', async () => {
+    // Seed the fixture at the canonical on-disk layout that
+    // screenshots.ts:add writes to. The HTTP request then walks the
+    // same shape (`<p>/<proc>/screenshots/<file>`) the lightbox
+    // composes.
+    writeMp4('data/media/patients/p1/proc1/screenshots/5000.jpg', 1024);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/screenshots/5000.jpg',
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers['content-length']).toBe('1024');
+    expect(response.body.length).toBe(1024);
+    // ponytail: do NOT assert content-type — the route serves `video/mp4`
+    // for v1 regardless of extension; the lightbox uses an <img> which
+    // sniffs the bytes, so the MIME is cosmetic. Asserting it here would
+    // couple the guard to a value the plan deliberately leaves alone.
+  });
+
+  it('returns 404 for an unknown subdir (allow-list defense — G-05-14)', async () => {
+    // Seed the fixture at the unknown-subdir path so the 404 proves the
+    // allow-list rejection rather than a missing-file fallback. If the
+    // server ever drops the ALLOWED_SUBDIRS check, this test fails
+    // because the file IS on disk.
+    writeMp4('data/media/patients/p1/proc1/thumbnails/5000.jpg', 1024);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/thumbnails/5000.jpg',
+    );
+    expect(response.status).toBe(404);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
