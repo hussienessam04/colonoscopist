@@ -26,6 +26,7 @@ import type {
   ProcedureSegment,
   Screenshot,
 } from '@shared/ipc-contract';
+import { screenshotToastStore } from '@/store/screenshot-toast';
 
 export type UseProceduresResult = {
   procedure: Procedure | null;
@@ -35,6 +36,7 @@ export type UseProceduresResult = {
   loading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+  removeScreenshot: (screenshotId: number) => void;
   updateAnnotation: (id: number, annotation: string | null) => Promise<void>;
 };
 
@@ -119,6 +121,23 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
     [],
   );
 
+  const removeScreenshot = useCallback((screenshotId: number): void => {
+    // G-05-13 — synchronous local-state removal for the optimistic
+    // delete UX. The actual IPC delete is the toast-store's job.
+    setScreenshots((rows) => rows.filter((row) => row.id !== screenshotId));
+  }, []);
+
+  useEffect(() => {
+    // G-05-13 — re-sync after the toast store fires the IPC. A failed
+    // delete leaves the DB row present, so refresh restores it locally.
+    const unsubscribe = screenshotToastStore.subscribeCommitted((event) => {
+      if (event.procedureId === procedureId) {
+        void refresh();
+      }
+    });
+    return unsubscribe;
+  }, [procedureId, refresh]);
+
   return {
     procedure,
     segments,
@@ -127,6 +146,7 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
     loading,
     error,
     refresh,
+    removeScreenshot,
     updateAnnotation,
   };
 }

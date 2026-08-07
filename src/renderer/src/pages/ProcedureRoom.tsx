@@ -165,20 +165,19 @@ export default function ProcedureRoom(): JSX.Element {
     }
   }
 
-  // G-05-8 / Plan 07 — gallery delete uses the same Toast-undo store as
-  // ProcedureReview. The hook's `screenshots[]` stays in sync via the
-  // underlying IPC; the optimistic `void refresh` dance from
-  // ProcedureReview is unnecessary here because the gallery consumes the
-  // hook state directly (the row stays visible until the next list
-  // refresh, which the next page mount triggers — same UX as the
-  // review timeline).
+  // G-05-8 / G-05-13 — remove the thumbnail immediately, then let the
+  // Toast-undo store schedule the disk + DB delete after its 5s window.
   function handleScreenshotDelete(s: Screenshot): void {
+    screenshotIntake.remove(s.id);
     screenshotToastStore.enqueueDelete(s.id, s.procedureId);
     toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
       duration: 5_000,
       action: {
         label: 'Undo',
-        onClick: () => screenshotToastStore.undoDelete(s.id),
+        onClick: () => {
+          screenshotToastStore.undoDelete(s.id);
+          void screenshotIntake.refresh();
+        },
       },
     });
   }

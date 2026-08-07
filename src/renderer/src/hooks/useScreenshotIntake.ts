@@ -26,6 +26,8 @@ export type ScreenshotIntakeOptions = {
 export type ScreenshotIntakeResult = {
   screenshots: Screenshot[];
   capture: () => Promise<Screenshot | null>;
+  remove: (screenshotId: number) => void;
+  refresh: () => Promise<void>;
   loading: boolean;
   error: string | null;
 };
@@ -95,5 +97,26 @@ export function useScreenshotIntake({
     }
   }, [procedureId, sourceRef, isRecording, startedAt]);
 
-  return { screenshots, capture, loading, error };
+  const remove = useCallback((screenshotId: number): void => {
+    // ponytail: pure local-state mutation. The IPC delete is the
+    // toast-store's job (after the 5s undo window). The page calls
+    // remove() synchronously before enqueueDelete() so the thumbnail
+    // disappears immediately (G-05-13).
+    setScreenshots((prev) => prev.filter((s) => s.id !== screenshotId));
+  }, []);
+
+  const refresh = useCallback(async (): Promise<void> => {
+    if (!procedureId) return;
+    setLoading(true);
+    try {
+      const rows = await window.api.screenshots.list({ procedureId });
+      setScreenshots(rows);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+    }
+  }, [procedureId]);
+
+  return { screenshots, capture, remove, refresh, loading, error };
 }

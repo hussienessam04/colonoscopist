@@ -16,6 +16,13 @@ export type PendingDelete = {
   expiresAt: number;
 };
 
+export type CommittedDelete = {
+  screenshotId: number;
+  procedureId: string;
+  success: boolean;
+  errorMessage: string | null;
+};
+
 type ToastState = {
   pending: PendingDelete[];
 };
@@ -24,6 +31,17 @@ const UNDO_WINDOW_MS = 5_000;
 
 let state: ToastState = { pending: [] };
 const listeners = new Set<() => void>();
+const committedListeners = new Set<(event: CommittedDelete) => void>();
+
+function emitCommitted(event: CommittedDelete): void {
+  for (const listener of committedListeners) listener(event);
+}
+
+function subscribeCommitted(listener: (event: CommittedDelete) => void): () => void {
+  committedListeners.add(listener);
+  return () => committedListeners.delete(listener);
+}
+
 // ponytail: tracked timeouts so undoDelete can cancel them deterministically
 // without relying on a slow setTimeout callback to read state.
 const scheduledTimers = new Map<number, ReturnType<typeof setTimeout>>();
@@ -78,11 +96,27 @@ function commitDelete(screenshotId: number): void {
   emit();
   void window.api.screenshots
     .delete({ id: screenshotId })
-    .then(() => undefined)
+    .then(() => {
+      emitCommitted({
+        screenshotId,
+        procedureId: entry.procedureId,
+        success: true,
+        errorMessage: null,
+      });
+    })
     .catch((err: unknown) => {
-      // The renderer re-renders the screenshot on failure; left for
-      // ProcedureReview to handle via toast.error.
-      console.error('screenshot delete failed:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      void import('sonner')
+        .then(({ toast }) => {
+          toast.error(`Failed to delete screenshot: ${message}`);
+        })
+        .catch(() => undefined);
+      emitCommitted({
+        screenshotId,
+        procedureId: entry.procedureId,
+        success: false,
+        errorMessage: message,
+      });
     });
 }
 
@@ -97,6 +131,7 @@ export const screenshotToastStore = {
   enqueueDelete,
   undoDelete,
   reset,
+  subscribeCommitted,
   __getState: snapshot,
 };
 

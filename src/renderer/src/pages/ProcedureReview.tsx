@@ -94,7 +94,14 @@ export default function ProcedureReview({
   const routeProcedureId = route.name === 'procedure-review' ? route.procedureId : null;
   const procedureId = initialId ?? routeProcedureId ?? null;
 
-  const { procedure, segments, screenshots, refresh, updateAnnotation } = useProcedures(procedureId);
+  const {
+    procedure,
+    segments,
+    screenshots,
+    refresh,
+    removeScreenshot,
+    updateAnnotation,
+  } = useProcedures(procedureId);
   const lastLost = useLastLost();
   const mediaUrl = useMediaUrl();
 
@@ -218,19 +225,22 @@ export default function ProcedureReview({
   }, [procedure, refresh]);
 
   const handleDelete = useCallback((s: Screenshot): void => {
-    // Optimistic UI: remove the screenshot from local state immediately
-    // so the × visual feels instant (D-12). The Toast store schedules
-    // the actual IPC delete after 5s; the user can Undo before then.
-    void refresh().then(() => undefined);
+    // G-05-13 — remove the thumbnail immediately. The toast store
+    // schedules the actual IPC delete after 5s; its committed event
+    // re-syncs this hook after the IPC settles.
+    removeScreenshot(s.id);
     screenshotToastStore.enqueueDelete(s.id, s.procedureId);
     toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
       duration: 5_000,
       action: {
         label: 'Undo',
-        onClick: () => screenshotToastStore.undoDelete(s.id),
+        onClick: () => {
+          screenshotToastStore.undoDelete(s.id);
+          void refresh();
+        },
       },
     });
-  }, [refresh]);
+  }, [removeScreenshot, refresh]);
 
   const handleAnnotate = useCallback(
     async (screenshot: Screenshot, annotation: string | null): Promise<void> => {
