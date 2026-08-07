@@ -1,11 +1,14 @@
 // ScreenshotLightbox — full-size view of a captured screenshot.
 //
-// Plan 07 / G-05-10: a dialog modal that renders the captured JPEG at its
-// native (up to 1280px) resolution via the existing `/media/` route. The
-// parent page owns `selectedScreenshot` state; passing `screenshot={null}`
-// closes the dialog. Closing paths: × button (testid
-// `screenshot-lightbox-close`), Esc, click-outside-via-overlay (Radix
-// defaults).
+// Plan 07 / G-05-10 + Plan 11 / G-05-14: a dialog modal that renders
+// the captured JPEG at its native (up to 1280px) resolution via the
+// existing `/media/` route. Screenshots live under a `screenshots/`
+// literal subdir on disk (per `paths.ts::screenshotsDir()` +
+// `screenshots.ts:add`), so the URL composition includes that segment.
+// The parent page owns `selectedScreenshot` state; passing
+// `screenshot={null}` closes the dialog. Closing paths: × button
+// (testid `screenshot-lightbox-close`), Esc, click-outside-via-overlay
+// (Radix defaults).
 //
 // Parity with the timeline delete: the lightbox accepts the same
 // `onDelete` callback the timeline receives. The doctor's delete from
@@ -15,8 +18,9 @@
 //
 // ponytail: no new dependencies. shadcn Dialog + lucide X / Trash2 are
 // already in the bundle. URL composition mirrors the existing
-// ProcedureReview video src so the path-escape regex on the server
-// already protects this route (T-05-55 mitigation).
+// ProcedureReview video src so the path-escape regex (T-05-08 +
+// T-05-28 + the new subdir allow-list from G-05-14) protects this
+// route.
 
 import {
   Dialog,
@@ -56,9 +60,15 @@ export function ScreenshotLightbox({
   // we only pass the leaf filename to the /media/ route, so the server's
   // path-escape regex (T-05-08) already protects this surface.
   const fileName = screenshot?.filePath.replace(/^.*[\\/]/, '') ?? '';
+  // G-05-14 — include the literal `screenshots/` subdir segment so the
+  // MediaServer route resolves the actual on-disk path
+  // (`<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg`).
+  // The server-side `MEDIA_ROUTE_RE` was extended to accept this
+  // shape; the server-side `ALLOWED_SUBDIRS` allow-list rejects
+  // unknown subdirs with 404.
   const src =
     mediaBaseUrl && screenshot
-      ? `${mediaBaseUrl}/media/${patientId}/${procedureId}/${fileName}`
+      ? `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`
       : null;
   const testIdPrefix = testId ?? 'screenshot-lightbox';
   return (

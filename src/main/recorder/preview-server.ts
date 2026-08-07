@@ -47,11 +47,27 @@ export type PreviewServerOptions = {
   onError?: (err: Error) => void;
 };
 
-// T-05-08 + T-05-28 — strict regex for the /media/ route. Each segment is
-// alphanumeric + hyphens; the file segment adds `.` to allow `.mp4`. Any
-// character outside this set (e.g. `/`, `\`, `..`, `?`) is rejected by
-// the regex match before the filesystem is touched.
-const MEDIA_ROUTE_RE = /^\/media\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]+)\/([\w.-]+)$/;
+// T-05-08 + T-05-28 + G-05-14 — strict regex for the /media/ route.
+// Each segment is alphanumeric + hyphens; the file segment adds `.` to
+// allow `.mp4` / `.jpg`. The route accepts both the flat shape
+// (`/media/<p>/<proc>/<file>` — video files) and the subdir shape
+// (`/media/<p>/<proc>/<subdir>/<file>` — screenshots live under a
+// literal `screenshots/` segment per `paths.ts::screenshotsDir`).
+// Any character outside this set (e.g. `?`, null bytes, `..`) is
+// rejected by the regex match before the filesystem is touched. The
+// optional subdir group is constrained to alphanumeric+hyphen; the
+// handler enforces an allow-list of known subdir names as
+// defense-in-depth (G-05-14).
+const MEDIA_ROUTE_RE =
+  /^\/media\/([a-zA-Z0-9-]+)\/([a-zA-Z0-9-]+)\/(?:([a-zA-Z0-9-]+)\/)?([\w.-]+)$/;
+
+// G-05-14 — defense-in-depth allow-list for the optional subdir segment.
+// The regex already constrains it to alphanumeric+hyphen, but an
+// allow-list ensures that expanding the route surface is a deliberate
+// code change. v1: only `screenshots` is allowed. New subdirs must be
+// added to this set explicitly (PR review + contract-guard tests catch
+// unauthorized additions).
+const ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots']);
 
 // ponytail: multipart/x-mixed-replace boundary. Standard Chromium-handled
 // MIME type for an MJPEG feed via <img>. The boundary itself can be any
@@ -452,7 +468,19 @@ export class MediaServer {
     }
     const patientId = match[1] ?? '';
     const procedureId = match[2] ?? '';
-    const file = match[3] ?? '';
+    const subdir = match[3] ?? ''; // '' = flat (video.mp4); 'screenshots' = subdir
+    const file = match[4] ?? '';
+
+    // G-05-14 — allow-list check: reject unknown subdirs with 404 before
+    // any filesystem access. The regex already constrains the subdir
+    // shape, but a future refactor that loosens the regex must NOT
+    // silently expand the route surface. This guard makes the
+    // subdir-segment surface an explicit allow-list.
+    if (subdir !== '' && !ALLOWED_SUBDIRS.has(subdir)) {
+      res.statusCode = 404;
+      res.end('Not Found');
+      return;
+    }
 
     // T-05-08 — resolve the file path and verify it stays inside userData.
     // `path.relative` returns the diff; if the path escaped the userData
@@ -465,6 +493,7 @@ export class MediaServer {
       'patients',
       patientId,
       procedureId,
+      subdir, // '' is a no-op for path.join (flat layout preserved)
       file,
     );
     const rel = path.relative(
