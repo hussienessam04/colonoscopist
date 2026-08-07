@@ -248,10 +248,14 @@ function rawHttpRequest(
   port: number,
   path: string,
   method: 'GET' | 'HEAD' = 'GET',
+  rangeHeader?: string,
 ): Promise<{ status: number; headers: Record<string, string>; body: Buffer }> {
   return new Promise((resolve, reject) => {
+    const rangeLine = rangeHeader !== undefined ? `Range: ${rangeHeader}\r\n` : '';
     const sock = connect(port, '127.0.0.1', () => {
-      sock.write(`${method} ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n`);
+      sock.write(
+        `${method} ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n${rangeLine}\r\n`,
+      );
     });
     const chunks: Buffer[] = [];
     sock.on('data', (c: Buffer) => chunks.push(c));
@@ -376,5 +380,180 @@ describe('MediaServer', () => {
         resolve();
       });
     });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MediaServer — HTTP Range request support (T-05-22 hardening + Plan 04).
+// Chromium's <video> uses Range requests to seek; the route must serve
+// 206 Partial Content with the requested byte slice. Malformed ranges
+// fall back to a full 200. Out-of-bounds + start>end clamp/return 416.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('MediaServer.parseRange', () => {
+  it('parses bytes=0-1023 as a closed range', () => {
+    expect(MediaServer.parseRange('bytes=0-1023', 4096)).toEqual({ start: 0, end: 1023 });
+  });
+  it('parses bytes=1000- as open-ended (extends to size-1)', () => {
+    expect(MediaServer.parseRange('bytes=1000-', 4096)).toEqual({ start: 1000, end: 4095 });
+  });
+  it('parses bytes=-100 as suffix-length (last 100 bytes)', () => {
+    expect(MediaServer.parseRange('bytes=-100', 4096)).toEqual({ start: 3996, end: 4095 });
+  });
+  it('clamps bytes=999999-9999999999 to file size', () => {
+    expect(MediaServer.parseRange('bytes=999999-9999999999', 1024)).toEqual({ start: 1023, end: 1023 });
+  });
+  it('returns { invalidRange: true } when start > end after clamping', () => {
+    expect(MediaServer.parseRange('bytes=100-50', 1024)).toEqual({ invalidRange: true });
+  });
+  it('returns null for malformed bytes=abc-def', () => {
+    expect(MediaServer.parseRange('bytes=abc-def', 1024)).toBeNull();
+  });
+  it('returns null for empty bytes=', () => {
+    expect(MediaServer.parseRange('bytes=', 1024)).toBeNull();
+  });
+  it('returns null for bytes=-0 (zero-byte suffix is meaningless)', () => {
+    expect(MediaServer.parseRange('bytes=-0', 1024)).toBeNull();
+  });
+});
+
+describe('MediaServer Range request handling (Plan 04)', () => {
+  let server: MediaServer;
+
+  beforeEach(() => {
+    mediaTmpDir = mkdtempSync(path.join(tmpdir(), 'colonosco-media-range-'));
+    vi.resetModules();
+    server = new MediaServer();
+  });
+
+  afterEach(async () => {
+    await server.stop();
+    try {
+      rmSync(mediaTmpDir, { recursive: true, force: true });
+    } catch {
+      // ignore
+    }
+  });
+
+  it('returns 206 with Content-Range + Content-Length for bytes=0-1023 of a 4096-byte file', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 4096);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=0-1023',
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 0-1023/4096');
+    expect(response.headers['content-length']).toBe('1024');
+    expect(response.body.length).toBe(1024);
+  });
+
+  it('returns 206 with start-extending-to-end for bytes=1000-', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 4096);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=1000-',
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 1000-4095/4096');
+    expect(response.headers['content-length']).toBe('3096');
+    expect(response.body.length).toBe(3096);
+  });
+
+  it('returns 206 with the last 100 bytes for bytes=-100', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 4096);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=-100',
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 3996-4095/4096');
+    expect(response.headers['content-length']).toBe('100');
+    expect(response.body.length).toBe(100);
+  });
+
+  it('clamps bytes=99999999-9999999999 to file size', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 2048);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=99999999-9999999999',
+    );
+    expect(response.status).toBe(206);
+    expect(response.headers['content-range']).toBe('bytes 2047-2047/2048');
+    expect(response.headers['content-length']).toBe('1');
+    expect(response.body.length).toBe(1);
+  });
+
+  it('returns 416 with Content-Range: bytes */<size> for bytes=100-50 (start > end)', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 2048);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=100-50',
+    );
+    expect(response.status).toBe(416);
+    expect(response.headers['content-range']).toBe('bytes */2048');
+  });
+
+  it('falls back to 200 with full file for malformed bytes=abc-def', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 2048);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=abc-def',
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers['content-length']).toBe('2048');
+    expect(response.body.length).toBe(2048);
+  });
+
+  it('returns 200 with full file when no Range header is present', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 2048);
+    const handle = await server.start();
+    const response = await rawHttpRequest(handle.httpPort, '/media/p1/proc1/video.mp4');
+    expect(response.status).toBe(200);
+    expect(response.headers['content-length']).toBe('2048');
+    expect(response.body.length).toBe(2048);
+  });
+
+  it('rejects multi-range requests (commas) by falling back to 200', async () => {
+    writeMp4('data/media/patients/p1/proc1/video.mp4', 2048);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/video.mp4',
+      'GET',
+      'bytes=0-100,200-300',
+    );
+    expect(response.status).toBe(200);
+    expect(response.headers['content-length']).toBe('2048');
+  });
+
+  it('still rejects path-escape attempts when a Range header is present', async () => {
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/..%2F..%2Fetc%2Fpasswd',
+      'GET',
+      'bytes=0-100',
+    );
+    // The regex rejects the path shape before any Range processing — same
+    // posture as Plan 03, all the pre-existing path-escape tests still pass.
+    expect([403, 404]).toContain(response.status);
   });
 });

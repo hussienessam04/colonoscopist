@@ -165,5 +165,12 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  // ponytail: tests that fire-and-forget `session.refresh()` (e.g.
+  // patients-list.test.tsx) leave the session store polluted across tests
+  // — the pending async refresh resolves AFTER the next beforeEach's
+  // `session.reset()`, overwriting the fresh null state with stale admin
+  // credentials. Resetting AFTER cleanup() gives a stable baseline for
+  // the next test.
+  session.reset();
   vi.restoreAllMocks();
 });

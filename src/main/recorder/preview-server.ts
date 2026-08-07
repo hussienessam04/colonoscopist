@@ -478,26 +478,70 @@ export class MediaServer {
       return;
     }
 
-    // T-05-22 — Accept-Ranges: bytes header so Chromium knows to ask for
-    // partial content on seek. We return the full body in a single 200
-    // response (v1.1 will parse Range for partial content); the header
-    // alone is enough for Chromium to recognize the URL as a seekable
-    // video source.
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'video/mp4');
-    res.setHeader('Content-Length', stat.size);
+    // T-05-22 — Chromium's <video> element uses Range requests to seek.
+    // Parse `Range: bytes=START-END` and return 206 Partial Content with the
+    // requested byte slice. Malformed ranges (or absent Range header) fall
+    // back to the full 200 response with `Accept-Ranges: bytes` so the
+    // client can re-issue on seek.
+    //
+    // ponytail: rejects multi-range (`bytes=0-100,200-300`) and malformed
+    // (`bytes=abc-def`, `bytes=-0`) — Chromium never sends these for a
+    // single <video> URL. Multi-range would require multipart/byteranges
+    // (RFC 7233) which is not in scope for v1.
     res.setHeader('Accept-Ranges', 'bytes');
+    res.setHeader('Content-Type', 'video/mp4');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
 
+    const rangeHeader = req.headers.range;
+    if (rangeHeader !== undefined && rangeHeader !== '') {
+      // Multi-range requests contain a comma — reject at this layer.
+      if (!rangeHeader.includes(',')) {
+        const parsed = MediaServer.parseRange(rangeHeader, stat.size);
+        if (parsed !== null && !('invalidRange' in parsed)) {
+          const { start, end } = parsed;
+          const length = end - start + 1;
+          res.statusCode = 206;
+          res.setHeader('Content-Range', `bytes ${start}-${end}/${stat.size}`);
+          res.setHeader('Content-Length', String(length));
+          if (req.method === 'HEAD') {
+            res.end();
+            return;
+          }
+          // Stream the requested byte slice directly from disk — Node's
+          // createReadStream honours { start, end } without buffering the
+          // file in memory.
+          const stream = createReadStream(resolved, { start, end });
+          stream.on('error', () => {
+            try {
+              res.destroy();
+            } catch {
+              // ignore
+            }
+          });
+          stream.pipe(res);
+          return;
+        }
+        if (parsed !== null && 'invalidRange' in parsed) {
+          // ponytail: well-formed shape with start > end after clamping
+          // (e.g. `bytes=100-50` against a 1024-byte file). The canonical
+          // Chromium posture is 416 with `Content-Range: bytes */<size>`.
+          res.statusCode = 416;
+          res.setHeader('Content-Range', `bytes */${stat.size}`);
+          res.end();
+          return;
+        }
+        // Malformed Range header — fall through to the full 200 response.
+      }
+    }
+
+    // No Range header (or malformed Range) — return the full body.
+    res.statusCode = 200;
+    res.setHeader('Content-Length', String(stat.size));
     if (req.method === 'HEAD') {
       res.end();
       return;
     }
-    // ponytail: stream the file via createReadStream so a 2 GB trimmed mp4
-    // doesn't load fully into the JS heap. Pipe errors are swallowed — the
-    // client likely closed the connection (navigated away, scrubbed past
-    // end, etc).
     const stream = createReadStream(resolved);
     stream.on('error', () => {
       try {
@@ -507,6 +551,60 @@ export class MediaServer {
       }
     });
     stream.pipe(res);
+  }
+
+  /**
+   * Parse a single-range `Range` header against the file's size.
+   *
+   *   `bytes=START-END`   -> { start, end } with both clamped to [0, size-1]
+   *   `bytes=START-`      -> { start: START, end: size-1 }  (open-ended)
+   *   `bytes=-N`          -> { start: size-N, end: size-1 } (suffix-length)
+   *   `bytes=START-END`   where START > END (after clamp) -> { invalidRange: true }
+   *
+   * Returns `null` for:
+   *   - empty / missing / non-bytes specifiers
+   *   - malformed values (`bytes=abc-def`)
+   *   - multi-range (`bytes=0-100,200-300`)
+   *   - `bytes=-0` (suffix of zero bytes is meaningless)
+   *
+   * ponytail: write a small pure parser instead of pulling the
+   * `range-parser` npm package — the package is ~70 lines and the
+   * surgeon-spec only needs the three forms above. Keep the API
+   * surface inside this file; the tests exercise the surface directly.
+   */
+  static parseRange(
+    header: string,
+    size: number,
+  ): { start: number; end: number } | { invalidRange: true } | null {
+    // Strict regex: `bytes=` prefix is literal; both halves must be digits
+    // (suffix-length uses empty start, open-ended uses empty end).
+    const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
+    if (!match) return null;
+    const startStr = match[1] ?? '';
+    const endStr = match[2] ?? '';
+    if (startStr === '' && endStr === '') return null;
+    const lastIndex = size - 1;
+    let start: number;
+    let end: number;
+    if (startStr === '') {
+      // Suffix-length: last N bytes. RFC 7233 forbids `-0` (zero bytes).
+      const suffixLen = Number(endStr);
+      if (suffixLen <= 0) return null;
+      start = Math.max(0, lastIndex - suffixLen + 1);
+      end = lastIndex;
+    } else {
+      start = Number(startStr);
+      if (endStr === '') {
+        end = lastIndex;
+      } else {
+        end = Number(endStr);
+      }
+      // Clamp both into [0, lastIndex].
+      start = Math.max(0, Math.min(start, lastIndex));
+      end = Math.max(0, Math.min(end, lastIndex));
+    }
+    if (start > end) return { invalidRange: true };
+    return { start, end };
   }
 
   private listenOnHttp(
