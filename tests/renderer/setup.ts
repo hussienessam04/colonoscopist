@@ -172,5 +172,12 @@ afterEach(() => {
   // credentials. Resetting AFTER cleanup() gives a stable baseline for
   // the next test.
   session.reset();
-  vi.restoreAllMocks();
+  // ponytail: `clearAllMocks` clears mock history (call counts) without
+  // tearing down `.mockResolvedValue` implementations. `restoreAllMocks`
+  // would strip implementations from `vi.fn()` instances mid-test,
+  // which is the cascade-pollution that surfaced as `Cannot read
+  // properties of undefined (reading 'then')` in ProcedureReview when
+  // a prior test's async `.then` resolves against an implementation-
+  // wiped mock.
+  vi.clearAllMocks();
 });

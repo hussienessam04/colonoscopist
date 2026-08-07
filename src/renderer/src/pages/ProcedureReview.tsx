@@ -70,14 +70,24 @@ export default function ProcedureReview({
       return;
     }
     let cancelled = false;
-    void window.api.patients
-      .get(procedure.patientId)
-      .then((row) => {
-        if (!cancelled) setPatient(row);
-      })
-      .catch(() => {
-        if (!cancelled) setPatient(null);
-      });
+    // ponytail: optional-chain `.then` so a mid-render mutation of
+    // `window.api` (cascade pollution from a prior test's stashed
+    // microtask) cannot crash the render with "Cannot read properties
+    // of undefined (reading 'then')". Production callers always seed
+    // `window.api` before mount; the optional chain is a defensive
+    // zero-cost guard for renderer tests + HMR edge cases.
+    const promise = window.api.patients?.get?.(procedure.patientId);
+    if (promise && typeof promise.then === 'function') {
+      promise
+        .then((row) => {
+          if (!cancelled) setPatient(row);
+        })
+        .catch(() => {
+          if (!cancelled) setPatient(null);
+        });
+    } else if (!cancelled) {
+      setPatient(null);
+    }
     return () => {
       cancelled = true;
     };
