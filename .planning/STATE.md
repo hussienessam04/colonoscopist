@@ -2,15 +2,28 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: milestone_v1_1_phase_5_complete
-stopped_at: Completed 05-09-PLAN.md
-last_updated: "2026-08-07T14:19:46.688Z"
+current_plan: 11 of 11
+status: paused
+stopped_at: Completed 05-10-PLAN.md
+paused_at: —
+last_updated: "2026-08-07T16:03:06.030Z"
+last_activity: 2026-08-07
+last_activity_desc: Completed 05-10-PLAN.md (G-05-13 delete UX fix; 511/511 tests pass across 64 files)
 progress:
   total_phases: 5
-  completed_phases: 5
-  total_plans: 28
-  completed_plans: 28
+  completed_phases: 4
+  total_plans: 30
+  completed_plans: 29
 ---
+
+**Current Plan:** 11 of 11
+**Total Plans in Phase:** 11
+**Last Activity:** 2026-08-07
+**Last Activity Description:** Completed 05-10-PLAN.md (G-05-13 delete UX fix; 511/511 tests pass across 64 files)
+**Status:** Phase complete — ready for verification
+**Paused At:** —
+
+**Progress:** [██████████] 97%
 
 # State: Colonoscopist
 
@@ -139,8 +152,8 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-07T14:12:00.548Z
-**Stopped at:** Completed 05-09-PLAN.md
+**Last session:** 2026-08-07T16:01:10.384Z
+**Stopped at:** Completed 05-10-PLAN.md
 **Resume file:** None
 
 ## Performance Metrics
@@ -152,6 +165,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 05 P07 | 25 min | 3 tasks | 6 files (ScreenshotThumbnail.tsx + ScreenshotTimeline.tsx + ProcedureRoom.tsx + ScreenshotLightbox.tsx [new] + ProcedureReview.tsx + 2 test files; 1 new test file) |
 | Phase 05 P08 | 5 min | 2 tasks | 2 files (trim.ts + trim.test.ts; one-key production fix + 2 contract-guard tests) |
 | Phase 5 P9 | 8min | 3 tasks | 5 files (Scrubber.tsx + TrimControls.tsx + ProcedureReview.tsx + 2 test files) |
+| Phase 05 P10 | 8 min | 2 tasks | 8 files |
 
 ## Decisions
 
@@ -173,3 +187,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase ?]: G-05-12: captureFrame test seam — production wires the seek + capture round-trip via captureFrameForTrim; tests pass a synchronous async stub returning 'AAAA' that RTL findBy* resolves immediately
 - [Phase ?]: G-05-12: module-scope captureFrameForTrim in ProcedureReview — stable identity across renders means TrimControls' useEffect doesn't re-fire on every parent re-render (dependency-array stability matters for capture-bound effects)
 - [Phase ?]: G-05-12: Scrubber wrapper testid conditional on trimMode (NOT testId fallback) — preserves screen.getByTestId('scrubber-track') resolution against the inner track. Plan text would have caused duplicate-id errors in RTL
+- [Phase ?]: G-05-13: pure local-state remove() on both screenshot-owning hooks — smallest correct fix; no IPC, no useReducer, just a setScreenshots filter
+- [Phase ?]: G-05-13: event-driven re-sync via screenshotToastStore.subscribeCommitted → useProcedures refresh() on match — success is a no-op refetch; failure restores the row
+- [Phase ?]: G-05-13: dynamic import('sonner') inside commitDelete's catch block keeps the store decoupled from the rendering layer at module init

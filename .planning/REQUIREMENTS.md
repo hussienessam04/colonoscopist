@@ -160,7 +160,7 @@ Filled by `ROADMAP.md` after roadmap creation. Each requirement maps to exactly 
 | CAPT-09 | Phase 4 | Pending |
 | CAPT-10 | Phase 3 | In Progress (03-01 done; 03-02/03-03 pending) |
 | SCRN-01 | Phase 5 | Done (05-01: migration 0003 + screenshots IPC + repo + preload bridge; 05-04: DestructivePartialAlert for partial recordings) |
-| SCRN-02 | Phase 5 | Done (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey; 05-07: ProcedureRoom mid-procedure gallery + 24×24 solid-red × discoverability + ScreenshotLightbox via shadcn Dialog) |
+| SCRN-02 | Phase 5 | Complete (05-01: capture-screenshot lib + Scrubber + ScreenshotTimeline + ProcedureRoom S/hotkey; 05-07: ProcedureRoom mid-procedure gallery + 24×24 solid-red × discoverability + ScreenshotLightbox via shadcn Dialog; 05-10: G-05-13 synchronous local-state remove() on useScreenshotIntake + useProcedures + commit toast.error on IPC failure + 4 contract-guard tests) |
 | REV-01 | Phase 5 | Done (05-01: Scrubber with pointer events + setPointerCapture; 05-02: pause markers from procedure_segments; 05-03: PreviewServer /media/ route; 05-04: HTTP Range request support + 9-case security audit) |
 | REV-02 | Phase 5 | Done (05-01: ScreenshotTimeline + click-to-seek + Toast-undo delete; 05-02: per-thumbnail inline ScreenshotAnnotation; 05-07: ScreenshotLightbox modal at native 1280-px resolution + dedicated expand affordance independent of seek-on-click) |
 | REV-03 | Phase 5 | Done (05-01: ProcedureReview real impl with video left + scrubber + timeline + bare metadata sidebar; 05-02: useProcedures SWR hook + D-13 capture gate) |
