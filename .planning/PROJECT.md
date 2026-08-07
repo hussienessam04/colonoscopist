@@ -19,7 +19,8 @@ A gloved, busy doctor can hit Record on a procedure, capture findings as screens
 
 ### Validated
 
-(None yet — ship to validate)
+- **SCRN-01, SCRN-02** — Mid-procedure + post-recording screenshot capture + persistent JPEG store (validated in Phase 5, 05-01 / 05-04).
+- **REV-01, REV-02, REV-03, REV-04** — Procedure Review screen with pause markers + clickable screenshot timeline + post-recording capture + non-destructive trim with restore (validated in Phase 5, 05-01 / 05-02 / 05-03 / 05-04).
 
 ### Active
 
@@ -76,6 +77,9 @@ A gloved, busy doctor can hit Record on a procedure, capture findings as screens
 | Tailwind + shadcn/ui for UI | Fast to build a clinical-feeling, high-contrast UI; shadcn components are copy-into-repo so we own the code. Trade-off: not Radix Material Design polish, but enough for a clinical tool. | — Pending |
 | N-API tamper-resistant license check (later sprint) | v1 ships with a JS license check. Hardening is deferred so v1 can ship faster; it is explicitly on the roadmap (Phase 8). | — Pending |
 | Backup = zip of `data/` (db + license + media) | No cloud, no service — the customer owns the backup. Easy to verify by unzipping. Restoring is also a zip extract. | — Pending |
+| Screenshot frame source = canvas snapshot from `<video>`/`<img>` at capture time (not MJPEG-tee or one-shot ffmpeg `image2`) | Simplest implementation that satisfies both mid-procedure and post-recording entry points; reuses the same `captureScreenshot(source)` lib. Trade-off: live-preview feed needs to be present at capture time (already true since renderer renders it). | ✓ Validated in Phase 5 |
+| Trim = `-ss before -i -c copy` (stream copy) with ±500ms accuracy | Faster than re-encode (no quality loss), but cuts may land a few hundred ms off from the doctor's intended handle. Doctor can fine-tune via drag handles. Trade-off accepted for v1; pixel-exact re-encode deferred. | ✓ Validated in Phase 5 |
+| Media server = long-lived HTTP on `127.0.0.1:<random>` with `/media/` route + HTTP Range support | `<video>` can't load `file://` under contextIsolation; local HTTP serves the mp4 + Range requests for Chromium seek. Path-escape protection + random port prevent local-network access. | ✓ Validated in Phase 5 |
 
 ## Evolution
 
@@ -96,4 +100,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state (clinic feedback, perf numbers, support load)
 
 ---
-*Last updated: 2026-07-31 after initialization*
+*Last updated: 2026-08-07 after Phase 5 execution (Screenshots + Procedure Review + Trim — 4/4 plans shipped, 484/484 tests pass, 6/6 phase requirements validated)*

@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: phase_5_plan_04_complete
-stopped_at: Completed 05-04-PLAN.md
-last_updated: "2026-08-07T04:30:00.000Z"
+status: milestone_v1_1_phase_5_complete
+stopped_at: Phase 5 execution complete; milestone v1.1 has Phases 1–5 verified, Phases 6–8 pending
+last_updated: "2026-08-07T11:42:00.000Z"
 progress:
-  total_phases: 5
-  completed_phases: 4
-  total_plans: 20
+  total_phases: 8
+  completed_phases: 5
+  total_plans: 23
   completed_plans: 23
 ---
 
@@ -23,25 +23,16 @@ progress:
 
 ## Current Focus
 
-Phase 4 — Recording (ffmpeg child + timer + device-lost): **FULLY VERIFIED** (all 20 UAT tests pass on Windows hardware, zero issues). Recording end-to-end works: ffmpeg-static spawns, segment files rename/concat into canonical `video.mp4`, mid-procedure notes save, Pause freezes the timer, Resume continues, Stop finalizes as `completed` (Windows EPERM on read-only fsync no longer downgrades status), device-lost detection renames the live segment to `.partial.mp4` and shows the inline banner, scanForOrphans writes `recording.crash_partial` on next launch, the recorder loads `ffmpeg-static` from `asarUnpack` in the packaged build.
+**Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans executed; 484/484 tests pass across 62 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
 
-Extra fixes landed during Phase 4 verification (out of original SUMMARY scope):
+- Mid-procedure screenshot capture via `S` hotkey + canvas snapshot from `<img>` MJPEG preview (SCRN-01)
+- Screenshots persisted under `<userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg` + indexed in `screenshots` table with FK ON DELETE CASCADE (SCRN-02)
+- Procedure Review screen with `<video>` + Scrubber (pointer events + setPointerCapture) + pause markers from `procedure_segments` (REV-01)
+- Clickable screenshot timeline seeks `<video>` to thumbnail timestamp; per-thumbnail inline annotation; Toast-undo delete (REV-02)
+- Post-recording screenshot capture via `<video>` + canvas snapshot (`+Capture` button on ProcedureReview); `useProcedures` SWR-style hook + D-13 capture gate (REV-03)
+- Non-destructive trim via ffmpeg `-ss before -i -c copy` (5-min SIGTERM timeout); restore re-points `<video>` to original; long-lived MediaServer on `127.0.0.1:<random>` with `/media/` route + HTTP Range request support + 9-case security audit (REV-04)
 
-- RecorderControlsBar overlay (timer + record/pause inside the preview pane, doctor doesn't look away from the screen)
-- FramingGuide rule-of-thirds SVG overlay
-- RecIndicator red "Rec" badge during recording
-- Keyboard shortcuts (Space=pause/resume, Esc=stop, R=record, suppressed in textarea inputs)
-- Collapsible side panel (notes + device-lost banner can be hidden)
-- Cleaner headers (no "Step 1 / Step 2" labels)
-- Auto-start preview on device pick (no explicit Start Preview button)
-
-`/gsd-verify-work 4` complete: UAT status `complete`, 20/20 pass, 0 issues, 0 blocked. Phase 4 is shippable for its scope (recording + pause/resume + device-lost).
-
-Phase 5 Plan 01 (screenshots + Procedure Review real impl) shipped: migration 0003 (screenshots table + procedures.video_path_original), IPC handlers add/list/delete/updateAnnotation, PROCEDURES_TRIM/RESTORE stubs throwing IPC_NOT_IMPLEMENTED, capture-screenshot lib, Scrubber with setPointerCapture + click-to-seek + drag-to-seek, ScreenshotTimeline with memoized ScreenshotThumbnail + Toast-undo delete store, useScreenshotIntake hook, ProcedureRoom Camera button + S hotkey, ProcedureReview replaces the Phase 4 placeholder. 39/39 unit tests pass across 6 files (migration, repo, IPC, capture-screenshot, Scrubber, ScreenshotTimeline).
-
-Phase 5 Plan 02 (right-rail Polish) shipped: pause markers on Scrubber from procedure_segments (D-11), per-thumbnail inline ScreenshotAnnotation (D-12), read-only ProcedureNotesReview accordion (D-09), reusable StatusBadge component, useProcedures SWR-style hook (parallel fetch + optimistic updateAnnotation), ScreenshotTimeline +Capture gate on crashed (D-13), PROCEDURES_LIST_SEGMENTS IPC channel + handler, hand-ported shadcn Accordion primitive (no @radix-ui/react-accordion dep), scrubber.css utility module with z-index ordering for the layered track. 67/67 unit tests pass across 10 files (Plan 01's 39 + Plan 02's 28 new). Plan 03 (trim + /media/ route) + Plan 04 (validation + UAT) follow.
-
-Phase 5 Plan 03 (Trim + `/media/` route) shipped: `buildTrimArgs` pure builder (`-ss` before `-i`, `-c copy`, `-movflags +faststart` — D-08 + PITFALLS §2); `applyTrim` ffmpeg subprocess with `windowsVerbatimArguments` + 5min SIGTERM timeout + post-spawn fsync (PITFALLS §1); `proceduresRepo.updateVideoPath` uses `COALESCE(video_path_original, ?)` for the canonical first-trim-only guard (D-07); `restoreFromOriginal` re-points `video_path` to `video_path_original` with file-existence + null guards; `MediaServer` is a long-lived localhost HTTP server (boots at app start, dies on `will-quit`) with the `/media/<patientId>/<procedureId>/<file>` route — regex-validated path components + `path.relative` escape check (T-05-08/T-05-28) + `Accept-Ranges: bytes` header (T-05-22); `procedures.trim` + `procedures.restore` IPC handlers replaced the Plan 01 stubs (validates input via safeParse, partial-status gate at both renderer + IPC layers per D-13, audits `procedure.trimmed` + `procedure.restored` with userData-relative paths per Fix 6); `IPC.RECORDING_GET_MEDIA_URL` + `api.recording.getMediaUrl()`; `TrimControls` right-rail panel with Apply/Restore + inline `Loader2` spinner + partial/missing-original disabled states; `useTrim` hook wires the IPC round-trip; `useMediaUrl` hook fetches + caches the MediaServer URL; `Scrubber` extended with `trimMode`/`inMs`/`outMs`/`onTrim` props + draggable `<TrimHandle>` children (in + out) + red-shaded `<TrimRegion>` rectangle; `clampHandle` pure function with 1000ms minimum gap (PITFALLS §6). 49 new unit tests across 8 files (ffmpeg-args 5 + trim 5 + preview-server 6 + procedures-repo 6 + procedures 4 + Scrubber 5 + trim-clamp 6 + TrimControls 10). Trim-related integration: 67 Plan 01 + 28 Plan 02 + 49 Plan 03 = 144 unit tests pass. The trim-smoke integration test (RUN_SMOKE=1) exercises the real `ffmpeg-static` binary against a lavfi source — opt-in so CI stays fast. REV-04 ships (last Phase 5 requirement). Plan 04 (validation + Windows hardware UAT) follows.
+`/gsd-verify-work 5` is the next manual step (Windows hardware smoke per `05-UAT.md`); code-ship + merge unblocked at 484/484 tests green. Pre-existing test cascade pollution from `procedure-room-timer.test.tsx` was fixed in 05-04 commit `165649e`. Plan 06 (Doctor Profile + Report Editor + PDF) follows Phase 5 verification.
 
 ## Project Reference
 
