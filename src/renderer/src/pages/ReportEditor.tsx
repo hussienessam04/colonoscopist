@@ -18,7 +18,7 @@
 // CONTEXT.md D-07 (any signed-in doctor can edit).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, FileText, FolderOpen } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -160,9 +160,22 @@ export default function ReportEditor({
   const handleOpenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
-      await window.api.reports.openPdf({ id: report.id });
+      await window.api.reports.openPdf({ id: report.id, reveal: false });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Open failed';
+      toast.error(msg);
+    }
+  }, [report]);
+
+  // ponytail: Reveal in Explorer uses the same IPC channel with
+  // `reveal: true` (per Plan 06-03 Task 4) so main.ts can dispatch to
+  // `shell.showItemInFolder` instead of the default PDF viewer.
+  const handleRevealPdf = useCallback(async (): Promise<void> => {
+    if (report === null) return;
+    try {
+      await window.api.reports.openPdf({ id: report.id, reveal: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Reveal failed';
       toast.error(msg);
     }
   }, [report]);
@@ -258,6 +271,15 @@ export default function ReportEditor({
                 >
                   <FileText className="size-4 mr-1" aria-hidden="true" />
                   Open PDF
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handleRevealPdf()}
+                  data-testid="report-editor-reveal-pdf"
+                >
+                  <FolderOpen className="size-4 mr-1" aria-hidden="true" />
+                  Reveal in Explorer
                 </Button>
                 <Button
                   variant="outline"
