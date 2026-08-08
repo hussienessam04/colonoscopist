@@ -99,11 +99,13 @@ describe('0002_procedures migration', () => {
     const { getDb, closeDb } = await import('../../../../src/main/db');
 
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(3);
+    // Phase 6 / Plan 06-01 added migration 0004 (doctor_profile + reports
+    // + report_screenshots). Total now = 4.
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(3);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
 
     closeDb();
   });

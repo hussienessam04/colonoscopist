@@ -44,7 +44,7 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
   const clinicName = input.clinicName;
   const now = Date.now();
 
-  // ponytail: single transaction wraps all four rows so any throw rolls back.
+  // ponytail: single transaction wraps all five rows so any throw rolls back.
   const db = getDb();
   const txn = db.transaction(() => {
     // INSERT users (admin = first user)
@@ -64,6 +64,16 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
       `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     ).run('schema_version', '1', now);
+
+    // INSERT doctor_profile (Phase 6 / D-01..D-04). New admins get a
+    // doctor_profile row alongside the users row so the ProfileEditor
+    // has something to render. The migration 0004 backfill handles the
+    // pre-Phase-6 upgrade case (existing users); this handles the
+    // first-launch-after-Phase-6 case (the wizard itself).
+    db.prepare(
+      `INSERT INTO doctor_profile (id, user_id, full_name_en, clinic_name_en, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(randomUUID(), userId, input.fullName, clinicName, now, now);
 
     // INSERT audit_log auth.bootstrap.completed
     db.prepare(

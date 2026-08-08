@@ -74,7 +74,9 @@ describe('db migrations', () => {
       id: number;
       name: string;
     }[];
-    expect(migrations).toHaveLength(3);
+    // Phase 6 / Plan 06-01 added migration 0004 (doctor_profile + reports
+    // + report_screenshots). Total now = 4.
+    expect(migrations).toHaveLength(4);
     expect(migrations[0].id).toBe(1);
 
     closeDb();
@@ -85,13 +87,13 @@ describe('db migrations', () => {
 
     // First open
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(3);
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(3);
+    expect(count).toBe(4);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(
