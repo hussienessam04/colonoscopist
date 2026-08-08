@@ -6,6 +6,7 @@ import type Database from 'better-sqlite3';
 import initSql from './migrations/0001_init.sql?raw';
 import proceduresSql from './migrations/0002_procedures.sql?raw';
 import screenshotsAndTrimSql from './migrations/0003_screenshots_and_trim.sql?raw';
+import doctorProfileAndReportsSql from './migrations/0004_doctor_profile_and_reports.sql?raw';
 
 type Migration = {
   id: number;
@@ -18,6 +19,7 @@ const MIGRATIONS: Migration[] = [
   { id: 1, name: 'init', up: initSql },
   { id: 2, name: 'procedures', up: proceduresSql },
   { id: 3, name: 'screenshots_and_trim', up: screenshotsAndTrimSql },
+  { id: 4, name: 'doctor_profile_and_reports', up: doctorProfileAndReportsSql },
 ];
 
 function loadMigrations(): typeof MIGRATIONS {
