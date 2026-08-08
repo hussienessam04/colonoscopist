@@ -168,6 +168,15 @@ Plans:
 **Pitfalls addressed:** Pitfall 8 (PDF RTL bidi handling).
 **Notes:** Sample AR PDF must be generated and visually inspected at end of phase — if `@react-pdf/renderer` bidi proves insufficient, plan a small HTML→PDF fallback for the AR report path only.
 
+**Plans:** 3 plans, 31 commits (15 + 10 + 6 task commits + 3 docs commits), 579/579 tests pass, all 9 requirements honored, 13/13 CONTEXT.md decisions honored.
+
+Plans:
+- [x] 06-01-PLAN.md — TRACER: migration 0004 (doctor_profile + reports + report_screenshots + idempotent backfill) + 3 repos + IPC skeletons + audit + PDF stub + @react-pdf/renderer ^4.5.1 install
+- [x] 06-02-PLAN.md — Renderer: ProfileEditor + ReportEditor + useAutoSave hook + ScreenshotTimeline attach toggle + drag-to-reorder + route wiring + auto-save-on-blur (300ms debounce) + Finalize button
+- [x] 06-03-PLAN.md — Full PDF clinical template (logo + signature + multi-page screenshots + footer) + shell.openPath() + Reveal in Explorer + EN smoke test (RUN_SMOKE=1)
+
+**Deferred to Phase 7:** AR PDF rendering (RPT-06 AR half — the AR bidi smoke test, Font.register for an Arabic TTF, bidi `<Text direction="rtl">` wrappers, numeric fragment isolation per Pitfall 8). Patient profile with past history (your suggestion mid-discuss-phase — out of scope for Phase 6).
+
 ---
 
 ## Phase 7 — Search & History + Audit UI + Backup/Restore + Arabic/RTL
