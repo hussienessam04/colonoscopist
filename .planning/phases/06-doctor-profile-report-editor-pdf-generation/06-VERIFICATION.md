@@ -1,8 +1,8 @@
 ---
 phase: 06
 slug: doctor-profile-report-editor-pdf-generation
-# status lifecycle: draft (initial) → verified (set by verify-phase §6)
-status: verified
+# status lifecycle: draft (initial) → passed (set by verify-phase §6)
+status: passed
 nyquist_compliant: true
 verified_at: 2026-08-09
 ---
@@ -11,7 +11,7 @@ verified_at: 2026-08-09
 
 ## Summary
 
-**Status:** VERIFIED ✓
+**Status:** PASSED ✓
 
 Phase 6 (Doctor Profile + Report Editor + PDF Generation) shipped all 9 requirements across 3 plans (06-01 tracer + 06-02 renderer + 06-03 PDF + finalize). 579/579 tests pass across 76 test files. 13/13 CONTEXT.md decisions honored.
 
