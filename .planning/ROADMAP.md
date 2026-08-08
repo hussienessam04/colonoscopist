@@ -124,7 +124,7 @@ Plans:
 **Pitfalls addressed:** Same file-corruption risks as Phase 4 (always operate on copies, never in place).
 **Notes:** This phase pairs with Phase 4 — `screenshots` rows can be created during recording (Phase 4 already has the write path), and review + trim are the post-procedure counterparts.
 
-**Plans:** 12/12 plans executed
+**Plans:** 12/12 plans complete
 
 - [x] 05-10-PLAN.md
 - [x] 05-11-PLAN.md
@@ -246,6 +246,17 @@ Phase 1 (Scaffold)
 ```
 
 Linear chain. Each phase's output is the next phase's input.
+
+### Phase 6: Doctor Profile + Report Editor + PDF Generation
+
+**Goal:** [To be planned]
+**Requirements**: TBD
+**Depends on:** Phase 5
+**Plans:** 0 plans
+
+Plans:
+
+- [ ] TBD (run /gsd-plan-phase 6 to break down)
 
 ---
 *Roadmap created: 2026-07-31*
