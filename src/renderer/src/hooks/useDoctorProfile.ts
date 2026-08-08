@@ -30,8 +30,15 @@ export function useDoctorProfile(): UseDoctorProfileResult {
     const promise = (async (): Promise<void> => {
       setLoading(true);
       try {
-        const row = await window.api.profile.get();
-        setProfile(row);
+        // ponytail: optional-chain so a mid-render mutation of
+        // `window.api` (cascade pollution from a prior test's stashed
+        // microtask) cannot crash the render with "Cannot read
+        // properties of undefined (reading 'get')". Production callers
+        // always seed `window.api.profile` before mount; the optional
+        // chain is a defensive zero-cost guard for renderer tests +
+        // HMR edge cases.
+        const row = await window.api.profile?.get?.();
+        setProfile(row ?? null);
       } finally {
         setLoading(false);
         refreshInFlightRef.current = null;

@@ -8,13 +8,19 @@
 // of which page mounts the sidebar so the admin gate (T-3-22) travels with
 // the component. The two `data-testid` values match the prior inline <aside>
 // so the existing SettingsHub tests keep finding the buttons.
+//
+// Phase 6 / Plan 02 — Profile entry. Per CONTEXT.md §Phase 6, every
+// doctor edits their own profile (no admin gate). The Profile button
+// lives alongside Capture + Users in the sidebar. The active highlight
+// keys on route.name === 'profile-edit' since the profile page has no
+// `activeTab` prop.
 
-import { Shield, Video } from 'lucide-react';
+import { Shield, UserCircle, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
 import { useRoute } from '@/lib/router';
 
-export type SettingsTab = 'capture' | 'users';
+export type SettingsTab = 'capture' | 'users' | 'profile';
 
 export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX.Element {
   const { navigate } = useRoute();
@@ -35,6 +41,16 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <Video className="size-4 mr-2" aria-hidden="true" />
         Capture
+      </Button>
+      <Button
+        variant={activeTab === 'profile' ? 'default' : 'outline'}
+        className="justify-start"
+        onClick={() => navigate({ name: 'profile-edit' })}
+        data-testid="settings-hub-profile"
+        data-active={activeTab === 'profile' ? 'true' : 'false'}
+      >
+        <UserCircle className="size-4 mr-2" aria-hidden="true" />
+        Profile
       </Button>
       <Button
         variant={activeTab === 'users' ? 'default' : 'outline'}
