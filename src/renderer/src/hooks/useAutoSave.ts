@@ -24,17 +24,17 @@ export type UseAutoSaveOptions<T> = {
   debounceMs?: number;
 };
 
-export type UseAutoSaveResult = {
+export type UseAutoSaveResult<T> = {
   status: SaveStatus;
   savedAt: number | null;
-  trigger: () => void;
+  trigger: (overrideValue?: T) => void;
 };
 
 export function useAutoSave<T>({
   value,
   onSave,
   debounceMs = 300,
-}: UseAutoSaveOptions<T>): UseAutoSaveResult {
+}: UseAutoSaveOptions<T>): UseAutoSaveResult<T> {
   const [status, setStatus] = useState<SaveStatus>('idle');
   const [savedAt, setSavedAt] = useState<number | null>(null);
   // ponytail: the debounced fn is rebuilt each render so `value` is
@@ -60,12 +60,13 @@ export function useAutoSave<T>({
   // Re-arm the debounce delay whenever the parent passes a new
   // debounceMs. We rebuild the primitive's timeout by calling cancel()
   // then letting the next trigger() reseed it.
+  // ponytail: NO `value` dep — every setLocal causes a re-render
+  // and would cancel the pending save the trigger just scheduled.
+  // The trigger is the only path to schedule a save; the cleanup
+  // is reserved for debounceMs changes + unmount.
   useEffect(() => {
     debouncedSave.cancel();
-    // ponytail: no useEffect dep on `value` — trigger is explicit.
-    // Re-renders don't fire IPC.
-    void value;
-  }, [debounceMs, debouncedSave, value]);
+  }, [debounceMs, debouncedSave]);
 
   // Cleanup on unmount — prevents a stale IPC from setStatus'ing an
   // unmounted component.
@@ -75,9 +76,17 @@ export function useAutoSave<T>({
     };
   }, [debouncedSave]);
 
-  const trigger = useCallback((): void => {
-    debouncedSave.call(value);
-  }, [debouncedSave, value]);
+  // ponytail: trigger accepts an OPTIONAL override value so the
+  // parent can pass the freshly patched state without waiting for
+  // React to flush the setState. The closure-captured `value` would
+  // otherwise race — by the time the debounce fires, the queued
+  // setLocal update hasn't landed and the wrapped fn sees stale data.
+  const trigger = useCallback(
+    (overrideValue?: T): void => {
+      debouncedSave.call(overrideValue ?? value);
+    },
+    [debouncedSave, value],
+  );
 
   return { status, savedAt, trigger };
 }

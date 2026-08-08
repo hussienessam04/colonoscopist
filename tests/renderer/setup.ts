@@ -71,6 +71,31 @@ type MockApi = {
     delete: ReturnType<typeof vi.fn>;
     updateAnnotation: ReturnType<typeof vi.fn>;
   };
+  // Phase 6 / Plan 02 — Profile + Reports namespaces. Plan 06-01 wired
+  // the IPC contract; the renderer pages (ProfileEditor, ReportEditor,
+  // ProcedureReview CTA) call these on mount. Tests seed defaults via
+  // mockResolvedValue per-test; the empty vi.fn() ensures happy-dom
+  // doesn't crash if a page mounts before the test seeds a specific
+  // shape.
+  profile: {
+    get: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+    uploadSignature: ReturnType<typeof vi.fn>;
+    uploadLogo: ReturnType<typeof vi.fn>;
+  };
+  reports: {
+    getOrCreate: ReturnType<typeof vi.fn>;
+    get: ReturnType<typeof vi.fn>;
+    updateDraft: ReturnType<typeof vi.fn>;
+    updateFinalized: ReturnType<typeof vi.fn>;
+    finalize: ReturnType<typeof vi.fn>;
+    regenPdf: ReturnType<typeof vi.fn>;
+    openPdf: ReturnType<typeof vi.fn>;
+    attachScreenshot: ReturnType<typeof vi.fn>;
+    detachScreenshot: ReturnType<typeof vi.fn>;
+    reorderScreenshots: ReturnType<typeof vi.fn>;
+    listScreenshots: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -147,6 +172,28 @@ export function mockApi(): MockApi {
       list: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(undefined),
       updateAnnotation: vi.fn(),
+    },
+    // Phase 6 / Plan 02 — defaults that resolve to safe empty values
+    // so any page that mounts the ProfileEditor / ReportEditor on
+    // initial render doesn't crash before the per-test seeds arrive.
+    profile: {
+      get: vi.fn().mockResolvedValue(null),
+      update: vi.fn(),
+      uploadSignature: vi.fn().mockResolvedValue({ signaturePath: 'sig.png' }),
+      uploadLogo: vi.fn().mockResolvedValue({ logoPath: 'logo.png' }),
+    },
+    reports: {
+      getOrCreate: vi.fn().mockResolvedValue(null),
+      get: vi.fn().mockResolvedValue(null),
+      updateDraft: vi.fn(),
+      updateFinalized: vi.fn(),
+      finalize: vi.fn(),
+      regenPdf: vi.fn().mockResolvedValue({ pdfPath: 'r.pdf' }),
+      openPdf: vi.fn().mockResolvedValue({ opened: true }),
+      attachScreenshot: vi.fn().mockResolvedValue({ ok: true }),
+      detachScreenshot: vi.fn().mockResolvedValue({ ok: true }),
+      reorderScreenshots: vi.fn().mockResolvedValue({ ok: true }),
+      listScreenshots: vi.fn().mockResolvedValue([]),
     },
   };
   (window as unknown as { api: MockApi }).api = api;

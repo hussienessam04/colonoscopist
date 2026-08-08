@@ -35,6 +35,7 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
+import type { Report } from '@shared/ipc-contract';
 
 type FieldKey = keyof ReportEditableFields;
 
@@ -120,10 +121,17 @@ export default function ReportEditor({
     (key: FieldKey) =>
       (e: React.ChangeEvent<HTMLTextAreaElement>): void => {
         const value = e.target.value;
-        setLocal({ [key]: value });
-        trigger();
+        const patched: Partial<ReportEditableFields> = { [key]: value };
+        setLocal(patched);
+        // ponytail: pass the patched report directly so the auto-save
+        // IPC doesn't race the React setState — by the time the
+        // 300ms debounce fires, setLocal has been queued but not yet
+        // flushed, so the hook's closure-captured `value` is stale.
+        const next =
+          report === null ? null : ({ ...report, ...patched } as Report);
+        trigger(next ?? undefined);
       },
-    [setLocal, trigger],
+    [report, setLocal, trigger],
   );
 
   const handleFinalize = useCallback(async (): Promise<void> => {
@@ -190,9 +198,16 @@ export default function ReportEditor({
       return;
     }
     let cancelled = false;
-    void window.api.procedures.get({ id: procedureId }).then((p) => {
-      if (!cancelled) setPatientId(p?.patientId ?? '');
-    });
+    // ponytail: optional-chain so a mid-render mutation of
+    // `window.api` (cascade pollution from a prior test's stashed
+    // microtask) cannot crash the render. Mirrors the
+    // ProcedureReview patient-fetch pattern at lines 110-138.
+    const promise = window.api.procedures?.get?.({ id: procedureId });
+    if (promise && typeof promise.then === 'function') {
+      promise.then((p) => {
+        if (!cancelled) setPatientId(p?.patientId ?? '');
+      });
+    }
     return () => {
       cancelled = true;
     };

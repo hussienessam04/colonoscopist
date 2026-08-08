@@ -132,10 +132,18 @@ export default function ProfileEditor(): JSX.Element {
     (field: keyof ReturnType<typeof profileFromPatch>) =>
       (e: ChangeEvent<HTMLInputElement>): void => {
         const value = e.target.value;
-        setLocal({ [field]: value === '' ? null : value } as Partial<DoctorProfile>);
-        trigger();
+        const patched: Partial<DoctorProfile> = {
+          [field]: value === '' ? null : value,
+        } as Partial<DoctorProfile>;
+        setLocal(patched);
+        // ponytail: pass the patched value directly so the auto-save
+        // IPC doesn't race the React setState — by the time the
+        // 300ms debounce fires, setLocal has been queued but not yet
+        // flushed, so the hook's closure-captured `value` is stale.
+        const next = profile === null ? null : { ...profile, ...patched };
+        trigger(next ?? undefined);
       },
-    [setLocal, trigger],
+    [profile, setLocal, trigger],
   );
 
   const handleUpload = useCallback(
