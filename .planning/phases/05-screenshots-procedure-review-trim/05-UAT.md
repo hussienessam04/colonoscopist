@@ -266,8 +266,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported."
-  reason: |
-    User reported: "Failed to execute 'toBlob' on 'HTMLCanvasElement': Tainted canvases may not be exported."
   severity: blocker
   test: 3
   root_cause: |
@@ -295,13 +293,11 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   truth: |
     Clicking Apply in the Trim panel runs ffmpeg against the canonical mp4 path stored in procedures.video_path and produces a trimmed sibling file. video_path_original is preserved (first-trim-only COALESCE).
   status: resolved
-  resolved_by: 05-06-PLAN.md
+  resolved_by: 05-09-PLAN.md
   resolved_at: 2026-08-07
   reason: |
-    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: Source video missing at data/media/patients/88147c14-658c-440a-badf-e0707f52acb7/116315a0-355f-4f7f-8c88-75ed80510524/video.mp4"
-  reason: |
-    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: Source video missing at data/media/patients/88147c14-658c-440a-badf-e0707f52acb7/116315a0-355f-4f7f-8c88-75ed80510524/video.mp4"
-  severity: blocker
+    User reported: "we need to add the timeline in the trim line so i understand exactly the timmming i trim"
+  severity: major
   test: 5
   root_cause: |
     Path-shape contract drift between Phase 4 recorder and Phase 5 trim resolver. Recorder stores `data/media/patients/<patientId>/<procedureId>/video.mp4` (full userData-relative path) into procedures.video_path, but `paths.ts::videoFilePath` joins procedureMediaDir (which already returns `<userData>/data/media/patients/<patientId>/<procedureId>`) with the stored value. Result: doubled absolute path `<userData>/data/media/patients/<patientId>/<procedureId>/data/media/patients/<patientId>/<procedureId>/video.mp4` → existsSync returns false → applyTrim throws IPC_NOT_FOUND. The toast at trim.ts:80 prints the raw stored value (single path) which matches the DB but doesn't reflect the doubled stat path. Same latent failure in proceduresRepo.restoreFromOriginal (currently masked because Trim never succeeds).
@@ -330,9 +326,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "its works but i still need to see the screensshoots in the romm procudere with delete option"
-  reason: |
-    User reported: "its works but i still need to see the screensshoots in the romm procudere with delete option"
-    Test 3 (post-recording +Capture) passes after G-05-3 fix. But the mid-procedure screenshot experience is incomplete: capturing via S/Camera saves the screenshot + returns success toast (per useScreenshotIntake hook, Plan 01), but the captured screenshot is NOT visible in ProcedureRoom. The doctor has no way to see or delete mid-procedure captures during the procedure. The screenshot timeline + Toast-undo delete are only available in ProcedureReview (post-recording). Phase 5's stated goal "Doctor can capture screenshots during OR AFTER a procedure" implies the doctor should see their captures during the procedure too.
   severity: major
   test: 3
   artifacts: []
@@ -350,8 +343,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "i need to be able to delete them" after Test 4 (seek).
-  reason: |
-    User reported: "i need to be able to delete them" after Test 4 (seek). Plan 02 shipped a placeholder × button in Plan 01 + wired the delete + Toast-undo in Plan 02, but the visibility/affordance is insufficient — either the × is hover-only (hidden by default) or otherwise not discoverable in the timeline. Audit: confirm ScreenshotThumbnail.tsx renders the × button by default (not on hover) at sufficient size + contrast, with proper aria-label.
   severity: major
   test: 4
   artifacts: []
@@ -368,8 +359,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "the photos are thumbnail i cant see the real image"
-  reason: |
-    User reported: "the photos are thumbnail i cant see the real image". Currently ScreenshotTimeline + ScreenshotThumbnail render the screenshot at ~120x90px in the timeline; clicking the thumbnail seeks the <video> (Test 4) but does NOT open a full-size view. Phase 5 ships a 1280px maxLongEdge JPEG (per D-04) but there's no UI surface to view it at that resolution.
   severity: major
   test: 4
   artifacts: []
@@ -387,17 +376,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
-  reason: |
-    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
-    Root cause confirmed by debugger: `src/main/recorder/trim.ts:137-140` sets `windowsVerbatimArguments: true` on the spawn. With that flag, Node passes the argv array as a single space-joined string with NO quoting/escaping. ffmpeg's parser splits on whitespace, so the path `C:\Users\Hussien Essam\AppData\Roaming\colonoscopist\data\media\patients\<id>\<id>\video.mp4` is truncated at the first space and arrives at ffmpeg as `C:\Users\Hussien` (the user's HOME directory, not a file). ffmpeg tries to open a directory → EACCES → "Permission denied". The trim subprocess is the only spawn in the codebase with this flag — recorder.ts:290 and recorder.ts:1045 use Node's default Windows quoting and work fine, which is why the recording itself succeeds on this user's machine.
-  reason: |
-    User reported: "Trim failed: Error invoking remote method 'procedures:trim': Error: ffmpeg trim failed (code=4294967283, signal=none): [in#0 @ 0000021c774dc480] Error opening input: Permission denied | Error opening input file C:\Users\Hussien. | Error opening input files: Permission denied"
-    The error message ends at "C:\Users\Hussien." — looks truncated (probably MAX_PATH or shell quoting, OR just ffmpeg's stderr truncation behavior). G-05-5 fix made the file findable but ffmpeg can't open it. Candidate causes:
-    - The file is locked by another process holding it open: (a) MediaServer's createReadStream for /media/ HTTP serving, (b) preview-server's MJPEG tee still streaming, (c) Chromium's <video> decoder holding a handle, or (d) Windows AV scanner. Most likely culprit: the MediaServer + the chromium <video> both holding read handles — Windows can usually handle concurrent reads, but `-c copy` may need exclusive read access on certain Windows builds.
-    - Path quoting issue: path has a space ("Hussien Essam") and the error truncates at the space — possibly `child_process.spawn` is splitting args incorrectly on Windows despite `windowsVerbatimArguments`. Verify spawn signature uses `{ windowsVerbatimArguments: true }` + single arg array entry, NOT shell:true.
-    - MAX_PATH (>260 chars without long path support): userData path is `C:\Users\Hussien Essam\AppData\Roaming\colonoscopist\` (~60 chars) + procedureId (~36 chars) + filename. Likely ~120-150 chars total — under MAX_PATH. Probably not it.
-    - User permissions: the user account doesn't have read access to the mp4 in userData. Unlikely on a single-user workstation, but possible if the recording was started as a different user (UAC).
-    - Antivirus lock: AV is mid-scan of the mp4 when ffmpeg opens it. Possible but rare; usually AV scans release the lock quickly.
   severity: blocker
   test: 5
   artifacts: []
@@ -416,8 +394,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported: "we need to add the timeline in the trim line so i understand exactly the timmming i trim"
-  reason: |
-    User reported: "we need to add the timeline in the trim line so i understand exactly the timmming i trim". Current TrimControls only shows text labels ("In: 00:00:05 · Out: 00:00:25") and the Scrubber shows two drag handles with a red-shaded cut region between them. But there's no frame-level visual preview — the doctor has to read numeric timestamps + scrub to find what each end of the cut corresponds to in the actual procedure.
   severity: major
   test: 5
   artifacts: []
@@ -433,16 +409,7 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_by: 05-10-PLAN.md
   resolved_at: 2026-08-07
   reason: |
-    User reported: "delete btn show toast msg but dont remove them"
-  reason: |
     User reported: "delete btn show toast msg but dont remove them".
-  reason: |
-    User reported: "delete btn show toast msg but dont remove them". After Plan 05-07 shipped the gallery + delete discoverability + Toast-undo plumbing, the × button click DOES fire (toast appears), but the screenshot remains visible in the timeline. Candidate causes:
-    - The handleScreenshotDelete function in ProcedureRoom OR ProcedureReview fires the toast BEFORE the IPC call returns, and a silent IPC failure leaves the screenshot in the gallery state.
-    - The gallery state (in useScreenshotIntake hook) is append-only — there's no `remove(screenshotId)` action wired to the delete handler.
-    - The Toast-undo store's enqueueDelete callback fires a 5-second windowed deletion but the actual removal happens on the timeout; if the IPC fails, the screenshot stays in local state but the row is gone from DB → inconsistent UI.
-    - The IPC `screenshots.delete` may be failing silently — the IPC_NOT_FOUND or IPC_VALIDATION paths aren't surfaced.
-    - Test masking: the gallery tests in plan 05-07 used mock-resolved IPC; real IPC behavior (success/error paths, state mutation) not exercised end-to-end.
   severity: major
   test: 7
   artifacts: []
@@ -459,17 +426,7 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_by: 05-11-PLAN.md
   resolved_at: 2026-08-07
   reason: |
-    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot"
-  reason: |
-    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot"
-  reason: |
-    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot". Plan 05-07 shipped the lightbox component via shadcn Dialog (commit 9465012) + the URL composition `${mediaBaseUrl}/media/${patientId}/${procedureId}/${fileName}`. But the user reports the lightbox still shows the thumbnail, not the full-size. Candidate causes:
-    - The expand affordance never wires to onClick — user clicks the expand icon but nothing happens (state not propagating)
-    - The lightbox opens but renders the same thumbnail src (`<img src={httpUrl} />` where httpUrl points to a different file or the thumbnail-sized version)
-    - The lightbox URL composition is wrong — filePath includes the userData prefix (`data/media/patients/.../screenshots/<ts>.jpg`) and gets concatenated incorrectly to the media URL
-    - The screenshot.filePath stored is relative to userData but the MediaServer expects a URL path under `/media/<patientId>/<procedureId>/<fileName>` — the fileName extraction is broken
-    - The MediaServer serves the file but the lightbox CSS constraints force the <img> to a small width
-    - Test masking: tests in plan 05-07 used mock-resolved URL + mock ref; real URL composition not exercised
+    User reported: "still the images is not shown its only thumbnil not the real image that i took as screenshot".
   severity: major
   test: 7
   artifacts: []
@@ -488,13 +445,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
   resolved_at: 2026-08-07
   reason: |
     User reported with screenshot evidence: "still as you can see i cant see the pic itself its just dummy pic that have text frame ????".
-  reason: |
-    User reported with screenshot evidence: "still as you can see i cant see the pic itself its just dummy pic that have text frame ????". The 3 timeline thumbnails show "FRAME" placeholder text + a loading-spinner-style icon instead of the captured images. The screenshot metadata (timestamps 00:00:00, 00:00:00, 00:00:08; × buttons; annotation triggers) renders correctly — the DB rows exist with valid file_paths. But the `<img>` element fails to load. Plan 05-11 fixed the LIGHTBOX URL composition to include the `screenshots/` subdir segment, but the TIMELINE thumbnails (in `ScreenshotThumbnail.tsx`) use a DIFFERENT src composition that was not updated. Candidate causes:
-    - Timeline uses `useMediaUrl()` hook → returns the media base URL — but doesn't compose the `screenshots/` subdir into the path, OR
-    - Timeline uses a different hook / different src path that also drops the subdir, OR
-    - CORS issue from G-05-3 fix only applied to the LIGHTBOX but not the thumbnails (unlikely — the server-side MediaServer headers apply globally), OR
-    - The thumbnail `<img>` is correctly loading but the response is a wrong/broken MIME type, OR
-    - The `<img>` is loading from a different endpoint that doesn't have the CORS fix applied
   severity: blocker
   test: 3
   artifacts: []
@@ -503,5 +453,6 @@ coverage_automated: 22 of 22 phase deliverables auto-passed (484/484 unit tests 
     - Audit ALL renderer code that composes a JPEG URL — the MediaServer URL composition pattern is the bug; both the lightbox AND the thumbnails (and any other consumer like the PDF preview in Phase 6) need to include `screenshots/`
     - Add a contract-guard test that asserts the timeline thumbnail `<img>` src === `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}` (same as the lightbox fix in Plan 05-11)
     - Add a contract-guard test that asserts the thumbnail `<img>` src includes the `screenshots/` segment — closing the test-mask gap that let this slip through Plan 05-11 verification
+```
 
 > **Note:** Test 7 is blocked (cascade from Test 5). Once G-05-11 is fixed, re-run Tests 6 + 7.
