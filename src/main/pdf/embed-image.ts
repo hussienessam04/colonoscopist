@@ -11,8 +11,42 @@
 //   PNG:  89 50 4E 47 0D 0A 1A 0A
 //   JPEG: FF D8 FF (followed by an APP0/APP1/DQT marker in practice)
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { ipcError } from '@shared/errors';
+
+// ponytail: per-task layout shape consumed by the ReportPdf template.
+// `widthPx`/`heightPx` come from the LOGO_BOX/SIGNATURE_BOX fallbacks
+// (fixed pixel sizes per CONTEXT.md D-11) or zero for screenshots
+// (where @react-pdf/renderer scales via the <Image style.width='100%'>
+// prop and ignores intrinsic dims).
+export type ImageBox = {
+  buffer: Buffer;
+  widthPx: number;
+  heightPx: number;
+  relPath: string;
+};
+
+// CONTEXT.md D-11 — fixed pixel sizes for the header layout.
+export const LOGO_BOX = { widthPx: 120, heightPx: 60 } as const;
+export const SIGNATURE_BOX = { widthPx: 120, heightPx: 40 } as const;
+
+// ponytail: returns null when the path is missing/empty so the
+// ReportPdf template can render a "No logo uploaded" placeholder
+// instead of crashing on @react-pdf/renderer's <Image src={undefined}>.
+export function readImageBox(
+  absPath: string,
+  fallback: { widthPx: number; heightPx: number },
+): ImageBox | null {
+  if (!absPath) return null;
+  if (!existsSync(absPath)) return null;
+  const buffer = readImageAsBuffer(absPath);
+  return {
+    buffer,
+    widthPx: fallback.widthPx,
+    heightPx: fallback.heightPx,
+    relPath: absPath,
+  };
+}
 
 export const PNG_SIGNATURE = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
