@@ -54,3 +54,55 @@ export function videoFilePath(
 ): string {
   return path.join(procedureMediaDir(patientId, procedureId), videoRel);
 }
+
+// Phase 6 / Plan 01 — Doctor profile asset storage (PROF-01, D-04).
+// `<userData>/data/profiles/<userId>/signature.{png,jpg}` and
+// `.../logo.{png,jpg}` live under per-doctor subdirectories so backup
+// zip (Phase 7) captures the subtree naturally. The DB stores the
+// userData-relative path per Anti-Pattern 2; absolute resolution
+// happens at read time via `profileAssetPath`.
+export function profilesDir(): string {
+  const dir = path.join(dataDir(), 'profiles');
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function profileDir(userId: string): string {
+  const dir = path.join(profilesDir(), userId);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+// ponytail: resolve the stored relative path against the per-user
+// directory at read time. The DB column holds the relative filename
+// (e.g. `signature.png`); the helper joins userId + filename so the
+// absolute path stays machine-portable.
+export function profileAssetPath(userId: string, assetRel: string): string {
+  return path.join(profileDir(userId), assetRel);
+}
+
+// Phase 6 / Plan 01 — PDF report storage (RPT-05, D-09).
+// `<userData>/data/reports/<reportId>.pdf` per CONTEXT.md D-09.
+// `reportsDir()` pre-creates the directory; `reportPdfPath()` is a pure
+// join so callers can compose the path without a side effect.
+export function reportsDir(): string {
+  const dir = path.join(dataDir(), 'reports');
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+export function reportPdfPath(reportId: string): string {
+  return path.join(reportsDir(), `${reportId}.pdf`);
+}
+
+// Phase 6 / Plan 01 — Read-side helper for the PDF template. The
+// screenshots table stores userData-relative `file_path` (per
+// Anti-Pattern 2); the PDF template runs in main so it has direct FS
+// access and can resolve the absolute path here. Never used for writes.
+export function screenshotAbsPath(
+  _patientId: string,
+  _procedureId: string,
+  filePath: string,
+): string {
+  return path.join(app.getPath('userData'), filePath);
+}
