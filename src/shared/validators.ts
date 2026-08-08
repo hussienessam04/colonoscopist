@@ -234,6 +234,64 @@ export type ScreenshotsUpdateAnnotationInput = z.infer<typeof screenshotsUpdateA
 export type ProceduresTrimInput = z.infer<typeof proceduresTrimInput>;
 export type ProceduresRestoreInput = z.infer<typeof proceduresRestoreInput>;
 
+// Phase 6 / Plan 01 — Doctor profile + reports input validators (PROF-01,
+// RPT-01..05). userId / doctorId are NEVER accepted as input — main
+// derives them from requireSession() per Phase 2 BLOCKER 4.
+//
+// doctorProfileUpdateSchema:
+export const doctorProfileUpdateSchema = z
+  .object({
+    fullNameEn: z.string().min(1).max(120),
+    fullNameAr: z.string().max(120).nullable(),
+    clinicNameEn: z.string().min(1).max(160),
+    clinicNameAr: z.string().max(160).nullable(),
+    address: z.string().max(500).nullable(),
+    phone: z.string().max(40).nullable(),
+  })
+  .strict();
+
+// reportUpdateSchema: patch only the four free-text fields. Per D-07 these
+// are the only patchable columns post-finalize. Status, procedure_id,
+// doctor_id, finalized_at, created_at are immutable post-insert.
+export const reportUpdateSchema = z
+  .object({
+    findings: z.string().max(8000).optional(),
+    diagnosis: z.string().max(4000).optional(),
+    recommendations: z.string().max(4000).optional(),
+    procedureDetails: z.string().max(4000).optional(),
+  })
+  .strict();
+
+// profileUploadSchema: the renderer's FileReader → base64 → IPC payload.
+// Either jpegBase64 OR pngBase64 is accepted (not both, not neither) so
+// the IPC handler can pick the right disk extension. The magic-byte
+// sniff in embed-image.ts is the second gate — zod only narrows the
+// shape, the actual format detection is zero-dep at the read side.
+export const profileUploadSchema = z
+  .object({
+    jpegBase64: z.string().min(1).optional(),
+    pngBase64: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine((v) => Boolean(v.jpegBase64) !== Boolean(v.pngBase64), {
+    message: 'exactly one of jpegBase64 or pngBase64 is required',
+  });
+
+// reportIdSchema: shared id validator for finalize / openPdf / regenPdf /
+// updateDraft / updateFinalized / attachScreenshot / etc.
+export const reportIdSchema = z.object({ id: z.string().min(1) }).strict();
+
+// reportProcedureSchema: for getOrCreate — procedureId is the lookup key.
+export const reportProcedureSchema = z
+  .object({ procedureId: z.string().min(1) })
+  .strict();
+
+export type DoctorProfileUpdateInput = z.infer<typeof doctorProfileUpdateSchema>;
+export type ReportUpdateInput = z.infer<typeof reportUpdateSchema>;
+export type ProfileUploadInput = z.infer<typeof profileUploadSchema>;
+export type ReportIdInput = z.infer<typeof reportIdSchema>;
+export type ReportProcedureInput = z.infer<typeof reportProcedureSchema>;
+
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);
 }
