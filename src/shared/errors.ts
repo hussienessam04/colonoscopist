@@ -8,6 +8,10 @@ export type IpcError =
   | { code: 'IPC_VALIDATION'; message: string; field?: string }
   | { code: 'IPC_NOT_FOUND'; message: string }
   | { code: 'IPC_ENCRYPTION_UNAVAILABLE'; message: string }
+  // Phase 6 — used by the PDF embed helper when a non-PNG/JPEG file is
+  // detected at the read side (defense-in-depth alongside the IPC upload
+  // magic-byte sniff).
+  | { code: 'IPC_BAD_REQUEST'; message: string }
   // Plan 01 stub: handlers whose real implementation lands in Plan 03
   // throw this so the renderer contract surface doesn't need to shift.
   | { code: 'IPC_NOT_IMPLEMENTED'; message: string };
@@ -34,6 +38,8 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
     case 'IPC_NOT_FOUND':
       return { code, message };
     case 'IPC_ENCRYPTION_UNAVAILABLE':
+      return { code, message };
+    case 'IPC_BAD_REQUEST':
       return { code, message };
     case 'IPC_NOT_IMPLEMENTED':
       return { code, message };
