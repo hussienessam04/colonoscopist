@@ -205,7 +205,16 @@ export function registerReportsIpc(): void {
   ipcMain.handle(IPC.REPORTS_OPEN_PDF, async (_e, raw) => {
     try {
       const userId = requireSession();
-      const { id } = safeParse(reportIdSchema, raw, 'id');
+      // ponytail: accept an optional `reveal` flag — when true, the
+      // handler invokes `shell.showItemInFolder(abs)` to highlight the
+      // PDF in the OS file manager instead of opening it. The default
+      // (omit or false) preserves the prior "open in default viewer"
+      // behavior so existing renderer callers keep working.
+      const { id, reveal } = safeParse(
+        reportIdSchema.extend({ reveal: z.boolean().optional() }),
+        raw,
+        'id',
+      );
       const report = reportsRepo.getById(id);
       if (!report || !report.pdfPath) {
         throw new IpcErrorException(
@@ -218,22 +227,29 @@ export function registerReportsIpc(): void {
           ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
         );
       }
-      // ponytail: shell.openPath returns an empty string on success and
-      // a non-empty error string on failure. Anything non-empty is a
-      // hard error (no PDF viewer installed, etc.) — surface as
-      // IPC_INTERNAL so the renderer shows a retry affordance.
-      const openedError = await shell.openPath(abs);
-      if (openedError) {
-        throw new IpcErrorException(
-          ipcError('IPC_INTERNAL', openedError),
-        );
+      if (reveal === true) {
+        // ponytail: shell.showItemInFolder is synchronous and does not
+        // return a status — Electron guarantees it returns synchronously
+        // on all platforms. We audit regardless of visual confirmation.
+        shell.showItemInFolder(abs);
+      } else {
+        // ponytail: shell.openPath returns an empty string on success and
+        // a non-empty error string on failure. Anything non-empty is a
+        // hard error (no PDF viewer installed, etc.) — surface as
+        // IPC_INTERNAL so the renderer shows a retry affordance.
+        const openedError = await shell.openPath(abs);
+        if (openedError) {
+          throw new IpcErrorException(
+            ipcError('IPC_INTERNAL', openedError),
+          );
+        }
       }
       audit({
         action: 'report.pdf_opened',
         entityType: 'report',
         entityId: id,
         userId,
-        metadata: { pdfPath: report.pdfPath },
+        metadata: { pdfPath: report.pdfPath, reveal: reveal === true },
       });
       return { opened: true } as const;
     } catch (err) {

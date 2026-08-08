@@ -462,7 +462,11 @@ export interface IpcContract {
     }) => Promise<Report>;
     finalize: (input: { id: string }) => Promise<Report>;
     regenPdf: (input: { id: string }) => Promise<{ pdfPath: string }>;
-    openPdf: (input: { id: string }) => Promise<{ opened: true }>;
+    // ponytail: `reveal: true` invokes `shell.showItemInFolder(abs)` —
+    // highlights the PDF in the OS file manager instead of opening it.
+    // Default (omit / false) preserves the "open in default viewer"
+    // behavior so existing callers keep working.
+    openPdf: (input: { id: string; reveal?: boolean }) => Promise<{ opened: true }>;
     attachScreenshot: (input: { id: string; screenshotId: number; sortOrder: number }) => Promise<{ ok: true }>;
     detachScreenshot: (input: { id: string; screenshotId: number }) => Promise<{ ok: true }>;
     reorderScreenshots: (input: { id: string; orderedIds: number[] }) => Promise<{ ok: true }>;
