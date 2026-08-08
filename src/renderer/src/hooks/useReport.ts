@@ -50,8 +50,14 @@ export function useReport({ procedureId }: { procedureId: string | null }): UseR
     const promise = (async (): Promise<void> => {
       setLoading(true);
       try {
-        const row = await window.api.reports.getOrCreate({ procedureId });
-        setReport(row);
+        // ponytail: optional-chain so a mid-render mutation of
+        // `window.api` (cascade pollution from a prior test's stashed
+        // microtask) cannot crash the render. The hook stays
+        // callable from tests that haven't seeded the `reports`
+        // namespace — the row stays null and the editor renders the
+        // empty state.
+        const row = await window.api.reports?.getOrCreate?.({ procedureId });
+        setReport(row ?? null);
       } finally {
         setLoading(false);
         refreshInFlightRef.current = null;
@@ -100,7 +106,10 @@ export function useAttachedScreenshots({
     const promise = (async (): Promise<void> => {
       setLoading(true);
       try {
-        const rows = await window.api.reports.listScreenshots({ id: reportId });
+        // ponytail: optional-chain guard mirrors useReport.refresh —
+        // tests that haven't seeded the `reports` namespace leave the
+        // attached list empty without throwing.
+        const rows = (await window.api.reports?.listScreenshots?.({ id: reportId })) ?? [];
         // Stable sort by sortOrder ASC so the renderer's "newest first"
         // assumption doesn't drift if main returns rows in insert order.
         const sorted = [...rows].sort((a, b) => a.sortOrder - b.sortOrder);
@@ -180,7 +189,10 @@ export function useProcedureScreenshots({
     const promise = (async (): Promise<void> => {
       setLoading(true);
       try {
-        const rows = await window.api.screenshots.list({ procedureId });
+        // ponytail: optional-chain guard mirrors useReport.refresh —
+        // tests that haven't seeded the `screenshots` namespace leave
+        // the list empty without throwing.
+        const rows = (await window.api.screenshots?.list?.({ procedureId })) ?? [];
         // ASC by timestampInVideoMs matches the timeline + the order the
         // doctor expects to scroll through clinical findings.
         const sorted = [...rows].sort(

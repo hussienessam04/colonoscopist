@@ -14,7 +14,7 @@
 // renders a clean track.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -27,6 +27,7 @@ import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
 import { StatusBadge } from '@/components/StatusBadge';
 import { TrimControls } from '@/components/TrimControls';
 import { useProcedures } from '@/hooks/useProcedures';
+import { useReport } from '@/hooks/useReport';
 import { useRoute } from '@/store/route';
 import { useLastLost, recordingStore } from '@/store/recording';
 import { useScreenshotToasts, screenshotToastStore } from '@/store/screenshot-toast';
@@ -102,6 +103,7 @@ export default function ProcedureReview({
     removeScreenshot,
     updateAnnotation,
   } = useProcedures(procedureId);
+  const { report, refresh: refreshReport } = useReport({ procedureId });
   const lastLost = useLastLost();
   const mediaUrl = useMediaUrl();
 
@@ -257,6 +259,34 @@ export default function ProcedureReview({
   // `screenshots[]` opens the modal. The lightbox lives in a Dialog
   // portal so its DOM position is independent of the page layout.
   const [lightboxScreenshot, setLightboxScreenshot] = useState<Screenshot | null>(null);
+
+  // Phase 6 / Plan 02 — Generate report / Edit report CTA. Disabled
+  // while the procedure is still recording (no meaningful content).
+  // Click: ensure the draft exists via getOrCreate, then navigate to
+  // the report editor with the resolved id so the editor mounts
+  // without a second round-trip.
+  const handleOpenReport = useCallback(async (): Promise<void> => {
+    if (!procedureId || procedure === null) return;
+    if (procedure.status === 'recording') return;
+    try {
+      const row = report ?? (await window.api.reports.getOrCreate({ procedureId }));
+      if (report === null) await refreshReport();
+      navigate({ name: 'report-editor', procedureId, reportId: row.id });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to open report';
+      toast.error(msg);
+    }
+  }, [procedureId, procedure, report, refreshReport, navigate]);
+
+  // ponytail: the PDF path is userData-relative; show only the leaf
+  // filename so the doctor sees "1234.pdf" instead of the full path.
+  // Plan 06-03 replaces this affordance with "Open PDF" + "Reveal in
+  // Explorer"; for now a small line is enough to confirm the PDF
+  // exists.
+  const pdfLeafName = useMemo((): string | null => {
+    if (report?.pdfPath === null || report?.pdfPath === undefined) return null;
+    return report.pdfPath.replace(/^.*[\\/]/, '');
+  }, [report?.pdfPath]);
 
   // ponytail: subscribe to the toast store so its listeners stay wired
   // (mirrors Plan 01). The subscription is otherwise unused.
@@ -441,6 +471,35 @@ export default function ProcedureReview({
                 ) : (
                   <p className="text-muted-foreground">Loading…</p>
                 )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="procedure-review-report-cta">
+              <CardHeader>
+                <CardTitle>Report</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2 text-sm">
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => void handleOpenReport()}
+                  disabled={
+                    procedure === null ||
+                    procedure.status === 'recording'
+                  }
+                  data-testid="procedure-review-report-button"
+                >
+                  <FileText className="size-4 mr-1" aria-hidden="true" />
+                  {report === null ? 'Generate report' : 'Edit report'}
+                </Button>
+                {pdfLeafName !== null ? (
+                  <p
+                    className="text-xs text-muted-foreground"
+                    data-testid="procedure-review-pdf-path"
+                  >
+                    PDF: {pdfLeafName}
+                  </p>
+                ) : null}
               </CardContent>
             </Card>
 
