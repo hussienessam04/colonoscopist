@@ -13,7 +13,13 @@ export type Route =
   | { name: 'settings-capture' }
   | { name: 'procedure-preview'; patientId: string; procedureId?: string }
   | { name: 'procedure-room'; patientId: string; procedureId: string }
-  | { name: 'procedure-review'; procedureId: string };
+  | { name: 'procedure-review'; procedureId: string }
+  // Phase 6 / Plan 01 — Doctor profile editor (PROF-01) + report editor
+  // (RPT-01..05). `report-editor` carries the optional `reportId` so the
+  // renderer can navigate with the resolved id after `getOrCreate` —
+  // avoids a second round-trip on every report editor mount.
+  | { name: 'profile-edit' }
+  | { name: 'report-editor'; procedureId: string; reportId?: string };
 
 export const initialRoute: Route = { name: 'login' };
 

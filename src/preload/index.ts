@@ -91,6 +91,37 @@ const api: IpcContract = {
     updateAnnotation: (input) =>
       ipcRenderer.invoke(IPC.SCREENSHOTS_UPDATE_ANNOTATION, input),
   },
+  // Phase 6 / Plan 01 — Doctor profile IPC. `get` reads the row keyed by
+  // the active session; `update` writes the bilingual name/clinic/contact
+  // fields. The renderer's ProfileEditor page (Plan 06-02) will consume this.
+  profile: {
+    get: () => ipcRenderer.invoke(IPC.PROFILE_GET),
+    update: (input) => ipcRenderer.invoke(IPC.PROFILE_UPDATE, input),
+    uploadSignature: (input) =>
+      ipcRenderer.invoke(IPC.PROFILE_UPLOAD_SIGNATURE, input),
+    uploadLogo: (input) => ipcRenderer.invoke(IPC.PROFILE_UPLOAD_LOGO, input),
+  },
+  // Phase 6 / Plan 01 — Reports IPC. `getOrCreate` is the renderer's
+  // entry point for the report editor (1:1 reports-per-procedure per
+  // CONTEXT.md D-05). Plan 06-02 wires the renderer pages that consume this.
+  reports: {
+    getOrCreate: (input) => ipcRenderer.invoke(IPC.REPORTS_GET_OR_CREATE, input),
+    get: (input) => ipcRenderer.invoke(IPC.REPORTS_GET, input),
+    updateDraft: (input) => ipcRenderer.invoke(IPC.REPORTS_UPDATE_DRAFT, input),
+    updateFinalized: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_UPDATE_FINALIZED, input),
+    finalize: (input) => ipcRenderer.invoke(IPC.REPORTS_FINALIZE, input),
+    regenPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_REGEN_PDF, input),
+    openPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_OPEN_PDF, input),
+    attachScreenshot: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_ATTACH_SCREENSHOT, input),
+    detachScreenshot: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_DETACH_SCREENSHOT, input),
+    reorderScreenshots: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_REORDER_SCREENSHOTS, input),
+    listScreenshots: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_LIST_SCREENSHOTS, input),
+  },
 };
 
 try {

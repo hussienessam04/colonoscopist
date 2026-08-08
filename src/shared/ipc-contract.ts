@@ -70,6 +70,24 @@ export const IPC = {
   // Phase 5 / Plan 02 — pause markers from procedure_segments. Renderer
   // fetches the segments list so the Scrubber can render D-11 ticks.
   PROCEDURES_LIST_SEGMENTS: 'procedures:list-segments',
+  // Phase 6 / Plan 01 — Doctor profile + report editor + PDF generation.
+  // PROFILE_GET/UPDATE/UPLOAD_SIGNATURE/UPLOAD_LOGO per PROF-01;
+  // REPORTS_* per RPT-01..05 + RPT-07 (RPT-06 deferred to Phase 7 i18n).
+  PROFILE_GET: 'profile:get',
+  PROFILE_UPDATE: 'profile:update',
+  PROFILE_UPLOAD_SIGNATURE: 'profile:upload-signature',
+  PROFILE_UPLOAD_LOGO: 'profile:upload-logo',
+  REPORTS_GET_OR_CREATE: 'reports:get-or-create',
+  REPORTS_GET: 'reports:get',
+  REPORTS_UPDATE_DRAFT: 'reports:update-draft',
+  REPORTS_UPDATE_FINALIZED: 'reports:update-finalized',
+  REPORTS_FINALIZE: 'reports:finalize',
+  REPORTS_OPEN_PDF: 'reports:open-pdf',
+  REPORTS_REGEN_PDF: 'reports:regen-pdf',
+  REPORTS_ATTACH_SCREENSHOT: 'reports:attach-screenshot',
+  REPORTS_DETACH_SCREENSHOT: 'reports:detach-screenshot',
+  REPORTS_REORDER_SCREENSHOTS: 'reports:reorder-screenshots',
+  REPORTS_LIST_SCREENSHOTS: 'reports:list-screenshots',
 } as const;
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
@@ -221,6 +239,52 @@ export type Screenshot = {
   createdAt: number;
 };
 
+// Phase 6 / Plan 01 — Doctor profile (PROF-01). Per CONTEXT.md D-02 the
+// bilingual EN+AR fields are parallel nullable columns; AR columns are
+// NULL until Phase 7 lands the per-doctor language preference. The
+// signature + logo paths are userData-relative per Anti-Pattern 2.
+export type DoctorProfile = {
+  id: string;
+  userId: string;
+  fullNameEn: string;
+  fullNameAr: string | null;
+  clinicNameEn: string;
+  clinicNameAr: string | null;
+  address: string | null;
+  phone: string | null;
+  signaturePath: string | null;
+  logoPath: string | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Phase 6 / Plan 01 — Report (RPT-01..05). Per D-05 the procedure FK is
+// UNIQUE (1:1 reports-per-procedure); per D-06 finalized_at is frozen
+// after Finalize; per D-07 the four free-text fields are the only
+// patchable columns. pdfPath is userData-relative per Anti-Pattern 2.
+export type Report = {
+  id: string;
+  procedureId: string;
+  doctorId: string;
+  findings: string;
+  diagnosis: string;
+  recommendations: string;
+  procedureDetails: string;
+  status: 'draft' | 'finalized';
+  finalizedAt: number | null;
+  pdfPath: string | null;
+  pdfGeneratedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Phase 6 / Plan 01 — Join row from report_screenshots (RPT-03).
+export type ReportScreenshot = {
+  reportId: string;
+  screenshotId: number;
+  sortOrder: number;
+};
+
 // Discriminated union for the recording:status push event.
 // Plan 04-01 only emits `started` and `stopped`; paused/resumed are Plan 03,
 // lost is Plan 04. The shape is fixed now so the renderer's store is final.
@@ -355,6 +419,54 @@ export interface IpcContract {
     list: (input: { procedureId: string }) => Promise<Screenshot[]>;
     delete: (input: { id: number }) => Promise<{ ok: true }>;
     updateAnnotation: (input: { id: number; annotation: string | null }) => Promise<Screenshot>;
+  };
+  // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per Phase 2 BLOCKER 4
+  // + D-07, the renderer never sends a `userId` or `doctorId` field — main
+  // derives them from `requireSession()`. `uploadSignature` and
+  // `uploadLogo` accept EITHER `{ jpegBase64 }` OR `{ pngBase64 }`
+  // (validated at the IPC boundary via magic-byte sniff in Plan 02).
+  profile: {
+    get: () => Promise<DoctorProfile | null>;
+    update: (input: {
+      fullNameEn: string;
+      fullNameAr: string | null;
+      clinicNameEn: string;
+      clinicNameAr: string | null;
+      address: string | null;
+      phone: string | null;
+    }) => Promise<DoctorProfile>;
+    uploadSignature: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ signaturePath: string }>;
+    uploadLogo: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ logoPath: string }>;
+  };
+  // Phase 6 / Plan 01 — Reports (RPT-01..05 + RPT-07). Per D-05 +
+  // BLOCKER 4, no method accepts a `doctorId` field — main derives it from
+  // `requireSession()`. `regenPdf` writes a fresh PDF to
+  // `<userData>/data/reports/<reportId>.pdf`; `openPdf` shells out via
+  // electron.shell.openPath (RPT-07).
+  reports: {
+    getOrCreate: (input: { procedureId: string }) => Promise<Report>;
+    get: (input: { id: string }) => Promise<Report | null>;
+    updateDraft: (input: {
+      id: string;
+      findings?: string;
+      diagnosis?: string;
+      recommendations?: string;
+      procedureDetails?: string;
+    }) => Promise<Report>;
+    updateFinalized: (input: {
+      id: string;
+      findings?: string;
+      diagnosis?: string;
+      recommendations?: string;
+      procedureDetails?: string;
+    }) => Promise<Report>;
+    finalize: (input: { id: string }) => Promise<Report>;
+    regenPdf: (input: { id: string }) => Promise<{ pdfPath: string }>;
+    openPdf: (input: { id: string }) => Promise<{ opened: true }>;
+    attachScreenshot: (input: { id: string; screenshotId: number; sortOrder: number }) => Promise<{ ok: true }>;
+    detachScreenshot: (input: { id: string; screenshotId: number }) => Promise<{ ok: true }>;
+    reorderScreenshots: (input: { id: string; orderedIds: number[] }) => Promise<{ ok: true }>;
+    listScreenshots: (input: { id: string }) => Promise<ReportScreenshot[]>;
   };
 }
 
