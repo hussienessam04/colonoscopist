@@ -2,28 +2,28 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: Not started
+current_plan: 3
 status: paused
-stopped_at: Phase 06 Plan 06-01 complete (tracer)
+stopped_at: Phase 06 Plan 06-02 complete (renderer surfaces)
 paused_at: —
-last_updated: "2026-08-08T15:12:00.575Z"
+last_updated: "2026-08-08T19:10:00.000Z"
 last_activity: 2026-08-08
-last_activity_desc: Phase 06 Plan 06-01 complete (tracer)
+last_activity_desc: Phase 06 Plan 06-02 complete (renderer surfaces)
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
 ---
 
-**Current Plan:** 2
+**Current Plan:** 3
 **Total Plans in Phase:** 3
 **Last Activity:** 2026-08-08
-**Last Activity Description:** Phase 06 Plan 06-01 complete (tracer)
+**Last Activity Description:** Phase 06 Plan 06-02 complete (renderer surfaces)
 **Status:** Executing Phase 06
 **Paused At:** —
 
-**Progress:** [██████░░░░] 60%
+**Progress:** [████████░░░] 80%
 
 # State: Colonoscopist
 
@@ -36,7 +36,9 @@ progress:
 
 ## Current Focus
 
-**Phase 6 Plan 06-01 (Tracer): COMPLETE.** All 14 task commits land end-to-end: migration 0004 (doctor_profile + reports + report_screenshots + idempotent backfill), three repos following the Phase 2 cached-statement pattern, IPC contract extension (15 new channels + DoctorProfile/Report/ReportScreenshot types + profile + reports namespaces), preload bridge, Route union (`profile-edit` + `report-editor`), validators (5 zod schemas), profile + reports IPC handlers (every state-change audited), paths helpers (profilesDir / reportsDir / reportPdfPath / profileAssetPath / screenshotAbsPath), `@react-pdf/renderer ^4.5.1` install + thin Node bridge (`pdf/embed-image.ts` zero-dep magic-byte sniff + `pdf/report.tsx` hello-world tracer + `pdf/render-report-pdf.ts` orchestrator), and 23 new Wave-0 repo tests. **543/543 tests pass across 68 files** (up from 520/65). All 3 contract checks pass: ipc-contract / no-any / security-baseline. 4 deviations documented in 06-01-SUMMARY.md (wizard creates doctor_profile, tasks 9+13+14 bundled, tsconfig.node.json jsx support, IPC_AUTH_REQUIRED/INTERNAL/BAD_REQUEST error codes). Plan 06-02 (renderer pages: ProfileEditor + ReportEditor + auto-save + screenshot attach) and Plan 06-03 (full PDF clinical layout + finalize + Open PDF + smoke test) build on this foundation. Phase 6 PDF renders English-only per D-10 (RPT-06 bidi/RTL deferred to Phase 7 i18n).
+**Phase 6 Plan 06-02 (Renderer Surfaces): COMPLETE.** All 10 task commits land end-to-end: `lib/debounce.ts` closure primitive, `useAutoSave` hook (trigger-explicit debounced save state machine with optional override value to bypass closure-staleness race), `useDoctorProfile` + `useReport` + `useAttachedScreenshots` + `useProcedureScreenshots` SWR-style hooks, `ProfileEditor.tsx` (6 bilingual fields + signature/logo upload with client-side magic-byte PNG/JPEG sniff — defense in depth on top of the main-side sniff), `ReportEditor.tsx` (4 textareas + screenshot attach + Finalize + post-finalize "Finalized · last edited by <X>" badge + Open PDF + Re-render PDF buttons), `ScreenshotTimeline` extended with 3 optional props (attachedIds / onToggleAttach / onReorder with native HTML5 drag-and-drop), App.tsx wired `profile-edit` + `report-editor` route cases, SettingsSidebar gained the Profile nav entry + SettingsHub renders a clinic-name preview card, ProcedureReview gained the Generate/Edit report CTA + post-finalize PDF leaf. **559/559 tests pass across 72 files** (up from 543/68 — +16 tests + 4 new files). All 3 contract checks pass: ipc-contract / no-any / security-baseline. 4 deviations documented in 06-02-SUMMARY.md (useAutoSave cleanup-effect dep-array bug, useAutoSave trigger override value, optional-chain guards on window.api in new SWR hooks + ReportEditor, MockApi setup gains profile + reports namespaces). Plan 06-03 (full PDF clinical layout + finalize → regenPdf → Open PDF + Reveal in Explorer + EN smoke test) builds on this foundation. Phase 6 PDF renders English-only per D-10 (RPT-06 bidi/RTL deferred to Phase 7 i18n).
+
+**Phase 6 Plan 06-01 (Tracer): COMPLETE** (archived). Migration 0004 + 3 repos + IPC contract extension + preload + Route union + 5 zod validators + 15 IPC handlers (every state-change audited) + 6 paths helpers + `@react-pdf/renderer ^4.5.1` + thin Node bridge + 23 Wave-0 repo tests. All 3 contract checks pass. 4 deviations documented. Foundation for Plan 06-02 + 06-03.
 
 **Phase 5 — Screenshots + Procedure Review + Trim: COMPLETE.** All 4 plans + 7 gap-closure plans (05-05/06/07/08/09/10/11/12) executed; 520/520 tests pass across 65 files (no regressions from prior phases). 6/6 phase requirements (SCRN-01/02 + REV-01..04) shipped end-to-end:
 
