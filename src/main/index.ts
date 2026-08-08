@@ -8,6 +8,8 @@ import { registerCaptureIpc } from './ipc/capture';
 import { registerProceduresIpc } from './ipc/procedures';
 import { registerRecordingIpc } from './ipc/recording';
 import { registerScreenshotsIpc } from './ipc/screenshots';
+import { registerProfileIpc } from './ipc/profile';
+import { registerReportsIpc } from './ipc/reports';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -67,6 +69,13 @@ app.whenReady().then(() => {
   // inside registerProceduresIpc — see that file. Migration 0003 applies
   // on db open above.
   registerScreenshotsIpc();
+  // Phase 6 / Plan 01 — Doctor profile + reports IPC. Profile must
+  // register BEFORE reports (no functional dependency, but the wizard
+  // flow creates a `users` row then the first admin's profile row —
+  // profile handlers don't need anything reports handlers don't already
+  // have, but the canonical ordering keeps the surface coherent).
+  registerProfileIpc();
+  registerReportsIpc();
   // Phase 5 / Plan 03 — boot the long-lived MediaServer so the renderer's
   // <video> element can compose `/media/<patientId>/<procedureId>/<file>`
   // URLs against `recording.getMediaUrl()`. The server stays bound across
