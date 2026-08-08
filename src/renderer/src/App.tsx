@@ -15,6 +15,8 @@ import SettingsHub from './pages/SettingsHub';
 import ProcedureRoom from './pages/ProcedureRoom';
 import ProcedurePreview from './pages/ProcedurePreview';
 import ProcedureReview from './pages/ProcedureReview';
+import ProfileEditor from './pages/ProfileEditor';
+import ReportEditor from './pages/ReportEditor';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -83,6 +85,10 @@ export default function App(): JSX.Element {
       return <ProcedureRoom />;
     case 'procedure-review':
       return <ProcedureReview procedureId={route.procedureId} />;
+    case 'profile-edit':
+      return <ProfileEditor />;
+    case 'report-editor':
+      return <ReportEditor procedureId={route.procedureId} reportId={route.reportId} />;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit
