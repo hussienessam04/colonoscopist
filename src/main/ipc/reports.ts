@@ -1,0 +1,350 @@
+// Reports IPC handlers (RPT-01..05 + RPT-07).
+// Per CONTEXT.md D-05..D-08 + Phase 2 BLOCKER 4 (renderer never sends a
+// doctorId — main derives it from `requireSession()`).
+//
+// Audit surface (per CONTEXT.md §Audit surface):
+//   report.created (via getOrCreate first time only — currently emitted
+//                    from the repo's insert path; the handler emits the
+//                    post-insert audit row)
+//   report.updated
+//   report.admin_edited        (post-finalize edits — D-08)
+//   report.finalized
+//   report.pdf_generated        (emitted by renderReportPdf)
+//   report.pdf_opened
+//   report.screenshot_attached
+//   report.screenshot_detached
+//   report.screenshots_reordered
+//
+// D-09: PDF cached on disk at finalize; re-rendered on every edit. The
+// renderReportPdf orchestrator writes the pdf_path + pdf_generated_at
+// + emits report.pdf_generated (see pdf/render-report-pdf.ts).
+
+import { ipcMain, shell } from 'electron';
+
+import { z } from 'zod';
+import {
+  IPC,
+  type Report,
+  type ReportScreenshot,
+} from '@shared/ipc-contract';
+import { IpcErrorException, ipcError } from '@shared/errors';
+
+import { reportUpdateSchema, reportIdSchema, reportProcedureSchema } from '@shared/validators';
+import { reportsRepo } from '../db/reports-repo';
+import { reportScreenshotsRepo } from '../db/report-screenshots-repo';
+import { audit } from '../db/audit';
+import { session } from '../auth/session';
+import { renderReportPdf } from '../pdf/render-report-pdf';
+import { reportPdfPath } from '../paths';
+import { existsSync } from 'node:fs';
+
+function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
+  const issue = err.issues[0];
+  const field = (issue?.path[0] as string | undefined) ?? fallbackField;
+  return new IpcErrorException(
+    ipcError('IPC_VALIDATION', issue?.message ?? 'Invalid input', field ? { field } : {}),
+  );
+}
+
+function safeParse<T>(schema: z.ZodType<T>, raw: unknown, fallbackField?: string): T {
+  try {
+    return schema.parse(raw);
+  } catch (err) {
+    if (err instanceof z.ZodError) throw fromZodError(err, fallbackField);
+    throw err;
+  }
+}
+
+function requireSession(): string {
+  const id = session.currentUserId;
+  if (!id) {
+    throw new IpcErrorException(ipcError('IPC_AUTH_REQUIRED', 'Not authenticated'));
+  }
+  return id;
+}
+
+function asIpcError(err: unknown): Error {
+  if (err instanceof z.ZodError) return asIpcError(fromZodError(err));
+  if (err instanceof IpcErrorException) {
+    const wrapped = new Error(err.ipc.message) as Error & { ipcError?: unknown };
+    wrapped.ipcError = err.ipc;
+    return wrapped;
+  }
+  if (err instanceof Error) return err;
+  return new Error(String(err));
+}
+
+function fieldList(patch: Record<string, unknown>): string[] {
+  return Object.keys(patch).filter((k) => patch[k] !== undefined);
+}
+
+export function registerReportsIpc(): void {
+  ipcMain.handle(IPC.REPORTS_GET_OR_CREATE, (_e, raw) => {
+    try {
+      const doctorId = requireSession();
+      const { procedureId } = safeParse(reportProcedureSchema, raw, 'procedureId');
+
+      const existing = reportsRepo.getByProcedure(procedureId);
+      const report: Report = existing ?? reportsRepo.getOrCreate(procedureId, doctorId);
+
+      if (!existing) {
+        audit({
+          action: 'report.created',
+          entityType: 'report',
+          entityId: report.id,
+          userId: doctorId,
+          metadata: { procedureId, doctorId },
+        });
+      }
+      return report;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_GET, (_e, raw) => {
+    try {
+      requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      return reportsRepo.getById(id);
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_UPDATE_DRAFT, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id, findings, diagnosis, recommendations, procedureDetails } = safeParse(
+        reportUpdateSchema.extend({ id: z.string().min(1) }),
+        raw,
+        'id',
+      );
+      const updated = reportsRepo.updateDraft(id, {
+        findings,
+        diagnosis,
+        recommendations,
+        procedureDetails,
+      });
+      audit({
+        action: 'report.updated',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { fields: fieldList({ findings, diagnosis, recommendations, procedureDetails }) },
+      });
+      return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_UPDATE_FINALIZED, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id, findings, diagnosis, recommendations, procedureDetails } = safeParse(
+        reportUpdateSchema.extend({ id: z.string().min(1) }),
+        raw,
+        'id',
+      );
+      const updated = reportsRepo.updateFinalized(id, {
+        findings,
+        diagnosis,
+        recommendations,
+        procedureDetails,
+      });
+      audit({
+        action: 'report.admin_edited',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { fields: fieldList({ findings, diagnosis, recommendations, procedureDetails }) },
+      });
+      return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_FINALIZE, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const finalized = reportsRepo.finalize(id);
+      audit({
+        action: 'report.finalized',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { finalizedAt: finalized.finalizedAt },
+      });
+      return finalized;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_REGEN_PDF, async (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const result = await renderReportPdf(id);
+      audit({
+        action: 'report.pdf_regenerated',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { pdfPath: result.pdfPath },
+      });
+      return result;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_OPEN_PDF, async (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const report = reportsRepo.getById(id);
+      if (!report || !report.pdfPath) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf not generated yet'),
+        );
+      }
+      const abs = reportPdfPath(id);
+      if (!existsSync(abs)) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
+        );
+      }
+      // ponytail: shell.openPath returns an empty string on success and
+      // a non-empty error string on failure. Anything non-empty is a
+      // hard error (no PDF viewer installed, etc.) — surface as
+      // IPC_INTERNAL so the renderer shows a retry affordance.
+      const openedError = await shell.openPath(abs);
+      if (openedError) {
+        throw new IpcErrorException(
+          ipcError('IPC_INTERNAL', openedError),
+        );
+      }
+      audit({
+        action: 'report.pdf_opened',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { pdfPath: report.pdfPath },
+      });
+      return { opened: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_ATTACH_SCREENSHOT, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(
+        z
+          .object({
+            id: z.string().min(1),
+            screenshotId: z.number().int().positive(),
+            sortOrder: z.number().int().nonnegative(),
+          })
+          .strict(),
+        raw,
+        'id',
+      );
+      reportScreenshotsRepo.attach(input.id, input.screenshotId, input.sortOrder);
+      audit({
+        action: 'report.screenshot_attached',
+        entityType: 'report',
+        entityId: input.id,
+        userId,
+        metadata: { screenshotId: input.screenshotId, sortOrder: input.sortOrder },
+      });
+      return { ok: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_DETACH_SCREENSHOT, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(
+        z
+          .object({
+            id: z.string().min(1),
+            screenshotId: z.number().int().positive(),
+          })
+          .strict(),
+        raw,
+        'id',
+      );
+      reportScreenshotsRepo.detach(input.id, input.screenshotId);
+      audit({
+        action: 'report.screenshot_detached',
+        entityType: 'report',
+        entityId: input.id,
+        userId,
+        metadata: { screenshotId: input.screenshotId },
+      });
+      return { ok: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_REORDER_SCREENSHOTS, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(
+        z
+          .object({
+            id: z.string().min(1),
+            orderedIds: z.array(z.number().int().positive()),
+          })
+          .strict(),
+        raw,
+        'id',
+      );
+      reportScreenshotsRepo.reorder(input.id, input.orderedIds);
+      audit({
+        action: 'report.screenshots_reordered',
+        entityType: 'report',
+        entityId: input.id,
+        userId,
+        metadata: { count: input.orderedIds.length },
+      });
+      return { ok: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.REPORTS_LIST_SCREENSHOTS, (_e, raw) => {
+    try {
+      requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const rows = reportScreenshotsRepo.listByReport(id);
+      const result: ReportScreenshot[] = rows.map((r) => ({
+        reportId: r.report_id,
+        screenshotId: r.screenshot_id,
+        sortOrder: r.sort_order,
+      }));
+      return result;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+}
+
+// Re-export for the test suite; not part of the IPC surface.
+export const __test = {
+  safeParse,
+  fromZodError,
+  asIpcError,
+  requireSession,
+  fieldList,
+};

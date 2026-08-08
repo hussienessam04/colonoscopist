@@ -8,6 +8,12 @@ export type IpcError =
   | { code: 'IPC_VALIDATION'; message: string; field?: string }
   | { code: 'IPC_NOT_FOUND'; message: string }
   | { code: 'IPC_ENCRYPTION_UNAVAILABLE'; message: string }
+  // Phase 6 — used by IPC handlers when the session is missing for an
+  // authenticated-only handler (profile.* + reports.* in Plan 06-01).
+  | { code: 'IPC_AUTH_REQUIRED'; message: string }
+  // Phase 6 — used by REPORTS_OPEN_PDF when shell.openPath returns a
+  // non-empty error string (no PDF viewer installed, etc.).
+  | { code: 'IPC_INTERNAL'; message: string }
   // Phase 6 — used by the PDF embed helper when a non-PNG/JPEG file is
   // detected at the read side (defense-in-depth alongside the IPC upload
   // magic-byte sniff).
@@ -38,6 +44,10 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
     case 'IPC_NOT_FOUND':
       return { code, message };
     case 'IPC_ENCRYPTION_UNAVAILABLE':
+      return { code, message };
+    case 'IPC_AUTH_REQUIRED':
+      return { code, message };
+    case 'IPC_INTERNAL':
       return { code, message };
     case 'IPC_BAD_REQUEST':
       return { code, message };
