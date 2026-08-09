@@ -17,99 +17,26 @@
 // Per RESEARCH §Pattern 3: <Text render={({ pageNumber, totalPages }) =>
 // ...} fixed /> is the built-in @react-pdf/renderer pattern for the
 // page-number footer; survives multi-page render automatically.
+//
+// IMPORTANT (Phase 6 UAT fix): @react-pdf/renderer v4 is ESM-only.
+// Electron's main process is bundled to CJS by electron-vite. Static
+// `import` of @react-pdf/renderer compiles to `require()` which crashes
+// at runtime with ERR_REQUIRE_ESM. This module therefore does NOT
+// statically import @react-pdf/renderer — instead it exports a pure
+// factory function `createReportPdfElement(P, input)` that receives
+// the React-PDF primitives (Document, Page, Text, View, Image,
+// StyleSheet) as the first parameter. render-report-pdf.ts lazy-loads
+// @react-pdf/renderer via `await import()` and calls the factory with
+// the resolved module. The build emits a chunk that itself has no
+// static require() of @react-pdf/renderer, so the chunk can be loaded
+// from a CJS Electron main process without ERR_REQUIRE_ESM.
 
 import React from 'react';
-import {
-  Document,
-  Page,
-  Text,
-  View,
-  Image,
-  StyleSheet,
-} from '@react-pdf/renderer';
-
 import {
   LOGO_BOX,
   SIGNATURE_BOX,
   type ImageBox,
 } from './embed-image';
-
-const styles = StyleSheet.create({
-  page: {
-    padding: 36,
-    fontSize: 11,
-    fontFamily: 'Helvetica',
-    color: '#1f2937',
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 18,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#cbd5e1',
-  },
-  headerLeft: {
-    flexDirection: 'column',
-    width: 200,
-  },
-  headerRight: {
-    flexDirection: 'column',
-    width: 220,
-    // ponytail: alignItems is not in @react-pdf/renderer's CSS subset;
-    // manual right-alignment via textAlign on the children.
-  },
-  logoOrPlaceholder: {
-    fontSize: 9,
-    color: '#94a3b8',
-  },
-  section: {
-    marginTop: 14,
-    marginBottom: 14,
-  },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    marginBottom: 4,
-    color: '#0f172a',
-  },
-  body: {
-    lineHeight: 1.4,
-  },
-  // ponytail: patientBlock was flexWrap:'wrap' + gap:8 — both are
-  // outside @react-pdf/renderer's CSS subset. Use explicit
-  // textAlign:'right' on the row + per-field marginRight instead;
-  // a tighter, deterministic layout for clinical PDFs.
-  patientBlock: {
-    flexDirection: 'row',
-    marginTop: 6,
-  },
-  patientField: {
-    marginRight: 18,
-  },
-  screenshotPage: {
-    padding: 36,
-    fontSize: 11,
-  },
-  screenshotCaption: {
-    fontSize: 10,
-    color: '#475569',
-    marginTop: 8,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 18,
-    left: 36,
-    right: 36,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    fontSize: 9,
-    color: '#64748b',
-    borderTopWidth: 1,
-    borderTopColor: '#e2e8f0',
-    paddingTop: 6,
-  },
-});
 
 export type AttachedScreenshot = {
   screenshotId: number;
@@ -142,11 +69,123 @@ export type ReportPdfInput = {
   attachedScreenshots: AttachedScreenshot[];
 };
 
+// Minimal subset of @react-pdf/renderer primitives the template needs.
+// Both TypeScript and the build treat this as `any`-shaped because
+// @react-pdf/renderer's types are large; the factory function's
+// contract is enforced by the runtime module shape (Document, Page,
+// Text, View, Image, StyleSheet.create).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PdfPrimitives = any;
+
+// ponytail: StyleSheet.create() is a state factory function that
+// freezes styles at module evaluation time. With a no-static-import
+// design the primitives arrive AFTER module init, so the factory
+// takes primitives as a parameter and creates the stylesheet on the
+// first call. Memoised inside the closure so subsequent renders
+// don't re-freeze the same styles.
+let _memoisedStyles: ReturnType<PdfPrimitives['StyleSheet']['create']> | null = null;
+function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['create']> {
+  if (_memoisedStyles) return _memoisedStyles;
+  _memoisedStyles = P.StyleSheet.create({
+    page: {
+      padding: 36,
+      fontSize: 11,
+      fontFamily: 'Helvetica',
+      color: '#1f2937',
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 18,
+      paddingBottom: 6,
+      borderBottomWidth: 1,
+      borderBottomColor: '#cbd5e1',
+    },
+    headerLeft: {
+      flexDirection: 'column',
+      width: 200,
+    },
+    headerRight: {
+      flexDirection: 'column',
+      width: 220,
+      // ponytail: alignItems is not in @react-pdf/renderer's CSS subset;
+      // manual right-alignment via textAlign on the children.
+    },
+    logoOrPlaceholder: {
+      fontSize: 9,
+      color: '#94a3b8',
+    },
+    section: {
+      marginTop: 14,
+      marginBottom: 14,
+    },
+    sectionTitle: {
+      fontSize: 12,
+      fontWeight: 'bold',
+      marginBottom: 4,
+      color: '#0f172a',
+    },
+    body: {
+      lineHeight: 1.4,
+    },
+    // ponytail: patientBlock was flexWrap:'wrap' + gap:8 — both are
+    // outside @react-pdf/renderer's CSS subset. Use explicit
+    // textAlign:'right' on the row + per-field marginRight instead;
+    // a tighter, deterministic layout for clinical PDFs.
+    patientBlock: {
+      flexDirection: 'row',
+      marginTop: 6,
+    },
+    patientField: {
+      marginRight: 18,
+    },
+    screenshotPage: {
+      padding: 36,
+      fontSize: 11,
+    },
+    screenshotCaption: {
+      fontSize: 10,
+      color: '#475569',
+      marginTop: 8,
+    },
+    footer: {
+      position: 'absolute',
+      bottom: 18,
+      left: 36,
+      right: 36,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      fontSize: 9,
+      color: '#64748b',
+      borderTopWidth: 1,
+      borderTopColor: '#e2e8f0',
+      paddingTop: 6,
+    },
+  });
+  return _memoisedStyles;
+}
+
 function placeholderText(missing: 'logo' | 'signature'): string {
   return missing === 'logo' ? '[No logo uploaded]' : '[No signature on file]';
 }
 
-export function ReportPdf({ input }: { input: ReportPdfInput }): React.JSX.Element {
+/**
+ * Build the React element tree for the report PDF using the supplied
+ * @react-pdf/renderer primitives. The caller is responsible for
+ * passing in a fully-resolved module (Document, Page, Text, View,
+ * Image, StyleSheet) — typically loaded via
+ * `await import('@react-pdf/renderer')` in a CJS main process.
+ *
+ * Returning a React element (not JSX) lets the factory be plain
+ * `React.createElement` calls — the build emits static require()s for
+ * `react` only, and the @react-pdf/renderer primitives are passed by
+ * reference at call time.
+ */
+export function createReportPdfElement(
+  P: PdfPrimitives,
+  input: ReportPdfInput,
+): React.JSX.Element {
+  const styles = getStyles(P);
   const {
     logoBox,
     signatureBox,
@@ -164,92 +203,127 @@ export function ReportPdf({ input }: { input: ReportPdfInput }): React.JSX.Eleme
     attachedScreenshots,
   } = input;
 
-  return (
-    <Document>
-      <Page size="LETTER" style={styles.page}>
-        <View style={styles.header} fixed>
-          <View style={styles.headerLeft}>
-            {logoBox ? (
-              <Image
-                src={logoBox.buffer}
-                style={{ width: LOGO_BOX.widthPx, height: LOGO_BOX.heightPx }}
-              />
-            ) : (
-              <Text style={styles.logoOrPlaceholder}>{placeholderText('logo')}</Text>
-            )}
-            <Text style={{ fontSize: 14, fontWeight: 'bold' }}>{clinicName}</Text>
-          </View>
-          <View style={styles.headerRight}>
-            {signatureBox ? (
-              <Image
-                src={signatureBox.buffer}
-                style={{ width: SIGNATURE_BOX.widthPx, height: SIGNATURE_BOX.heightPx }}
-              />
-            ) : (
-              <Text style={styles.logoOrPlaceholder}>{placeholderText('signature')}</Text>
-            )}
-            <Text>{doctorName}</Text>
-            <Text>{procedureDateLabel}</Text>
-          </View>
-        </View>
+  return React.createElement(
+    P.Document,
+    null,
+    React.createElement(
+      P.Page,
+      { size: 'LETTER', style: styles.page },
+      // Header (logo + signature + names + date)
+      React.createElement(
+        P.View,
+        { style: styles.header, fixed: true },
+        React.createElement(
+          P.View,
+          { style: styles.headerLeft },
+          logoBox
+            ? React.createElement(P.Image, {
+                src: logoBox.buffer,
+                style: { width: LOGO_BOX.widthPx, height: LOGO_BOX.heightPx },
+              })
+            : React.createElement(
+                P.Text,
+                { style: styles.logoOrPlaceholder },
+                placeholderText('logo'),
+              ),
+          React.createElement(P.Text, { style: { fontSize: 14, fontWeight: 'bold' } }, clinicName),
+        ),
+        React.createElement(
+          P.View,
+          { style: styles.headerRight },
+          signatureBox
+            ? React.createElement(P.Image, {
+                src: signatureBox.buffer,
+                style: { width: SIGNATURE_BOX.widthPx, height: SIGNATURE_BOX.heightPx },
+              })
+            : React.createElement(
+                P.Text,
+                { style: styles.logoOrPlaceholder },
+                placeholderText('signature'),
+              ),
+          React.createElement(P.Text, null, doctorName),
+          React.createElement(P.Text, null, procedureDateLabel),
+        ),
+      ),
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Patient</Text>
-          <View style={styles.patientBlock}>
-            <Text style={styles.patientField}>Name: {patientName}</Text>
-            <Text style={styles.patientField}>MRN: {patientMrn ?? '—'}</Text>
-            <Text style={styles.patientField}>DOB: {patientDob}</Text>
-            <Text style={styles.patientField}>Gender: {patientGender ?? '—'}</Text>
-          </View>
-        </View>
+      // Patient block
+      React.createElement(
+        P.View,
+        { style: styles.section },
+        React.createElement(P.Text, { style: styles.sectionTitle }, 'Patient'),
+        React.createElement(
+          P.View,
+          { style: styles.patientBlock },
+          React.createElement(P.Text, { style: styles.patientField }, `Name: ${patientName}`),
+          React.createElement(P.Text, { style: styles.patientField }, `MRN: ${patientMrn ?? '—'}`),
+          React.createElement(P.Text, { style: styles.patientField }, `DOB: ${patientDob}`),
+          React.createElement(P.Text, { style: styles.patientField }, `Gender: ${patientGender ?? '—'}`),
+        ),
+      ),
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Procedure</Text>
-          <Text>Date: {procedureDateLabel}</Text>
-          <Text>Duration: {procedureDurationLabel}</Text>
-          <Text>Doctor: {doctorName}</Text>
-        </View>
+      // Procedure block
+      React.createElement(
+        P.View,
+        { style: styles.section },
+        React.createElement(P.Text, { style: styles.sectionTitle }, 'Procedure'),
+        React.createElement(P.Text, null, `Date: ${procedureDateLabel}`),
+        React.createElement(P.Text, null, `Duration: ${procedureDurationLabel}`),
+        React.createElement(P.Text, null, `Doctor: ${doctorName}`),
+      ),
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Findings</Text>
-          <Text style={styles.body}>{findings || '—'}</Text>
-        </View>
+      // Findings / Diagnosis / Recommendations
+      React.createElement(
+        P.View,
+        { style: styles.section },
+        React.createElement(P.Text, { style: styles.sectionTitle }, 'Findings'),
+        React.createElement(P.Text, { style: styles.body }, findings || '—'),
+      ),
+      React.createElement(
+        P.View,
+        { style: styles.section },
+        React.createElement(P.Text, { style: styles.sectionTitle }, 'Diagnosis'),
+        React.createElement(P.Text, { style: styles.body }, diagnosis || '—'),
+      ),
+      React.createElement(
+        P.View,
+        { style: styles.section },
+        React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendations'),
+        React.createElement(P.Text, { style: styles.body }, recommendations || '—'),
+      ),
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Diagnosis</Text>
-          <Text style={styles.body}>{diagnosis || '—'}</Text>
-        </View>
+      // Footer with page numbers
+      React.createElement(
+        P.View,
+        { style: styles.footer, fixed: true },
+        React.createElement(P.Text, null, clinicName),
+        React.createElement(P.Text, {
+          render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+            `Page ${pageNumber} of ${totalPages}`,
+        }),
+      ),
+    ),
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Recommendations</Text>
-          <Text style={styles.body}>{recommendations || '—'}</Text>
-        </View>
-
-        <View style={styles.footer} fixed>
-          <Text>{clinicName}</Text>
-          <Text
-            render={({ pageNumber, totalPages }) =>
-              `Page ${pageNumber} of ${totalPages}`
-            }
-          />
-        </View>
-      </Page>
-
-      {attachedScreenshots.map((s) => (
-        <Page key={s.screenshotId} size="LETTER" style={styles.screenshotPage}>
-          <Image src={s.imageBuffer} style={{ width: '100%', objectFit: 'contain' }} />
-          <Text style={styles.screenshotCaption}>Fig. {s.sortOrder + 1}</Text>
-          <View style={styles.footer} fixed>
-            <Text>{clinicName}</Text>
-            <Text
-              render={({ pageNumber, totalPages }) =>
-                `Page ${pageNumber} of ${totalPages}`
-              }
-            />
-          </View>
-        </Page>
-      ))}
-    </Document>
+    // Attached screenshots: one <Page> per screenshot with caption + footer
+    ...attachedScreenshots.map((s) =>
+      React.createElement(
+        P.Page,
+        { key: s.screenshotId, size: 'LETTER', style: styles.screenshotPage },
+        React.createElement(P.Image, {
+          src: s.imageBuffer,
+          style: { width: '100%', objectFit: 'contain' },
+        }),
+        React.createElement(P.Text, { style: styles.screenshotCaption }, `Fig. ${s.sortOrder + 1}`),
+        React.createElement(
+          P.View,
+          { style: styles.footer, fixed: true },
+          React.createElement(P.Text, null, clinicName),
+          React.createElement(P.Text, {
+            render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+              `Page ${pageNumber} of ${totalPages}`,
+          }),
+        ),
+      ),
+    ),
   );
 }
 
