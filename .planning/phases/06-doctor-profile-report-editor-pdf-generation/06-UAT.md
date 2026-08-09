@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 2
-name: ProfileEditor renders bilingual fields + auto-save on blur
+number: 3
+name: Signature upload accepts PNG + rejects non-image
 expected: |
-  Navigate to Settings → Profile. The page renders 6 labeled inputs: Full name (EN/AR), Clinic name (EN/AR), Address, Phone. Edit any field → blur (Tab or click outside) → "Saving…" indicator appears for ~300ms → "Saved at HH:MM:SS" replaces it. Reopen the page → the value persisted.
+  Click "Upload signature image" → file picker opens (accept="image/png,image/jpeg"). Pick a PNG → "Signature uploaded at HH:MM:SS" appears. Pick a JPEG → same. Pick a .txt or .pdf → toast "Only PNG or JPEG images are accepted" + no IPC fired. Same flow for "Upload logo".
 awaiting: user response
 
 ## Tests
@@ -24,7 +24,7 @@ result: pass
 ### 2. ProfileEditor renders bilingual fields + auto-save on blur
 expected: |
   Navigate to Settings → Profile. The page renders 6 labeled inputs: Full name (EN/AR), Clinic name (EN/AR), Address, Phone. Edit any field → blur (Tab or click outside) → "Saving…" indicator appears for ~300ms → "Saved at HH:MM:SS" replaces it. Reopen the page → the value persisted.
-result: pending
+result: pass
 
 ### 3. Signature upload accepts PNG + rejects non-image
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 1
+passed: 2
 issues: 0
-pending: 11
+pending: 10
 skipped: 0
 
 ## Gaps
