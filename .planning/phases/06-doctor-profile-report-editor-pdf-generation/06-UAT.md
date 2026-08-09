@@ -80,7 +80,7 @@ result: pending
 
 total: 12
 passed: 3
-issues: 0
+issues: 2 (new gaps — awaiting plan-phase round)
 pending: 9
 skipped: 0
 
@@ -100,5 +100,42 @@ skipped: 0
   status: resolved
   resolved_by: 90390e1
   resolved_at: 2026-08-09
+
+- gap_id: G-06-3
+  truth: |
+    ProfileEditor renders the uploaded signature image and clinic logo as visible previews (not just a status text "Uploaded at HH:MM:SS"). Re-rendering after navigation shows the persisted image.
+  status: failed
+  reason: |
+    User reported: After uploading signature/logo, only a text status ("Uploaded at HH:MM:SS") appears — the actual uploaded image is never rendered as a preview. The doctor has no visual confirmation that the right file was uploaded, and cannot quickly see what their signature looks like in the rendered PDF header.
+  severity: minor
+  test: 3
+  artifacts:
+    - src/renderer/src/pages/ProfileEditor.tsx (renders status text via `signatureAt` / `logoAt`; no `<img>` preview)
+    - src/main/ipc/profile.ts (returns only `{ signaturePath, logoPath }` — no data URL or Buffer for renderer preview)
+  missing:
+    - ProfileEditor `<img src={profile.signaturePath}>` + `<img src={profile.logoPath}>` (resolved via MediaServer `/media/<userId>/<file>` route OR a new `api.profile.getAssetDataUrl({ kind })` IPC that returns a base64 data URL)
+    - onUpload success refresh the profile so the preview is immediately visible
+- gap_id: G-06-4
+  truth: |
+    The report PDF renders with: header (logo + clinic name top-left, signature + doctor name top-right), patient block, procedure block (date + duration + doctor), Findings / Diagnosis / Recommendations body sections, attached screenshots (small inline thumbnails, ~120×100px, embedded in body — not separate full-page screenshots), footer (clinic name + doctor signature image + page number).
+  status: failed
+  reason: |
+    User reported: The current PDF renders as only one page with diagnoses and findings stacked, attached screenshots appear small (~120×100px) rather than as their own full pages, and the footer is text-only — needs the doctor's signature image instead of (or alongside) "Page X of Y".
+
+    Current implementation: Plan 06-03 Task 2 renders one full <Page size="LETTER"> with header/body/footer + one extra <Page> per attached screenshot (each at 100% page width with "Fig. N" caption). The user wants screenshots to be SMALLER inline thumbnails in the body (not separate full-page figures), and wants the footer to include the doctor's signature image. Additionally the current report shows only one page even when no screenshots are attached — this matches the layout but the user calls it "only one page" because the visual single page doesn't reflect the requested multi-page flow.
+
+    Reread of CONTEXT.md D-11: "Per attached screenshots: one screenshot per page with 'Fig. N' caption ordered by sort_order ASC". The plan was "one page per screenshot" but the user wants "small inline thumbnails in body" — that's a UX preference that supersedes the plan. The D-11 SPEC's "one page per screenshot" is one valid interpretation; the user's "inline thumbnails" is the other.
+  severity: major
+  test: 4 (deferred — only reachable after Test 8 PDF render)
+  artifacts:
+    - src/main/pdf/report.tsx (one full <Page> per screenshot; current layout)
+    - src/main/pdf/embed-image.ts (image helpers; unchanged)
+  missing:
+    - Change the report template to render attached screenshots as inline thumbnails in a grid/strip BELOW the body sections (each ~120×100px, with a small caption "Fig. N") instead of as separate full-page figures
+    - Add a signature image to the footer (left or right side) using `readImageBox(signatureBox.buffer, ...)` — the doctor's signature appears on every page
+    - Footer layout: clinic name (left) + signature image (center, small) + page number (right) — or keep clinic name + signature + "Page X of Y"
+    - Confirm screenshots grid does not overflow the page (limit to 3-4 per row to stay under the body)
+    - Update tests/main/pdf/render-report-pdf.test.ts + tests/integration/pdf-smoke.test.ts to reflect the new layout
+    - Re-run RUN_SMOKE=1 to validate the new PDF visually
 ```
 ```
