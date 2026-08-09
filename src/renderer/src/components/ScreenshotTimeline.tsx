@@ -22,15 +22,23 @@
 //     each thumbnail (top-LEFT, contrasting with the existing × on
 //     top-RIGHT and the expand affordance).
 //   - onReorder: (orderedIds: number[]) => void — when supplied AND
-//     more than one screenshot is attached, native HTML5 drag-and-drop
+//     more than one screenshot is attached, pointer-event drag-to-reorder
 //     is enabled on attached thumbnails. The drop event builds the new
 //     orderedIds array from DOM order after the drop and calls onReorder.
+//
+// Phase 6 UAT fix (gap G-06-5 — reorder not working): the original
+// implementation used native HTML5 drag-and-drop (dataTransfer + dragstart /
+// dragover / drop). The inner `<img draggable={false}>` blocks dragstart
+// in Chromium when the user mousedown-drags the image, so onReorder never
+// fires. Switched to pointer events with explicit `setPointerCapture` on
+// the source item so the drag survives mousedown-mousemove-mouseup even
+// when the cursor leaves the source thumbnail.
 //
 // ponytail: extend, don't replace. The previous Phase 5 props keep
 // working unchanged; the three new props are all optional with safe
 // defaults (empty Set, no-op callbacks).
 
-import { useState, type DragEvent } from 'react';
+import { useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScreenshotThumbnail } from '@/components/ScreenshotThumbnail';
 import { screenshotUrl } from '@/lib/screenshot-url';
@@ -101,58 +109,93 @@ export function ScreenshotTimeline({
   const attached = attachedIds ?? new Set<number>();
   const toggleAttach = onToggleAttach;
   const reorder = onReorder;
-  // ponytail: which screenshot is being dragged? Module state via
-  // useState so the drop target can read the source id from the dataTransfer
-  // payload and rebuild the new order. The native HTML5 DnD surface is
-  // small enough to keep inline.
+  // ponytail: which screenshot is being dragged? useRef so the
+  // pointermove handler (fires on every move, not just React commits)
+  // can read the latest value without re-binding the listener.
+  const draggingIdRef = useRef<number | null>(null);
+  // Also useState so the visual `opacity-50` re-renders on drag start/end.
   const [draggingId, setDraggingId] = useState<number | null>(null);
+  // ponytail: list of attached screenshot IDs in current display order.
+  // Re-derived from the screenshots prop on every render so React's
+  // diff picks up the new order when the parent refreshes the report
+  // after onReorder. The drag handler computes the next order from this
+  // list + the dropped target.
+  const attachedInOrder = screenshots
+    .map((s) => s.id)
+    .filter((id) => attached.has(id));
 
   // ponytail: enabled only when reorder callback is supplied AND there
-  // are at least 2 attached screenshots — DnD on a single item is a
+  // are at least 2 attached screenshots — drag on a single item is a
   // confusing affordance (no reorder is possible).
-  const reorderEnabled =
-    reorder !== undefined && [...attached].length > 1;
+  const reorderEnabled = reorder !== undefined && attachedInOrder.length > 1;
 
-  const handleDragStart = (screenshotId: number) =>
-    (e: DragEvent<HTMLDivElement>): void => {
+  // ponytail: pointer-event drag-to-reorder. Lifecycle:
+  //   pointerdown on an attached thumbnail → record source id,
+  //     setPointerCapture so subsequent move events keep flowing to the
+  //     source element even when the cursor leaves it.
+  //   pointermove (or pointerup) → if cursor is over a different
+  //     attached thumbnail, swap the source + target in the new order.
+  //   pointerup anywhere → release capture, clear state.
+  const handleDragPointerDown =
+    (screenshotId: number) =>
+    (e: ReactPointerEvent<HTMLDivElement>): void => {
       if (!reorderEnabled) return;
-      setDraggingId(screenshotId);
-      e.dataTransfer.effectAllowed = 'move';
-      // dataTransfer.setData is required by some browsers to actually
-      // fire the drop event; we use a no-op payload.
-      e.dataTransfer.setData('text/plain', String(screenshotId));
-    };
-  const handleDragOver = (e: DragEvent<HTMLDivElement>): void => {
-    if (!reorderEnabled || draggingId === null) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-  };
-  const handleDrop = (targetId: number) =>
-    (e: DragEvent<HTMLDivElement>): void => {
-      if (!reorderEnabled || draggingId === null || reorder === undefined) return;
+      // ponytail: only left-button drag counts; ignore right-click /
+      // middle-click so the context menu + middle-click scroll still work.
+      if (e.button !== 0) return;
+      // ponytail: prevent the underlying <ScreenshotThumbnail> onClick
+      // from firing on the same gesture (it seeks the <video>).
+      e.stopPropagation();
       e.preventDefault();
-      if (targetId === draggingId) {
-        setDraggingId(null);
-        return;
-      }
-      // Build the new orderedIds from DOM order of attached thumbnails
-      // after the swap. The DOM order is the source of truth for "what
-      // the doctor sees" — we walk the screenshots[] array (already
-      // sorted by timestampInVideoMs in useReport), filter to attached
-      // only, then move draggingId to the targetId position.
-      const base = screenshots
-        .map((s) => s.id)
-        .filter((id) => attached.has(id) && id !== draggingId);
-      const targetIdx = base.indexOf(targetId);
-      if (targetIdx < 0) {
-        setDraggingId(null);
-        return;
-      }
-      const next = [...base.slice(0, targetIdx), draggingId, ...base.slice(targetIdx)];
-      reorder(next);
-      setDraggingId(null);
+      draggingIdRef.current = screenshotId;
+      setDraggingId(screenshotId);
+      // ponytail: setPointerCapture keeps the move events flowing to
+      // this element even when the cursor leaves its bounds — same
+      // pattern as Scrubber.tsx's trim handles.
+      e.currentTarget.setPointerCapture(e.pointerId);
     };
-  const handleDragEnd = (): void => {
+
+  const handleDragPointerMove = (
+    e: ReactPointerEvent<HTMLDivElement>,
+  ): void => {
+    const sourceId = draggingIdRef.current;
+    if (sourceId === null || reorder === undefined) return;
+    // ponytail: query the element under the pointer. We can't use
+    // `e.target` because pointer-capture redirects all events to the
+    // source element. document.elementFromPoint(x, y) returns the
+    // topmost element at the cursor's client coords.
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    if (under === null) return;
+    const dropEl = under.closest<HTMLElement>('[data-screenshot-id]');
+    if (dropEl === null) return;
+    const targetId = Number(dropEl.dataset.screenshotId);
+    if (Number.isNaN(targetId) || targetId === sourceId) return;
+    if (!attached.has(targetId)) return;
+    // ponytail: only re-order once per (source, target) pair so a slow
+    // drag across a single target doesn't fire onReorder 30 times/sec.
+    if (dropEl.dataset.lastDroppedFrom === String(sourceId)) return;
+    dropEl.dataset.lastDroppedFrom = String(sourceId);
+    // Build the new order with sourceId inserted at targetId's position.
+    const base = attachedInOrder.filter((id) => id !== sourceId);
+    const targetIdx = base.indexOf(targetId);
+    if (targetIdx < 0) return;
+    const next = [...base.slice(0, targetIdx), sourceId, ...base.slice(targetIdx)];
+    reorder(next);
+  };
+
+  const handleDragPointerUp = (
+    e: ReactPointerEvent<HTMLDivElement>,
+  ): void => {
+    if (draggingIdRef.current === null) return;
+    // ponytail: releasePointerCapture throws if the pointer wasn't
+    // captured (e.g. up-event fired on a different element). Wrap in
+    // try/catch to match the Scrubber pattern.
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      // best-effort
+    }
+    draggingIdRef.current = null;
     setDraggingId(null);
   };
 
@@ -171,16 +214,17 @@ export function ScreenshotTimeline({
           <div
             key={s.id}
             // ponytail: when reorder is enabled AND the thumbnail is
-            // attached, wrap it in a draggable div. We don't make the
-            // ScreenshotThumbnail itself draggable — its onClick seeks
-            // the <video>, which conflicts with the DnD start.
-            draggable={isDraggable}
-            onDragStart={isDraggable ? handleDragStart(s.id) : undefined}
-            onDragOver={isDraggable ? handleDragOver : undefined}
-            onDrop={isDraggable ? handleDrop(s.id) : undefined}
-            onDragEnd={isDraggable ? handleDragEnd : undefined}
+            // attached, wrap it in a div with pointer-event drag handlers.
+            // We don't use HTML5 draggable because the inner <img
+            // draggable={false}> blocks dragstart on Chromium when the
+            // user mousedown-drags the image itself.
+            data-screenshot-id={s.id}
+            onPointerDown={isDraggable ? handleDragPointerDown(s.id) : undefined}
+            onPointerMove={isDraggable ? handleDragPointerMove : undefined}
+            onPointerUp={isDraggable ? handleDragPointerUp : undefined}
+            onPointerCancel={isDraggable ? handleDragPointerUp : undefined}
             className={`relative rounded ${
-              isAttached ? 'border-2 border-blue-500' : 'border-2 border-transparent'
+              isAttached ? 'border-2 border-blue-500 cursor-grab active:cursor-grabbing' : 'border-2 border-transparent'
             } ${isDragging ? 'opacity-50' : ''}`}
             data-testid={isAttached ? 'screenshot-attached' : undefined}
           >
