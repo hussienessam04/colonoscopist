@@ -39,7 +39,13 @@ result: pass
 ### 5. Screenshot attach toggle + blue border + drag-reorder
 expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
-result: pending
+result: issue
+reported: |
+  Drag-reorder is not working. Dragging an attached thumbnail does nothing — the order stays the same.
+  Root cause: HTML5 drag-and-drop (`draggable` + `onDragStart` + `onDragOver` + `onDrop`) was blocked by the inner `<img draggable={false}>`. In Chromium, the IMG suppresses dragstart when the user mousedown-drags the image, and the drag never bubbles to the wrapper div. `dataTransfer.setData('text/plain', ...)` never fires.
+  Fix (commit 3bef4bc): replaced with pointer events (`onPointerDown` / `onPointerMove` / `onPointerUp`) + `setPointerCapture` on the source item. Drop target identified via `document.elementFromPoint(x, y).closest('[data-screenshot-id]')`. Cursor is `cursor-grab` over attached thumbnails + `active:cursor-grabbing` during drag.
+severity: major
+status: fixed-via-3bef4bc
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
@@ -80,7 +86,7 @@ result: pending
 
 total: 12
 passed: 4
-issues: 2 (new gaps — awaiting plan-phase round)
+issues: 3 (G-06-3 image preview, G-06-4 PDF layout, G-06-5 reorder — all open for plan-phase round)
 pending: 8
 skipped: 0
 
@@ -120,7 +126,7 @@ skipped: 0
     The report PDF renders with: header (logo + clinic name top-left, signature + doctor name top-right), patient block, procedure block (date + duration + doctor), Findings / Diagnosis / Recommendations body sections, attached screenshots (small inline thumbnails, ~120×100px, embedded in body — not separate full-page screenshots), footer (clinic name + doctor signature image + page number).
   status: failed
   reason: |
-    User reported: The current PDF renders as only one page with diagnoses and findings stacked, attached screenshots appear small (~120×100px) rather than as their own full pages, and the footer is text-only — needs the doctor's signature image instead of (or alongside) "Page X of Y".
+    User reported: The current PDF renders as only one page with diagnoses and findings stacked, attached screenshots appear small (~120×100px) rather than as their own full-page figures, and the footer is text-only — needs the doctor's signature image instead of (or alongside) "Page X of Y".
 
     Current implementation: Plan 06-03 Task 2 renders one full <Page size="LETTER"> with header/body/footer + one extra <Page> per attached screenshot (each at 100% page width with "Fig. N" caption). The user wants screenshots to be SMALLER inline thumbnails in the body (not separate full-page figures), and wants the footer to include the doctor's signature image. Additionally the current report shows only one page even when no screenshots are attached — this matches the layout but the user calls it "only one page" because the visual single page doesn't reflect the requested multi-page flow.
 
@@ -137,5 +143,25 @@ skipped: 0
     - Confirm screenshots grid does not overflow the page (limit to 3-4 per row to stay under the body)
     - Update tests/main/pdf/render-report-pdf.test.ts + tests/integration/pdf-smoke.test.ts to reflect the new layout
     - Re-run RUN_SMOKE=1 to validate the new PDF visually
+
+- gap_id: G-06-5
+  truth: |
+    Dragging an attached screenshot thumbnail reorders the attached list. The new order persists across navigation (sort_order saved to DB).
+  status: failed
+  reason: |
+    User reported: Reorder is not working — attached screenshots stay in the same order after attempting a drag.
+    Root cause: HTML5 drag-and-drop (`draggable` + `onDragStart` + `onDragOver` + `onDrop`) was blocked by the inner `<img draggable={false}>` inside ScreenshotThumbnail. In Chromium, when the user mousedown-drags the image itself, the IMG suppresses dragstart (because `draggable={false}`), and the drag never bubbles to the wrapper div. `dataTransfer.setData('text/plain', ...)` never fires, so `onDragOver` / `onDrop` never receive a valid drop target, and `onReorder` is never called.
+    Fix (commit 3bef4bc): replaced HTML5 DnD with pointer events (`onPointerDown` / `onPointerMove` / `onPointerUp`) + `setPointerCapture(e.pointerId)` on the source item. Drop target identified via `document.elementFromPoint(e.clientX, e.clientY).closest('[data-screenshot-id]')` so the source element does not need to be a draggable. Added a `lastDroppedFrom` dataset guard so a slow drag across a single target does not fire `onReorder` 30 times per second. Cursor styling: `cursor-grab` over attached thumbnails, `active:cursor-grabbing` during drag.
+  severity: major
+  test: 5
+  artifacts:
+    - src/renderer/src/components/ScreenshotTimeline.tsx (now: pointer events + setPointerCapture; data-screenshot-id on each wrapper div)
+  missing: []
+  fixed_in: 3bef4bc
+  fixed_at: 2026-08-09
+  fix_verification:
+    - typecheck passes (0 errors)
+    - 579/579 unit tests pass (ScreenshotTimeline tests still green; no regression in ProcedureReview / ProcedureRoom callers since the new props are optional and the new handlers only fire when isDraggable is true)
+    - Visual: cursor is grab/grabbing during drag
 ```
 ```
