@@ -41,11 +41,9 @@ expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
 result: issue
 reported: |
-  Drag-reorder still does not work — the order stays the same. The pointer-event fix (commit 3bef4bc) made the wrapper correctly receive pointer events, but `elementFromPoint` + `closest('[data-screenshot-id]')` either returns null (cursor over the IMG or the button overlays), or the source-id is the same as target-id (no reorder fired), or the `lastDroppedFrom` guard prevents the second call from re-ordering.
-
-  User requested pause of UAT to address the previously-recorded gaps + this reorder issue + capture-button removal + Print button — then resume.
+  Reorder still doesn't work — the new ‹ / › buttons don't change the order. (Pointer-event fix was abandoned; replaced with Move buttons. But the parent (useReport) is not seeing the new order — `reorder` callback in the ReportEditor wires the update to `reportScreenshotsRepo.reorder` which writes to DB. The DOM re-render needs `screenshots` prop to reflect the new sort_order, which only happens after a refetch.)
 severity: major
-status: paused — block on G-06-3/4/5/6/7 fixes before resuming
+status: paused — additional gap G-06-8
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
@@ -86,7 +84,7 @@ result: pending
 
 total: 12
 passed: 4
-issues: 0 (5 gaps resolved via commit 8728ec5 — awaiting re-confirm of Tests 3, 5, 8)
+issues: 5 (G-06-8 reorder callback, G-06-9 auto-PDF on finalize, G-06-10 remove Recommendations + procedure details, G-06-11 print preview, G-06-12 editor UI matches PDF — all open for next round)
 pending: 8
 skipped: 0
 
@@ -137,5 +135,105 @@ skipped: 0
   status: resolved
   resolved_by: 8728ec5
   resolved_at: 2026-08-09
+
+- gap_id: G-06-8
+  truth: |
+    Clicking the ‹ / › buttons on an attached screenshot thumbnail swaps it with its left/right neighbour in the attached list. The new order persists across navigation (sort_order saved to DB).
+  status: failed
+  reason: |
+    User reported: Reorder still doesn't work — the new ‹ / › buttons don't change the order. (Previous attempts: HTML5 DnD (G-06-5 attempt 1) → blocked by inner `<img draggable={false}>`; pointer events with setPointerCapture (G-06-5 attempt 2) → blocked by ScreenshotThumbnail's nested onClick + overlay buttons absorbing pointer events; Move buttons (G-06-5 attempt 3, commit 8728ec5) → still not working.)
+
+    The Move buttons DO call `handleMoveLeft` / `handleMoveRight` which mutate `next` and call `reorder(next)`. The reorder callback in ReportEditor is `reorder = (orderedIds: number[]) => { ... }` which calls `reportScreenshotsRepo.reorder(report.id, orderedIds)`. The DB write succeeds, but the UI's `screenshots` prop on the next render still has the OLD `sort_order` because `useProcedureScreenshots` is not refetched after the reorder. The parent component needs to refetch the procedure's screenshot list after the reorder IPC returns.
+  severity: major
+  test: 5
+  artifacts:
+    - src/renderer/src/hooks/useReport.ts (the `reorder` async helper)
+    - src/renderer/src/pages/ReportEditor.tsx (the inline `reorder` callback passed to ScreenshotTimeline)
+  missing:
+    - after the reorder IPC resolves, refetch the procedure's screenshots via `useProcedureScreenshots.refresh()` so the DOM re-renders with the new order
+    - or have the reorder IPC return the updated list of report_screenshots rows so the parent can update state without a refetch round-trip
+    - alternatively, move the order computation into the parent's `useReport` hook so the screenshots array already reflects the persisted order
+
+- gap_id: G-06-9
+  truth: |
+    Clicking the "Finalize" button auto-triggers a PDF render. The doctor's workflow is: edit fields → click Finalize → PDF is ready immediately, no extra "Re-render PDF" click needed. The "Re-render PDF" button can still exist for post-finalize edits (already implemented) but is not the primary path.
+  status: failed
+  reason: |
+    User reported: "remove Recommendations and procedure details after finalize report generate the pdf automaticlly" — i.e. when the user clicks Finalize, the PDF should auto-generate without an extra button click.
+
+    Current implementation: Finalize calls `api.reports.finalize({ id: report.id })` and refreshes the report row. The PDF render is a separate `api.reports.regenPdf({ id })` call. The doctor has to click "Re-render PDF" to actually produce the file.
+
+    Fix: after `api.reports.finalize` resolves, automatically call `api.reports.regenPdf` (and refresh the report so the new pdfPath populates). Sequential — finalize first (so the report row has status='finalized' + finalized_at), then regenPdf (so the PDF is for a finalized report).
+  severity: minor
+  test: 6
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (the `handleFinalize` callback; currently calls only finalize, not regenPdf)
+  missing:
+    - `handleFinalize` should `await api.reports.finalize(...)` then `await api.reports.regenPdf(...)` then `useReport.refresh()` so the buttons (Open PDF, Reveal, Print) immediately show the generated PDF
+    - consider a single IPC `api.reports.finalizeAndRenderPdf({ id })` that does both atomically in main (one transaction-style wrapper) so the renderer doesn't need to coordinate two round-trips; cleaner contract
+
+- gap_id: G-06-10
+  truth: |
+    The ReportEditor UI does NOT render "Recommendations" and "procedure details" fields. The final PDF report contains only the doctor-relevant fields: Findings, Diagnosis, and (optionally) attached screenshots. Recommendations + procedure_details are not part of the v1 report.
+  status: failed
+  reason: |
+    User reported: "remove Recommendations and procedure details after finalize" — interpreted as "remove these two fields from the editor + PDF". Recommendations is a clinical recommendation that the doctor would write AFTER diagnosis, and procedure_details duplicates information already on the procedure row (procedure type, equipment used, etc.). The user wants the editor + PDF to be lean — only Findings + Diagnosis as the body, plus attached screenshots.
+
+    Current implementation: ReportEditor has 4 textareas (findings, diagnosis, recommendations, procedureDetails); all 4 are written to the `reports` row. The PDF renders all 4 as body sections.
+
+    Fix: drop the recommendations + procedureDetails state from the editor UI; keep the columns in the `reports` table for backward compat + future re-introduction but stop persisting new values; remove the two textareas from the editor; remove the two body sections from the PDF template.
+  severity: minor
+  test: 4 (deferred — edit flow)
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (4 textareas)
+    - src/main/pdf/report.tsx (Recommendations + procedureDetails sections)
+  missing:
+    - remove the recommendations + procedureDetails textareas from the editor
+    - remove the Recommendations + procedureDetails body sections from the PDF template
+    - update the IPC contract + validators to mark these fields as optional/deprecated (or drop them entirely)
+    - the DB columns stay for now (no migration needed — they're nullable TEXT); just stop surfacing them in the editor/PDF
+
+- gap_id: G-06-11
+  truth: |
+    Clicking the "Print" button shows a print preview of the actual generated PDF report. The user sees the PDF rendered inline (so they can verify it looks right) and then confirms the print via the OS print dialog.
+  status: failed
+  reason: |
+    User reported: "in print there is no preview" — the current `window.print()` calls the OS print dialog immediately with the on-screen DOM as the print target. There's no PDF preview because the OS dialog is too far from the user's mental model ("print the report I just generated").
+
+    Current implementation: `handlePrint` calls `window.print()`. The OS print dialog shows whatever DOM is currently on screen (the ReportEditor with textareas, the Print button, etc.) — not the actual generated PDF.
+
+    Fix options:
+      A. Open the generated PDF in a hidden `<iframe>` via the MediaServer's `/media/<reportId>/<file>.pdf` route (or a new `/reports/<reportId>.pdf` route), then call `iframe.contentWindow.print()`. The OS print dialog shows the actual PDF.
+      B. Use Electron's `webContents.print({ silent: false })` with the PDF as the print target. The OS print dialog has the PDF as the source.
+      C. Simplest: open the PDF in the OS viewer (via `api.reports.openPdf`); the user prints from there. Already exists as the "Open PDF" button.
+  severity: minor
+  test: 8 (after PDF renders)
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (the `handlePrint` callback)
+  missing:
+    - implement option A: an `<iframe>` mounted in the report editor (hidden) that loads the generated PDF via a `blob:` URL, then call `iframe.contentWindow.print()` on Print click. The OS print dialog shows the PDF as the source.
+    - or implement option B: shell.openPath opens the PDF; user prints from the OS viewer. Already implemented as "Open PDF" button. The Print button can redirect to Open PDF if no iframe is feasible.
+    - or: simplest = "Print" → "Open PDF" + on-print confirm. Combine the two buttons into one.
+    - recommendation: option A (iframe + blob URL + contentWindow.print()) is the cleanest "print the PDF" affordance — the user sees the PDF in the print dialog preview, not the on-screen DOM.
+
+- gap_id: G-06-12
+  truth: |
+    The ReportEditor UI matches the rendered PDF layout: header (logo + clinic name + signature + doctor name + procedure date), patient block, procedure block (date + duration + doctor), Findings / Diagnosis sections, attached screenshots thumbnail grid, footer (signature image + doctor name + clinic name + page number). The doctor sees a faithful preview of the PDF as they edit.
+  status: failed
+  reason: |
+    User reported: "make the pdf editor ui match the report" — the editor is a form with labels + textareas, not a clinical-report layout. The doctor has to imagine what the final PDF will look like. The user wants the editor to render the report in the same shape as the PDF (header + body sections + footer + screenshot grid) so the editing experience matches the artifact.
+
+    Current implementation: ReportEditor renders labeled `<Textarea>`s in `<Card>`s, side-by-side with the ScreenshotTimeline. The PDF renders header + patient/procedure blocks + 3 body sections + screenshot thumbnails + footer. They look completely different.
+
+    Fix: redesign the ReportEditor to render the report inline (header + patient/procedure blocks + Findings textarea + Diagnosis textarea + screenshot grid + footer). Each editable field is rendered as a contentEditable area or a positioned `<textarea>` over the rendered layout. The doctor sees the final shape as they type.
+  severity: major
+  test: 4 (deferred — edit flow)
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (current form-based layout; needs to become a render-matches-PDF layout)
+  missing:
+    - rewrite the ReportEditor JSX to render the same visual shape as the PDF (header + patient/procedure blocks + Findings + Diagnosis + screenshots + footer)
+    - editable textareas positioned over the rendered content, or inline contentEditable spans that commit on blur
+    - or: a "Preview" tab/mode that shows the rendered PDF in a sandboxed iframe, and an "Edit" tab with the form. Toggle via tabs/button.
+    - or: the simplest = a side-by-side editor + preview, where the preview is the rendered PDF via MediaServer `/media/<reportId>/<file>.pdf` loaded in an iframe. Edits on the left update the preview on the right.
 ```
 ```
