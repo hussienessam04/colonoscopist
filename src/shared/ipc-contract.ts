@@ -77,6 +77,7 @@ export const IPC = {
   PROFILE_UPDATE: 'profile:update',
   PROFILE_UPLOAD_SIGNATURE: 'profile:upload-signature',
   PROFILE_UPLOAD_LOGO: 'profile:upload-logo',
+  PROFILE_GET_ASSET_DATA_URL: 'profile:get-asset-data-url',
   REPORTS_GET_OR_CREATE: 'reports:get-or-create',
   REPORTS_GET: 'reports:get',
   REPORTS_UPDATE_DRAFT: 'reports:update-draft',
@@ -435,8 +436,13 @@ export interface IpcContract {
       address: string | null;
       phone: string | null;
     }) => Promise<DoctorProfile>;
-    uploadSignature: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ signaturePath: string }>;
-    uploadLogo: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ logoPath: string }>;
+        uploadSignature: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ signaturePath: string }>;
+        uploadLogo: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ logoPath: string }>;
+        // Phase 6 UAT G-06-3 — image preview. Returns a data URL the
+        // renderer can drop straight into <img src=...> for the
+        // signature + logo previews. Returns { dataUrl: null } if the
+        // asset is unset or the file is missing.
+        getAssetDataUrl: (input: { kind: 'signature' | 'logo' }) => Promise<{ dataUrl: string | null }>;
   };
   // Phase 6 / Plan 01 — Reports (RPT-01..05 + RPT-07). Per D-05 +
   // BLOCKER 4, no method accepts a `doctorId` field — main derives it from

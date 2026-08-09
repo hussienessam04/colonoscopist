@@ -139,14 +139,29 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     patientField: {
       marginRight: 18,
     },
-    screenshotPage: {
-      padding: 36,
-      fontSize: 11,
+    // Phase 6 UAT G-06-4 — attached screenshots render as INLINE
+    // thumbnails BELOW the body sections (not separate full-page
+    // figures). Each thumbnail is ~120×100px to keep the visual
+    // footprint small + a grid of 3 columns.
+    screenshotsSection: {
+      marginTop: 14,
+      marginBottom: 14,
+    },
+    screenshotGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginTop: 6,
+    },
+    screenshotThumb: {
+      width: 120,
+      height: 100,
+      marginRight: 8,
+      marginBottom: 8,
     },
     screenshotCaption: {
-      fontSize: 10,
+      fontSize: 9,
       color: '#475569',
-      marginTop: 8,
+      marginTop: 2,
     },
     footer: {
       position: 'absolute',
@@ -155,11 +170,17 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       right: 36,
       flexDirection: 'row',
       justifyContent: 'space-between',
+      alignItems: 'center',
       fontSize: 9,
       color: '#64748b',
       borderTopWidth: 1,
       borderTopColor: '#e2e8f0',
       paddingTop: 6,
+    },
+    footerSignature: {
+      width: 60,
+      height: 20,
+      marginRight: 6,
     },
   });
   return _memoisedStyles;
@@ -291,36 +312,69 @@ export function createReportPdfElement(
         React.createElement(P.Text, { style: styles.body }, recommendations || '—'),
       ),
 
-      // Footer with page numbers
+      // Phase 6 UAT G-06-4 — attached screenshots render as small
+      // INLINE thumbnails in a grid BELOW the body sections (not
+      // separate full-page figures). 3 per row, ~120×100px each, with
+      // a "Fig. N" caption under each. The grid is positioned on the
+      // first page (with the body); if the grid overflows, @react-pdf
+      // paginates the rest onto the next page automatically.
+      attachedScreenshots.length > 0
+        ? React.createElement(
+            P.View,
+            { style: styles.screenshotsSection, wrap: false },
+            React.createElement(P.Text, { style: styles.sectionTitle }, 'Attached screenshots'),
+            React.createElement(
+              P.View,
+              { style: styles.screenshotGrid },
+              ...attachedScreenshots.map((s) =>
+                React.createElement(
+                  P.View,
+                  { key: s.screenshotId, style: { marginRight: 8, marginBottom: 8 } },
+                  React.createElement(P.Image, {
+                    src: s.imageBuffer,
+                    style: styles.screenshotThumb,
+                  }),
+                  React.createElement(
+                    P.Text,
+                    { style: styles.screenshotCaption },
+                    `Fig. ${s.sortOrder + 1}`,
+                  ),
+                ),
+              ),
+            ),
+          )
+        : null,
+
+      // Footer with page numbers — now includes the doctor's
+      // signature image (per G-06-4 user request). Layout: signature
+      // image (left) + doctor name (next to sig) + spacer + clinic
+      // name + page number (right).
       React.createElement(
         P.View,
         { style: styles.footer, fixed: true },
-        React.createElement(P.Text, null, clinicName),
-        React.createElement(P.Text, {
-          render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-            `Page ${pageNumber} of ${totalPages}`,
-        }),
-      ),
-    ),
-
-    // Attached screenshots: one <Page> per screenshot with caption + footer
-    ...attachedScreenshots.map((s) =>
-      React.createElement(
-        P.Page,
-        { key: s.screenshotId, size: 'LETTER', style: styles.screenshotPage },
-        React.createElement(P.Image, {
-          src: s.imageBuffer,
-          style: { width: '100%', objectFit: 'contain' },
-        }),
-        React.createElement(P.Text, { style: styles.screenshotCaption }, `Fig. ${s.sortOrder + 1}`),
         React.createElement(
           P.View,
-          { style: styles.footer, fixed: true },
+          { style: { flexDirection: 'row', alignItems: 'center' } },
+          signatureBox !== null
+            ? React.createElement(P.Image, {
+                src: signatureBox.buffer,
+                style: styles.footerSignature,
+              })
+            : null,
+          React.createElement(P.Text, null, doctorName),
+        ),
+        React.createElement(
+          P.View,
+          { style: { flexDirection: 'row', alignItems: 'center' } },
           React.createElement(P.Text, null, clinicName),
-          React.createElement(P.Text, {
-            render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-              `Page ${pageNumber} of ${totalPages}`,
-          }),
+          React.createElement(
+            P.Text,
+            {
+              style: { marginLeft: 8 },
+              render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
+                `Page ${pageNumber} of ${totalPages}`,
+            },
+          ),
         ),
       ),
     ),

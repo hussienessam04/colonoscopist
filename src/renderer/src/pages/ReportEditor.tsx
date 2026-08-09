@@ -18,7 +18,7 @@
 // CONTEXT.md D-07 (any signed-in doctor can edit).
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, FileText, FolderOpen } from 'lucide-react';
+import { ArrowLeft, FileText, FolderOpen, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -180,6 +180,18 @@ export default function ReportEditor({
     }
   }, [report]);
 
+  // Phase 6 UAT G-06-7 — Print button. `window.print()` opens the OS
+  // print dialog (which includes a "Save as PDF" destination in
+  // Chromium). The user can pick a printer, "Save as PDF", or any
+  // installed virtual printer. The dialog prints whatever is in the
+  // renderer's DOM — for a clinical-report workflow this is the
+  // "print the on-screen report preview" affordance. For "print the
+  // generated PDF", the user uses the existing Open PDF button (which
+  // opens the file in the OS PDF viewer, which has its own print).
+  const handlePrint = useCallback((): void => {
+    window.print();
+  }, []);
+
   const handleToggleAttach = useCallback(
     (screenshotId: number): void => {
       const isAttached = attached.some((a) => a.screenshotId === screenshotId);
@@ -263,6 +275,15 @@ export default function ReportEditor({
           <div className="flex items-center gap-2">
             {isFinalized ? (
               <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void handlePrint()}
+                  data-testid="report-editor-print"
+                >
+                  <Printer className="size-4 mr-1" aria-hidden="true" />
+                  Print
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -375,9 +396,14 @@ export default function ReportEditor({
                   onSeek={() => {
                     /* no-op in editor — seeking the video is owned by ProcedureReview */
                   }}
-                  onCapture={() => {
-                    /* disabled: capture is a ProcedureReview action */
-                  }}
+                  // ponytail (Phase 6 UAT G-06-6): `onCapture` is intentionally
+                  // OMITTED in the report-editor context. The +Capture
+                  // button is a ProcedureRoom/ProcedureReview affordance
+                  // (the doctor captures a frame while recording). In the
+                  // report editor, capture is meaningless — the procedure
+                  // is already finalized, and the doctor attaches existing
+                  // screenshots. ScreenshotTimeline renders the +Capture
+                  // button only when this prop is defined.
                   attachedIds={new Set(attached.map((a) => a.screenshotId))}
                   onToggleAttach={handleToggleAttach}
                   onReorder={reorder}

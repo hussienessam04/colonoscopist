@@ -12,7 +12,7 @@
 // IPC_BAD_REQUEST before the file lands on disk.
 
 import { ipcMain, app } from 'electron';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 import { z } from 'zod';
@@ -23,7 +23,7 @@ import { doctorProfileUpdateSchema, profileUploadSchema } from '@shared/validato
 import { doctorProfileRepo } from '../db/doctor-profile-repo';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
-import { profileAssetPath, profileDir } from '../paths';
+import { profileAssetPath, profileDir, dataDir } from '../paths';
 import { detectImageFormat, extensionForFormat } from '../pdf/embed-image';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
@@ -172,6 +172,49 @@ export function registerProfileIpc(): void {
         metadata: { logoPath: relPath },
       });
       return { logoPath: relPath };
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  // Phase 6 UAT G-06-3 — image preview. ProfileEditor needs to render
+  // the actual uploaded signature + logo as `<img>` previews. The
+  // signature/logo_path columns store userData-relative paths; the
+  // MediaServer only handles `/media/<patientId>/...` for screenshots,
+  // not profile assets. Cheapest path: a new IPC that returns the
+  // bytes as a base64 data URL. The renderer can drop this straight
+  // into `<img src=...>`. Limited to ~2MB per asset (matches the
+  // MediaServer's screenshot cap) — adequate for a 1-2MB signature
+  // PNG or logo.
+  ipcMain.handle(IPC.PROFILE_GET_ASSET_DATA_URL, (_e, raw: unknown) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(
+        z.object({ kind: z.enum(['signature', 'logo']) }),
+        raw,
+      );
+      const row = doctorProfileRepo.get(userId);
+      if (row === null) {
+        return { dataUrl: null };
+      }
+      const relPath = input.kind === 'signature' ? row.signaturePath : row.logoPath;
+      if (relPath === null) {
+        return { dataUrl: null };
+      }
+      const userData = app.getPath('userData');
+      const absPath = path.join(userData, relPath.split('/').join(path.sep));
+      if (!existsSync(absPath)) {
+        return { dataUrl: null };
+      }
+      const buf = readFileSync(absPath);
+      // ponytail: re-validate magic bytes on read (defense in depth — a
+      // maliciously-renamed file should never reach the renderer).
+      const format = detectImageFormat(buf);
+      if (!format) {
+        return { dataUrl: null };
+      }
+      const mime = format === 'png' ? 'image/png' : 'image/jpeg';
+      return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` };
     } catch (err) {
       throw asIpcError(err);
     }

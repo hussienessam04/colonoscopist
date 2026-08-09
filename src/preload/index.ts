@@ -100,6 +100,8 @@ const api: IpcContract = {
     uploadSignature: (input) =>
       ipcRenderer.invoke(IPC.PROFILE_UPLOAD_SIGNATURE, input),
     uploadLogo: (input) => ipcRenderer.invoke(IPC.PROFILE_UPLOAD_LOGO, input),
+    getAssetDataUrl: (input) =>
+      ipcRenderer.invoke(IPC.PROFILE_GET_ASSET_DATA_URL, input),
   },
   // Phase 6 / Plan 01 — Reports IPC. `getOrCreate` is the renderer's
   // entry point for the report editor (1:1 reports-per-procedure per

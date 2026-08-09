@@ -115,6 +115,32 @@ export default function ProfileEditor(): JSX.Element {
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const [signatureAt, setSignatureAt] = useState<number | null>(null);
   const [logoAt, setLogoAt] = useState<number | null>(null);
+  // Phase 6 UAT G-06-3 — image previews. Loaded as base64 data URLs from
+  // the new `api.profile.getAssetDataUrl` IPC so the doctor can see
+  // what their signature/logo actually look like (and confirm the right
+  // file uploaded). Refreshed after every successful upload.
+  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+
+  // ponytail: centralizes the data-URL fetch + state set so the
+  // upload handler can call it on success. Profile change (e.g. on
+  // wizard-bootstrap backfill) also calls this.
+  const refreshPreviews = useCallback(async (): Promise<void> => {
+    try {
+      const [sig, logo] = await Promise.all([
+        window.api.profile.getAssetDataUrl({ kind: 'signature' }),
+        window.api.profile.getAssetDataUrl({ kind: 'logo' }),
+      ]);
+      setSignaturePreview(sig.dataUrl);
+      setLogoPreview(logo.dataUrl);
+    } catch {
+      // best-effort: keep last preview; toast on actual upload errors
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshPreviews();
+  }, [refreshPreviews]);
 
   // Inline save indicator text already covers the auto-save lifecycle
   // (Saving… / Saved at HH:MM:SS / Save failed — retry). No additional
@@ -187,6 +213,7 @@ export default function ProfileEditor(): JSX.Element {
           setLogoAt(Date.now());
         }
         void refresh();
+        void refreshPreviews();
         toast.success(`${kind === 'signature' ? 'Signature' : 'Logo'} uploaded`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Upload failed';
@@ -338,13 +365,26 @@ export default function ProfileEditor(): JSX.Element {
               data-testid="profile-editor-signature-input"
             />
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">Signature</p>
                 <p className="text-xs text-muted-foreground" data-testid="profile-editor-signature-status">
                   {signatureAt === null
                     ? 'Not uploaded'
                     : `Uploaded at ${formatHHMMSS(signatureAt)}`}
                 </p>
+                {/* Phase 6 UAT G-06-3 — render the actual uploaded image so the
+                    doctor can confirm the right file landed. Hidden when
+                    nothing is uploaded yet. ~60px tall preview — large
+                    enough to verify legibility, small enough to not
+                    dominate the page. */}
+                {signaturePreview !== null ? (
+                  <img
+                    src={signaturePreview}
+                    alt="Uploaded signature preview"
+                    className="mt-1 max-h-[60px] max-w-[200px] rounded border border-slate-200 bg-white object-contain p-1"
+                    data-testid="profile-editor-signature-preview"
+                  />
+                ) : null}
               </div>
               <Button
                 variant="outline"
@@ -366,13 +406,21 @@ export default function ProfileEditor(): JSX.Element {
               data-testid="profile-editor-logo-input"
             />
             <div className="flex items-center justify-between">
-              <div>
+              <div className="flex flex-col gap-1">
                 <p className="text-sm font-medium">Clinic logo</p>
                 <p className="text-xs text-muted-foreground" data-testid="profile-editor-logo-status">
                   {logoAt === null
                     ? 'Not uploaded'
                     : `Uploaded at ${formatHHMMSS(logoAt)}`}
                 </p>
+                {logoPreview !== null ? (
+                  <img
+                    src={logoPreview}
+                    alt="Uploaded clinic logo preview"
+                    className="mt-1 max-h-[60px] max-w-[200px] rounded border border-slate-200 bg-white object-contain p-1"
+                    data-testid="profile-editor-logo-preview"
+                  />
+                ) : null}
               </div>
               <Button
                 variant="outline"
