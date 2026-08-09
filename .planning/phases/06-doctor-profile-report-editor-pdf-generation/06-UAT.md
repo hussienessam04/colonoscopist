@@ -12,7 +12,7 @@ number: 5
 name: Screenshot attach toggle + blue border + drag-reorder
 expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
-awaiting: user response
+awaiting: user response — BLOCKED on G-06-3/4/5/6/7 fixes per user direction
 
 ## Tests
 
@@ -41,11 +41,11 @@ expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
 result: issue
 reported: |
-  Drag-reorder is not working. Dragging an attached thumbnail does nothing — the order stays the same.
-  Root cause: HTML5 drag-and-drop (`draggable` + `onDragStart` + `onDragOver` + `onDrop`) was blocked by the inner `<img draggable={false}>`. In Chromium, the IMG suppresses dragstart when the user mousedown-drags the image, and the drag never bubbles to the wrapper div. `dataTransfer.setData('text/plain', ...)` never fires.
-  Fix (commit 3bef4bc): replaced with pointer events (`onPointerDown` / `onPointerMove` / `onPointerUp`) + `setPointerCapture` on the source item. Drop target identified via `document.elementFromPoint(x, y).closest('[data-screenshot-id]')`. Cursor is `cursor-grab` over attached thumbnails + `active:cursor-grabbing` during drag.
+  Drag-reorder still does not work — the order stays the same. The pointer-event fix (commit 3bef4bc) made the wrapper correctly receive pointer events, but `elementFromPoint` + `closest('[data-screenshot-id]')` either returns null (cursor over the IMG or the button overlays), or the source-id is the same as target-id (no reorder fired), or the `lastDroppedFrom` guard prevents the second call from re-ordering.
+
+  User requested pause of UAT to address the previously-recorded gaps + this reorder issue + capture-button removal + Print button — then resume.
 severity: major
-status: fixed-via-3bef4bc
+status: paused — block on G-06-3/4/5/6/7 fixes before resuming
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
@@ -86,7 +86,7 @@ result: pending
 
 total: 12
 passed: 4
-issues: 3 (G-06-3 image preview, G-06-4 PDF layout, G-06-5 reorder — all open for plan-phase round)
+issues: 5 (G-06-3 image preview, G-06-4 PDF layout, G-06-5 reorder, G-06-6 capture button, G-06-7 print button — all open for plan-phase round)
 pending: 8
 skipped: 0
 
@@ -149,19 +149,49 @@ skipped: 0
     Dragging an attached screenshot thumbnail reorders the attached list. The new order persists across navigation (sort_order saved to DB).
   status: failed
   reason: |
-    User reported: Reorder is not working — attached screenshots stay in the same order after attempting a drag.
-    Root cause: HTML5 drag-and-drop (`draggable` + `onDragStart` + `onDragOver` + `onDrop`) was blocked by the inner `<img draggable={false}>` inside ScreenshotThumbnail. In Chromium, when the user mousedown-drags the image itself, the IMG suppresses dragstart (because `draggable={false}`), and the drag never bubbles to the wrapper div. `dataTransfer.setData('text/plain', ...)` never fires, so `onDragOver` / `onDrop` never receive a valid drop target, and `onReorder` is never called.
-    Fix (commit 3bef4bc): replaced HTML5 DnD with pointer events (`onPointerDown` / `onPointerMove` / `onPointerUp`) + `setPointerCapture(e.pointerId)` on the source item. Drop target identified via `document.elementFromPoint(e.clientX, e.clientY).closest('[data-screenshot-id]')` so the source element does not need to be a draggable. Added a `lastDroppedFrom` dataset guard so a slow drag across a single target does not fire `onReorder` 30 times per second. Cursor styling: `cursor-grab` over attached thumbnails, `active:cursor-grabbing` during drag.
+    User reported: Reorder is not working — attached screenshots stay in the same order after attempting a drag. (First fix attempt 3bef4bc replaced HTML5 DnD with pointer events + setPointerCapture, but the reorder STILL doesn't fire. The pointer-event handler in the wrapper is competing with the ScreenshotThumbnail's own onClick/onPointerDown handlers, and the elementFromPoint lookup returns the IMG (which has `draggable={false}` from earlier) or one of the overlay buttons instead of the wrapper div, so the closest('[data-screenshot-id]') lookup either fails or returns the source itself.)
   severity: major
   test: 5
   artifacts:
-    - src/renderer/src/components/ScreenshotTimeline.tsx (now: pointer events + setPointerCapture; data-screenshot-id on each wrapper div)
-  missing: []
-  fixed_in: 3bef4bc
-  fixed_at: 2026-08-09
-  fix_verification:
-    - typecheck passes (0 errors)
-    - 579/579 unit tests pass (ScreenshotTimeline tests still green; no regression in ProcedureReview / ProcedureRoom callers since the new props are optional and the new handlers only fire when isDraggable is true)
-    - Visual: cursor is grab/grabbing during drag
+    - src/renderer/src/components/ScreenshotTimeline.tsx (pointer-event reorder handler)
+    - src/renderer/src/components/ScreenshotThumbnail.tsx (its own onClick handler + nested buttons that absorb pointer events)
+  missing:
+    - replace the pointer-event-based reorder with a simpler affordance that does not require nested-element coordination:
+      * Option A: Move Up / Move Down buttons on each attached thumbnail (no drag needed; works around the nested-event problem entirely)
+      * Option B: Use a "reorder mode" where clicking a thumbnail moves it to the head of the attached list (the report shows the new order immediately)
+      * Option C: Drop the manual reorder feature entirely; rely on the natural `timestampInVideoMs ASC` sort (the doctor can re-capture screenshots in different order if needed). Simpler, removes a footgun.
+
+- gap_id: G-06-6
+  truth: |
+    The ReportEditor's screenshot timeline does NOT show a "+Capture" button. Capture is a procedure-room feature (Plan 05's <ScreenshotTimeline onCapture> prop), not a report-editor feature. The report editor should show only the attach/reorder/delete affordances.
+  status: failed
+  reason: |
+    User reported: The +Capture button is still present in the report editor's screenshot timeline. Capture is a procedure-room concern (the doctor records the procedure, then later opens the report to attach screenshots to it). Showing +Capture in the report editor is confusing — clicking it tries to capture from the current video position but the doctor is editing a finalized report, not in a recording session.
+  severity: minor
+  test: 5
+  artifacts:
+    - src/renderer/src/components/ScreenshotTimeline.tsx (renders the <Button onClick={onCapture}>+ Capture</Button> unconditionally at the end of the row)
+    - src/renderer/src/pages/ReportEditor.tsx (passes onCapture to ScreenshotTimeline — should not)
+  missing:
+    - Either make `onCapture` prop optional in ScreenshotTimelineProps (default: button hidden) — or have ReportEditor NOT pass `onCapture` so the button is suppressed
+    - the ScreenshotTimeline signature already has `onCapture: () => void` as required; change to `onCapture?: () => void` and render the button only when defined
+    - add a test that verifies the +Capture button does NOT appear when `onCapture` is undefined
+
+- gap_id: G-06-7
+  truth: |
+    The ReportEditor has a "Print" button (post-finalize) that calls `window.print()` on the renderer, opening the OS print dialog. The user can also "Save as PDF" via the OS print dialog. This is the desktop-browser standard for a "print to PDF" affordance.
+  status: failed
+  reason: |
+    User reported: No print button in the PDF editor. The user wants a "Print" button alongside "Open PDF" + "Reveal in Explorer" so they can print the report directly without opening the PDF in an external viewer first. The standard desktop-app pattern is to call `window.print()` on the renderer, which opens the OS print dialog and lets the user pick the printer or "Save as PDF".
+  severity: minor
+  test: 8 (after PDF renders)
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (Open PDF + Reveal in Explorer buttons exist; no Print button)
+  missing:
+    - add a "Print" button in the report editor header (post-finalize only) that calls `window.print()`
+    - the renderer can render the PDF inline in a hidden `<iframe>` (object URL) so the OS print dialog has something to print — or just open the PDF in the OS viewer and let the user print from there
+    - simpler: open the existing PDF via the `Open PDF` button (already does this) and document that the OS viewer provides the Print affordance
+    - or: add a "Print" button that calls `window.print()` on the rendered ReportEditor DOM (no iframe needed; the browser prints whatever is on screen)
+    - recommendation: simplest = add a "Print" button that calls `window.print()` and let the user pick "Save as PDF" from the OS dialog (Chromium print dialog has a "Save as PDF" destination)
 ```
 ```
