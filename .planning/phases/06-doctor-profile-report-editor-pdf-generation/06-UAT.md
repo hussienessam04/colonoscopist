@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 4
-name: ReportEditor opens draft + 4 textareas auto-save on blur
+number: 5
+name: Screenshot attach toggle + blue border + drag-reorder
 expected: |
-  From ProcedureReview, click "Edit report" (button enabled when procedure.status is completed). Land on ReportEditor with empty Findings / Diagnosis / Recommendations / Procedure details textareas. Type text into any textarea → blur → "Saving…" → "Saved at HH:MM:SS". Reopen ReportEditor → text persisted. The status badge shows "Draft".
+  In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
 awaiting: user response
 
 ## Tests
@@ -34,7 +34,7 @@ result: pass
 ### 4. ReportEditor opens draft + 4 textareas auto-save on blur
 expected: |
   From ProcedureReview, click "Edit report" (button enabled when procedure.status is completed). Land on ReportEditor with empty Findings / Diagnosis / Recommendations / Procedure details textareas. Type text into any textarea → blur → "Saving…" → "Saved at HH:MM:SS". Reopen ReportEditor → text persisted. The status badge shows "Draft".
-result: pending
+result: pass
 
 ### 5. Screenshot attach toggle + blue border + drag-reorder
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 3
+passed: 4
 issues: 2 (new gaps — awaiting plan-phase round)
-pending: 9
+pending: 8
 skipped: 0
 
 ## Gaps
