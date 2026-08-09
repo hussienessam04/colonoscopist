@@ -19,24 +19,7 @@ awaiting: user response
 ### 1. Cold Start Smoke Test (migration 0004 + wizardBootstrap creates doctor_profile row)
 expected: |
   Fresh launch → wizard appears → submit admin credentials → land on Patients List. doctor_profile row created in same transaction as the user row. No migration errors in stdout/stderr. ProfileEditor shows the bilingual EN+AR fields (AR empty for fresh wizard — fill it later).
-result: issue
-reported: |
-  App threw on load with `Error [ERR_REQUIRE_ESM]: require() of ES Module @react-pdf/renderer/lib/react-pdf.js from out/main/index.js not supported`. Root cause: `@react-pdf/renderer` v4 is ESM-only; electron-vite compiled main process to CJS so static `import { Document, pdf } from '@react-pdf/renderer'` became static `require()` at runtime, which Node 20 refuses.
-
-  **Fix applied (commit 59130bd):**
-  1. `render-report-pdf.ts` — removed static `import { Document, pdf } from '@react-pdf/renderer'`; replaced with `loadReactPdf()` cached promise that uses `await import('@react-pdf/renderer')`.
-  2. `report.tsx` — removed all static `@react-pdf/renderer` imports (Document, Page, Text, View, Image, StyleSheet). Replaced JSX with `React.createElement` calls that take the primitives as a parameter. Now exports a pure factory function `createReportPdfElement(P, input)` that takes primitives at call time.
-  3. `render-report-pdf.ts` calls `pdf(createReportPdfElement(reactPdf, input))` — primitives passed by reference after the dynamic import resolves.
-
-  **Verification (post-fix):**
-  - `npm run typecheck` exits 0
-  - `npm run build` succeeds; `out/main/index.js` has zero `require("@react-pdf/renderer")` calls (only the dynamic `import()` at line 3682)
-  - `npm run test:unit` → 579/579 tests pass across 76 files
-  - `RUN_SMOKE=1 npm run test:integration:smoke:optin` → 4/4 PDF smoke tests pass (real PDFs render with `%PDF-` magic + size > 5KB + bilingual placeholder text + numeric fragment preservation)
-
-  The app should now boot on a fresh launch. Please re-run Test 1 and confirm.
-severity: blocker
-status: fixed-via-59130bd
+result: pass
 
 ### 2. ProfileEditor renders bilingual fields + auto-save on blur
 expected: |
@@ -96,8 +79,8 @@ result: pending
 ## Summary
 
 total: 12
-passed: 0
-issues: 1 (fixed via commit 59130bd — awaiting user re-confirmation)
+passed: 1
+issues: 0
 pending: 11
 skipped: 0
 
@@ -107,22 +90,8 @@ skipped: 0
 - gap_id: G-06-1
   truth: |
     The Electron app boots successfully without runtime errors. Migration 0004 applies on first launch (idempotent), and the wizardBootstrap creates a doctor_profile row in the same transaction as the users row.
-  status: failed
-  reason: |
-    User reported: App threw ERR_REQUIRE_ESM on load. @react-pdf/renderer v4 ships as ES Module only; the main process is compiled to CommonJS by electron-vite, so `require('@react-pdf/renderer')` at runtime fails. App does not start, blocking all downstream tests.
-  severity: blocker
-  test: 1
-  artifacts:
-    - src/main/pdf/render-report-pdf.ts (now: lazy dynamic-imports @react-pdf/renderer)
-    - src/main/pdf/report.tsx (now: exports pure factory `createReportPdfElement(P, input)` with zero static @react-pdf/renderer imports)
-    - out/main/index.js (now: zero `require("@react-pdf/renderer")` calls; only the dynamic `import()` at line 3682)
-  missing: []
-  fixed_in: 59130bd
-  fixed_at: 2026-08-09
-  fix_verification:
-    - typecheck passes (0 errors)
-    - 579/579 unit tests pass
-    - 4/4 PDF smoke tests pass with RUN_SMOKE=1
-    - build succeeds with no chunk splitting (single out/main/index.js, no @react-pdf/renderer static require)
+  status: resolved
+  resolved_by: 59130bd
+  resolved_at: 2026-08-09
 ```
 ```
