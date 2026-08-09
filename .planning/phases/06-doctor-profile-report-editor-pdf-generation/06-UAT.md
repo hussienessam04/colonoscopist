@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 3
-name: Signature upload accepts PNG + rejects non-image
+number: 4
+name: ReportEditor opens draft + 4 textareas auto-save on blur
 expected: |
-  Click "Upload signature image" → file picker opens (accept="image/png,image/jpeg"). Pick a PNG → "Signature uploaded at HH:MM:SS" appears. Pick a JPEG → same. Pick a .txt or .pdf → toast "Only PNG or JPEG images are accepted" + no IPC fired. Same flow for "Upload logo".
+  From ProcedureReview, click "Edit report" (button enabled when procedure.status is completed). Land on ReportEditor with empty Findings / Diagnosis / Recommendations / Procedure details textareas. Type text into any textarea → blur → "Saving…" → "Saved at HH:MM:SS". Reopen ReportEditor → text persisted. The status badge shows "Draft".
 awaiting: user response
 
 ## Tests
@@ -29,15 +29,7 @@ result: pass
 ### 3. Signature upload accepts PNG + rejects non-image
 expected: |
   Click "Upload signature image" → file picker opens (accept="image/png,image/jpeg"). Pick a PNG → "Signature uploaded at HH:MM:SS" appears. Pick a JPEG → same. Pick a .txt or .pdf → toast "Only PNG or JPEG images are accepted" + no IPC fired. Same flow for "Upload logo".
-result: issue
-reported: |
-  IPC error: `Error invoking remote method 'profile:upload-signature': Error: image: invalid PNG/JPEG signature`.
-
-  Root cause: ProfileEditor was sending the **full data URL** (`data:image/png;base64,XXX`) as `pngBase64` over IPC. Main-side handler did `Buffer.from(payload.pngBase64, 'base64')` — Node silently drops NON-base64 chars (`:`, `;`, `,`) but keeps VALID ones (`/`). So the `image/png` part of the prefix decoded as 6 garbage bytes BEFORE the actual PNG bytes. The decoded buffer's first 8 bytes were NOT the PNG signature, the magic-byte sniff rejected the file, and the error propagated to the renderer as a thrown IPC error.
-
-  Fix (commit 90390e1): ProfileEditor now strips the `data:image/<type>;base64,` prefix before sending over IPC. Test assertions updated to verify the IPC payload is raw base64 (regex `^[A-Za-z0-9+/=]+$`) and does NOT contain `data:image/...`. 579/579 unit tests pass.
-severity: major
-status: fixed-via-90390e1
+result: pass
 
 ### 4. ReportEditor opens draft + 4 textareas auto-save on blur
 expected: |
@@ -87,8 +79,8 @@ result: pending
 ## Summary
 
 total: 12
-passed: 2
-issues: 1 (fixed via commit 90390e1 — awaiting user re-confirmation)
+passed: 3
+issues: 0
 pending: 9
 skipped: 0
 
@@ -105,21 +97,8 @@ skipped: 0
 - gap_id: G-06-2
   truth: |
     Signature + logo upload accepts PNG and JPEG files (writes them to `<userData>/data/profiles/<userId>/`) and rejects any other file type at the client-side sniff BEFORE crossing the IPC boundary.
-  status: failed
-  reason: |
-    User reported: IPC error `image: invalid PNG/JPEG signature` even when uploading a real PNG. ProfileEditor was sending the full `data:image/png;base64,XXX` data URL as `pngBase64`; main's `Buffer.from('data:image/png;base64,XXX', 'base64')` decoded `image/png` (which contains the base64-valid char `/`) as 6 garbage bytes BEFORE the actual PNG bytes. The decoded buffer's first 8 bytes were NOT the PNG signature, the magic-byte sniff correctly rejected the file, and the error surfaced as a thrown IPC.
-  severity: major
-  test: 3
-  artifacts:
-    - src/renderer/src/pages/ProfileEditor.tsx (sends full data URL as pngBase64)
-    - src/main/ipc/profile.ts (correctly rejects garbage buffer per Anti-Pattern 2 + Pitfall 4 — no fix needed on the main side)
-  missing:
-    - the IPC contract's `pngBase64` / `jpegBase64` field is documented as raw base64 but the renderer was sending the full data URL; renderer must strip the `data:image/<type>;base64,` prefix before sending
-  fixed_in: 90390e1
-  fixed_at: 2026-08-09
-  fix_verification:
-    - typecheck passes (0 errors)
-    - 579/579 unit tests pass (updated test assertions verify raw base64 payload + no data URL prefix)
-    - 4/4 PDF smoke tests pass with RUN_SMOKE=1
+  status: resolved
+  resolved_by: 90390e1
+  resolved_at: 2026-08-09
 ```
 ```
