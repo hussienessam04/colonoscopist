@@ -143,7 +143,15 @@ describe('ProfileEditor', () => {
       const lastCall = api.profile.uploadSignature.mock.calls.at(-1)![0] as {
         pngBase64?: string;
       };
-      expect(lastCall.pngBase64).toContain('data:image/png');
+      // ponytail: payload is RAW base64, not the data URL. The main
+      // side's Buffer.from(payload.pngBase64, 'base64') would silently
+      // decode the prefix chars (e.g. '/') and corrupt the first bytes
+      // of the buffer — the magic-byte sniff would then reject a valid
+      // PNG. So ProfileEditor strips the `data:image/png;base64,`
+      // prefix before sending. Asserting that the payload starts with
+      // the actual base64 (iVBORw0... for a 1x1 PNG) verifies the fix.
+      expect(lastCall.pngBase64).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(lastCall.pngBase64).not.toContain('data:image/png');
     } finally {
       globalThis.FileReader = origFileReader;
     }
@@ -217,7 +225,9 @@ describe('ProfileEditor', () => {
       const lastCall = api.profile.uploadLogo.mock.calls.at(-1)![0] as {
         jpegBase64?: string;
       };
-      expect(lastCall.jpegBase64).toContain('data:image/jpeg');
+      // ponytail: see signature test — payload is RAW base64, no data URL prefix.
+      expect(lastCall.jpegBase64).toMatch(/^[A-Za-z0-9+/=]+$/);
+      expect(lastCall.jpegBase64).not.toContain('data:image/jpeg');
     } finally {
       globalThis.FileReader = origFileReader;
     }

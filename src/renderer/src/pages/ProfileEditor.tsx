@@ -168,8 +168,16 @@ export default function ProfileEditor(): JSX.Element {
         toast.error('Only PNG or JPEG images are accepted');
         return;
       }
+      // ponytail: send ONLY the raw base64 payload over IPC, NOT the
+      // full data URL. Buffer.from('data:image/png;base64,XXX',
+      // 'base64') does not strip the data URL prefix — Node drops the
+      // non-base64 chars but keeps the valid ones (e.g. '/'), so the
+      // decoded buffer's first 8 bytes are NOT the PNG signature. The
+      // main-side magic-byte sniff then rejects a perfectly valid PNG.
+      // Strip `data:<mime>;base64,` here so main receives pure base64.
+      const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
       const payload =
-        fmt === 'png' ? { pngBase64: dataUrl } : { jpegBase64: dataUrl };
+        fmt === 'png' ? { pngBase64: rawBase64 } : { jpegBase64: rawBase64 };
       try {
         if (kind === 'signature') {
           await window.api.profile.uploadSignature(payload);
