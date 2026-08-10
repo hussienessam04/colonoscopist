@@ -138,19 +138,11 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       const instance = pdf(
         React.createElement(Document, null, React.createElement(ReportPdf, { input })),
       );
-      const stream = (await instance.toBuffer()) as NodeJS.ReadableStream;
 
       const outPath = path.join(tmpRoot, 'report.pdf');
       mkdirSync(tmpRoot, { recursive: true });
-      // Stream the PDF to disk using Node fs.writeStream + pipe.
-      const { createWriteStream } = await import('node:fs');
-      await new Promise<void>((resolve, reject) => {
-        const writer = createWriteStream(outPath);
-        writer.on('finish', () => resolve());
-        writer.on('error', (err) => reject(err));
-        stream.on('error', (err) => reject(err));
-        stream.pipe(writer);
-      });
+      // Use toFile — matches the production renderReportPdf pattern.
+      await instance.toFile(outPath);
 
       // 1. File exists.
       expect(existsSync(outPath)).toBe(true);
@@ -203,17 +195,10 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       const instance = pdf(
         React.createElement(Document, null, React.createElement(ReportPdf, { input })),
       );
-      const stream = (await instance.toBuffer()) as NodeJS.ReadableStream;
 
       const outPath = path.join(tmpRoot, 'no-assets.pdf');
-      const { createWriteStream } = await import('node:fs');
-      await new Promise<void>((resolve, reject) => {
-        const writer = createWriteStream(outPath);
-        writer.on('finish', () => resolve());
-        writer.on('error', (err) => reject(err));
-        stream.on('error', (err) => reject(err));
-        stream.pipe(writer);
-      });
+      mkdirSync(tmpRoot, { recursive: true });
+      await instance.toFile(outPath);
 
       expect(existsSync(outPath)).toBe(true);
       expect(statSync(outPath).size).toBeGreaterThan(5_000);
@@ -256,17 +241,10 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       const instance = pdf(
         React.createElement(Document, null, React.createElement(ReportPdf, { input })),
       );
-      const stream = (await instance.toBuffer()) as NodeJS.ReadableStream;
 
       const outPath = path.join(tmpRoot, 'numeric.pdf');
-      const { createWriteStream } = await import('node:fs');
-      await new Promise<void>((resolve, reject) => {
-        const writer = createWriteStream(outPath);
-        writer.on('finish', () => resolve());
-        writer.on('error', (err) => reject(err));
-        stream.on('error', (err) => reject(err));
-        stream.pipe(writer);
-      });
+      mkdirSync(tmpRoot, { recursive: true });
+      await instance.toFile(outPath);
       // Assert: input.mrn is the same value the template receives
       // (sanity check on the input shape). The visual bidi reversal
       // check happens at the manual smoke test phase.
