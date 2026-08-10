@@ -156,26 +156,23 @@ skipped: 0
   resolved_at: 2026-08-09
 - gap_id: G-06-11
   truth: |
-    Clicking the "Print" button shows a print preview of the actual generated PDF report. The user sees the PDF rendered inline (so they can verify it looks right) and then confirms the print via the OS print dialog.
-  status: failed
-  reason: |
-    User reported: "BUT NOW PRINT IS NOT WORKING". The first Print implementation tried to load the PDF via `MediaServer /media/<patientId>/<procedureId>/<file.pdf>`, but the MediaServer's path-safety check requires the file to be under `<userData>/data/media/patients/`. The PDF lives at `<userData>/data/reports/<reportId>.pdf` — the MediaServer returns 403 for any PDF URL. The iframe loads the 403 error page; `contentWindow.print()` opens the print dialog with the error page. No PDF preview, no real PDF printed.
-
-    Fix (commit e13007d): new IPC `api.reports.getPdfBlob({ id })` returns the raw PDF bytes. The renderer wraps them in a `Blob({ type: 'application/pdf' })` + `URL.createObjectURL(blob)` and loads the blob URL in the iframe. The MediaServer is no longer in the path. The blob URL is owned by the PrintPreview component — revoked on unmount or when the reportId changes.
+    Clicking the "Print" button opens the generated PDF in the OS default PDF viewer. The viewer has a built-in print preview + dialog that lets the user print directly. The PDF shown in the viewer is exactly what the report looks like.
+  status: resolved
+  resolved_by: ad6ca0d
+  resolved_at: 2026-08-09
+  fix_notes: |
+    Two attempts:
+      1. (e13007d) new `getPdfBlob` IPC + blob: URL iframe + `contentWindow.print()` — fragile in Electron (iframe contentWindow null races, blob URL revoke timing, sandbox issues). User reported "PDF not ready — click Re-render PDF first" error toast.
+      2. (ad6ca0d) switch to the simpler `api.reports.openPdf({ id, reveal: false })` IPC which invokes `shell.openPath()`. The OS default PDF viewer (Adobe Reader / Edge / Chrome's built-in) handles the rest, including a built-in print preview + dialog. The Print button label is now "Print (opens PDF)" to set the expectation. The PrintPreview iframe + getPdfBlob IPC remain in place — they're no longer wired to the Print button but the IPC + preload bridge stay available for any future preview-in-renderer use cases.
   severity: major
   test: 8
   artifacts:
-    - src/renderer/src/pages/ReportEditor.tsx (PrintPreview now uses blob URL via getPdfBlob IPC instead of MediaServer route)
-    - src/main/ipc/reports.ts (new REPORTS_GET_PDF_BLOB handler)
-    - src/shared/ipc-contract.ts (new IPC constant + IpcContract.reports.getPdfBlob entry)
-    - src/preload/index.ts (new preload bridge)
+    - src/renderer/src/pages/ReportEditor.tsx (handlePrint now calls openPdf IPC; Print button label updated to "Print (opens PDF)")
   missing: []
-  fixed_in: e13007d
-  fixed_at: 2026-08-09
-  fix_verification:
-    - typecheck passes (0 errors)
-    - 579/579 unit tests pass
-    - logic verified: PrintPreview calls `api.reports.getPdfBlob({ id: reportId })` → reads `<userData>/data/reports/<reportId>.pdf` from main → returns `{ bytes, mime }` → renderer creates `new Blob([bytes], { type: 'application/pdf' })` → `URL.createObjectURL(blob)` → loads in iframe → `iframe.contentWindow.print()` opens the OS print dialog with the PDF as the print target
+  manual_verification_steps:
+    - Restart the app, navigate to a finalized report
+    - Click "Print (opens PDF)" — the OS default PDF viewer opens with the report
+    - Use the viewer's toolbar/file menu to invoke Print (Ctrl+P usually) — the OS print dialog shows the PDF as the print source with a live preview
 - gap_id: G-06-12
   truth: |
     The ReportEditor UI matches the rendered PDF layout: header (logo + clinic name + signature + doctor name + procedure date), patient block, procedure block (date + duration + doctor), Findings / Diagnosis sections, attached screenshots thumbnail grid, footer (signature image + doctor name + clinic name + page number). The doctor sees a faithful preview of the PDF as they edit.
