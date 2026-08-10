@@ -12,7 +12,7 @@ number: 5
 name: Screenshot attach toggle + blue border + drag-reorder
 expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
-awaiting: user response — BLOCKED on G-06-3/4/5/6/7 fixes per user direction
+awaiting: user response
 
 ## Tests
 
@@ -43,7 +43,7 @@ result: issue
 reported: |
   Reorder still doesn't work — the new ‹ / › buttons don't change the order. (Pointer-event fix was abandoned; replaced with Move buttons. But the parent (useReport) is not seeing the new order — `reorder` callback in the ReportEditor wires the update to `reportScreenshotsRepo.reorder` which writes to DB. The DOM re-render needs `screenshots` prop to reflect the new sort_order, which only happens after a refetch.)
 severity: major
-status: paused — additional gap G-06-8
+status: resolved via commit 3fe7645 — awaiting re-test
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
@@ -84,7 +84,7 @@ result: pending
 
 total: 12
 passed: 4
-issues: 5 (G-06-8 reorder, G-06-9 auto-PDF, G-06-10 remove recs, G-06-11 print preview, G-06-12 editor UI matches PDF — all resolved via commit 3fe7645)
+issues: 0 (5 gaps resolved via commits 3fe7645 + e13007d + ad6ca0d; 8 tests still pending re-test)
 pending: 8
 skipped: 0
 
