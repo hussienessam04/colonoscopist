@@ -184,7 +184,7 @@ Plans:
 
 **Goal:** Cross-cutting finishing work: cross-cutting search by date range and doctor; visible audit log; data backup and restore; full Arabic + RTL coverage.
 **Mode:** mvp
-**Requirements covered:** SRCH-01, SRCH-02, SRCH-03, SET-05, SET-06, I18N-01, I18N-02, I18N-03
+**Requirements covered:** SRCH-01, SRCH-02, SRCH-03, SET-05, SET-06, I18N-01, I18N-02, I18N-03, AUDIT-01, AUDIT-02, RPT-06 (deferred from Phase 6)
 **Success criteria:**
 
 1. Search by date range + doctor (combinable with name/MRN) returns matching procedures with their reports and patient context.
@@ -194,8 +194,18 @@ Plans:
 5. UI is bilingual (EN + AR); document direction flips on language change; every shadcn component renders correctly in RTL (slider, dropdown, dialog, calendar, popover).
 6. Restored DB passes `PRAGMA integrity_check` end-to-end.
 
-**Pitfalls addressed:** Pitfall 7 (RTL layout breaks in shadcn), Pitfall 9 (backup captures partial DB).
+**Pitfalls addressed:** Pitfall 7 (RTL layout breaks in shadcn), Pitfall 8 (PDF bidi), Pitfall 9 (backup captures partial DB).
 **Notes:** This phase is the GCC-market ship gate. Every visible UI string must be in both languages before tagging this phase done.
+**Plans:** 6 plans
+
+Plans:
+
+- [ ] 07-01-PLAN.md — Tracer: Migration 0007 (users.language + doctor_profile.language) + src/main/backup/{snapshot,index,restore}.ts (archiver zip + yauzl unpack + PRAGMA integrity_check) + 3 shadcn primitives install (popover, tooltip, slider) + IPC contract extensions (backup.* + restore.* + audit.log) + profile.update(extends language) + wizard bootstrap(extends language) + users.create(extends language); full real archiver round-trip + yauzl entry-path filter tests (Wave 1)
+- [ ] 07-02-PLAN.md — Patient List filter sidebar (name + MRN + date range + doctor + procedure status, AND-combined) + PatientRow accordion expansion (procedure row → procedure-review, report row → reports.openPdf) + SettingsSidebar visual entries for Audit + Backup & Restore (Wave 2, depends_on: 07-01)
+- [ ] 07-03-PLAN.md — Audit page (compact one-line rows, 100/page, filter bar, detail Dialog) + audit_view self-audit emit on mount (debounced 1s) + useAudit SWR-style hook + ProfileEditor language picker Card (EN/AR radio → doctor_profile.language, emits language.changed audit row) (Wave 3, depends_on: 07-01)
+- [ ] 07-04-PLAN.md — i18next bundles (en/ar) + useLanguage hook flips <html dir> on change + Wizard step 4 (language radio submits users.language) + AR PDF via Font.register(NotoSansArabic) + bidi <Text direction='rtl'> wrappers + numeric fragment <Text direction='ltr'> isolation per Pitfall 8 + D-24 parity check Vitest + integration smoke (file > 50KB + PDF magic bytes) (Wave 4, depends_on: 07-01)
+- [ ] 07-05-PLAN.md — BackupRestore page (Backup Card with pickDestination + create + Reveal in Explorer toast + inline warning Alert) + Restore Card with two-step flow (Choose backup → Preview with counts + integrity check → Restore to staging via ConfirmDialog) + Activate this backup v1.1 disabled placeholder (Wave 5, depends_on: 07-01)
+- [ ] 07-06-PLAN.md — Playwright RTL smoke per route (8 tests: dir='rtl' + scrollWidth check + screenshot) + backup → restore roundtrip integration test (RUN_SMOKE=1, integrity_check === 'ok') + AR PDF magic bytes integration test (RUN_SMOKE=1, file > 50KB + '%PDF' magic) + 07-UAT.md phase acceptance plan (Wave 6, depends_on: 07-02, 07-03, 07-04, 07-05)
 
 ---
 
