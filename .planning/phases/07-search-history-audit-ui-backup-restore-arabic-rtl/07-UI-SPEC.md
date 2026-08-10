@@ -57,13 +57,12 @@ Phase 7 does NOT introduce a new type scale. It inherits the scale already estab
 |------|------|--------|-------------|----------------|------------------|
 | Page heading | 24px | 600 | 1.2 | `text-2xl font-semibold` | `Settings → Audit`, `Settings → Backup & Restore` page `<h1>` |
 | Section heading | 20px | 600 | 1.2 | `text-xl font-semibold` | Card titles for Audit filters + Backup subsections |
-| Subheading | 16px | 600 | 1.2 | `text-base font-semibold` | Dialog section labels, audit row entity label |
-| Body | 14px | 400 | 1.5 | `text-sm` | Default — table cells, form labels, dialog description |
-| Label | 12px | 600 | 1.2 | `text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground` | Page kicker ("Settings", "Workspace"), Settings sidebar "Sections" |
-| Mono | 13px | 400 | 1.5 | `font-mono text-[13px]` | Audit metadata JSON preview, restore preview zip path |
-| Audit row timestamp | 12px | 500 | 1.4 | `text-xs font-medium tabular-nums` | Audit row timestamp column (locale-aware `Intl.DateTimeFormat`) |
+| Body + subheading + mono | 14px | 400 (subheading 600) | 1.5 | `text-sm` (subheading: `font-semibold`; mono: `font-mono`) | Default body — table cells, form labels, dialog description. Subheading bumps weight only (no size bump). Mono adds `font-mono` for audit metadata JSON preview + restore preview zip path |
+| Label + timestamp | 12px | 600 | 1.2 | `text-xs font-semibold` (label adds `uppercase tracking-[0.2em] text-muted-foreground`; timestamp adds `tabular-nums`) | Page kicker ("Settings", "Workspace"), Settings sidebar "Sections"; audit row timestamp column (locale-aware `Intl.DateTimeFormat`) |
 
-**Line-height rule:** body = 1.5, headings = 1.2, matches Phase 6 ProfileEditor `lineHeight: 1.4` for textareas. Mono line-height = 1.5 for readable JSON.
+**Two weights only:** 600 (page heading, section heading, subheading weight-bump, label, timestamp) and 400 (body, mono). No intermediate `font-medium` (500) — audit row timestamps use the same 600 as labels.
+
+**Line-height rule:** body + subheading + mono = 1.5; headings + label + timestamp = 1.2. Matches Phase 6 ProfileEditor `lineHeight: 1.4` for textareas.
 
 **RTL exception:** in `dir="rtl"` mode, the EN-vs-AR font swap happens inside the iframe-rendered PDF (NotoSansArabic) only. The chrome (Card, Button, Dialog) uses `font-sans` system stack — Arabic in the chrome is rendered by the OS Arabic fallback (Segoe UI Arabic on Windows, Geeza Pro / default on macOS, Noto Sans Arabic on Linux). The 14px body weight stays 400 (matches existing SettingsHub / SettingsCapture).
 
@@ -111,7 +110,7 @@ EN is the source. AR is the full hand-written mirror (D-20 — NO machine transl
 | Status partial | `Partial` | `جزئي` |
 | Status recording | `Recording` | `جاري التسجيل` |
 | Clear filters button | `Clear filters` | `مسح التصفية` |
-| Apply filters button | `Apply` | `تطبيق` |
+| Apply filters button | `Apply filters` | `تطبيق التصفية` |
 | Results heading | `Results` | `النتائج` |
 | Procedure link | `Open procedure` | `فتح الإجراء` |
 | Report link | `Open report PDF` | `فتح تقرير PDF` |
@@ -135,8 +134,8 @@ EN is the source. AR is the full hand-written mirror (D-20 — NO machine transl
 | Action placeholder | `Any action` | `أي إجراء` |
 | Entity type filter | `Entity type` | `نوع الكيان` |
 | Entity types | `user`, `patient`, `procedure`, `report`, `profile`, `screenshot`, `device`, `audit`, `backup`, `restore`, `language` | same Arabic transliteration — enum renders on i18n switch |
-| Apply | `Apply` | `تطبيق` |
-| Clear | `Clear` | `مسح` |
+| Apply filters | `Apply filters` | `تطبيق التصفية` |
+| Clear all | `Clear all` | `مسح الكل` |
 | Row column — time | `Time` | `الوقت` |
 | Row column — user | `User` | `المستخدم` |
 | Row column — action | `Action` | `الإجراء` |
