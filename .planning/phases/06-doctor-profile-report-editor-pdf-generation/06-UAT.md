@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 6
-name: Finalize button locks state + shows "Finalized · last edited by <X>" badge
+number: 7
+name: Re-render PDF button works after post-finalize edit
 expected: |
-  In ReportEditor with a draft, click "Finalize report (auto-generates PDF)" → success toast → status badge flips to "Finalized · last edited by <admin name>". Findings/Diagnosis remain editable (per CONTEXT.md D-07 — any signed-in doctor can edit after finalize). procedure_id / doctor_id / finalized_at are NOT editable. PDF file is automatically generated (per G-06-9).
+  After finalize, edit a textarea → blur → the inline save indicator updates → click "Re-render PDF" → success toast → the PDF file at `<userData>/data/reports/<reportId>.pdf` updates (modify time changes; size changes if body content changed).
 awaiting: user response
 
 ## Tests
@@ -43,8 +43,8 @@ result: pass
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
-  In ReportEditor with a draft, click "Finalize" → success toast → status badge flips to "Finalized · last edited by <admin name>". Findings/Diagnosis/Recommendations remain editable (per CONTEXT.md D-07 — wider post-finalize edits; no role gate per D-08). procedure_id / doctor_id / finalized_at are NOT editable.
-result: pending
+  In ReportEditor with a draft, click "Finalize report (auto-generates PDF)" → success toast → status badge flips to "Finalized · last edited by <admin name>". Findings/Diagnosis remain editable (per CONTEXT.md D-07 — any signed-in doctor can edit after finalize). procedure_id / doctor_id / finalized_at are NOT editable. PDF file is automatically generated (per G-06-9).
+result: pass
 
 ### 7. Re-render PDF button works after post-finalize edit
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 5
-issues: 0 (all gaps resolved; 7 tests pending)
-pending: 7
+passed: 6
+issues: 0 (all gaps resolved; 6 tests pending)
+pending: 6
 skipped: 0
 
 ## Gaps
