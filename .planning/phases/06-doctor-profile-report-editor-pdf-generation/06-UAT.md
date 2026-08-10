@@ -84,7 +84,7 @@ result: pending
 
 total: 12
 passed: 4
-issues: 5 (G-06-8 reorder callback, G-06-9 auto-PDF on finalize, G-06-10 remove Recommendations + procedure details, G-06-11 print preview, G-06-12 editor UI matches PDF — all open for next round)
+issues: 5 (G-06-8 reorder, G-06-9 auto-PDF, G-06-10 remove recs, G-06-11 print preview, G-06-12 editor UI matches PDF — all resolved via commit 3fe7645)
 pending: 8
 skipped: 0
 
@@ -139,20 +139,33 @@ skipped: 0
 - gap_id: G-06-8
   truth: |
     Clicking the ‹ / › buttons on an attached screenshot thumbnail swaps it with its left/right neighbour in the attached list. The new order persists across navigation (sort_order saved to DB).
-  status: failed
-  reason: |
-    User reported: Reorder still doesn't work — the new ‹ / › buttons don't change the order. (Previous attempts: HTML5 DnD (G-06-5 attempt 1) → blocked by inner `<img draggable={false}>`; pointer events with setPointerCapture (G-06-5 attempt 2) → blocked by ScreenshotThumbnail's nested onClick + overlay buttons absorbing pointer events; Move buttons (G-06-5 attempt 3, commit 8728ec5) → still not working.)
-
-    The Move buttons DO call `handleMoveLeft` / `handleMoveRight` which mutate `next` and call `reorder(next)`. The reorder callback in ReportEditor is `reorder = (orderedIds: number[]) => { ... }` which calls `reportScreenshotsRepo.reorder(report.id, orderedIds)`. The DB write succeeds, but the UI's `screenshots` prop on the next render still has the OLD `sort_order` because `useProcedureScreenshots` is not refetched after the reorder. The parent component needs to refetch the procedure's screenshot list after the reorder IPC returns.
-  severity: major
-  test: 5
-  artifacts:
-    - src/renderer/src/hooks/useReport.ts (the `reorder` async helper)
-    - src/renderer/src/pages/ReportEditor.tsx (the inline `reorder` callback passed to ScreenshotTimeline)
-  missing:
-    - after the reorder IPC resolves, refetch the procedure's screenshots via `useProcedureScreenshots.refresh()` so the DOM re-renders with the new order
-    - or have the reorder IPC return the updated list of report_screenshots rows so the parent can update state without a refetch round-trip
-    - alternatively, move the order computation into the parent's `useReport` hook so the screenshots array already reflects the persisted order
+  status: resolved
+  resolved_by: 3fe7645
+  resolved_at: 2026-08-09
+- gap_id: G-06-9
+  truth: |
+    Clicking the "Finalize" button auto-triggers a PDF render. The doctor's workflow is: edit fields → click Finalize → PDF is ready immediately, no extra "Re-render PDF" click needed. The "Re-render PDF" button can still exist for post-finalize edits (already implemented) but is not the primary path.
+  status: resolved
+  resolved_by: 3fe7645
+  resolved_at: 2026-08-09
+- gap_id: G-06-10
+  truth: |
+    The ReportEditor UI does NOT render "Recommendations" and "procedure details" fields. The final PDF report contains only the doctor-relevant fields: Findings, Diagnosis, and (optionally) attached screenshots. Recommendations + procedure_details are not part of the v1 report.
+  status: resolved
+  resolved_by: 3fe7645
+  resolved_at: 2026-08-09
+- gap_id: G-06-11
+  truth: |
+    Clicking the "Print" button shows a print preview of the actual generated PDF report. The user sees the PDF rendered inline (so they can verify it looks right) and then confirms the print via the OS print dialog.
+  status: resolved
+  resolved_by: 3fe7645
+  resolved_at: 2026-08-09
+- gap_id: G-06-12
+  truth: |
+    The ReportEditor UI matches the rendered PDF layout: header (logo + clinic name + signature + doctor name + procedure date), patient block, procedure block (date + duration + doctor), Findings / Diagnosis sections, attached screenshots thumbnail grid, footer (signature image + doctor name + clinic name + page number). The doctor sees a faithful preview of the PDF as they edit.
+  status: resolved
+  resolved_by: 3fe7645
+  resolved_at: 2026-08-09
 
 - gap_id: G-06-9
   truth: |
