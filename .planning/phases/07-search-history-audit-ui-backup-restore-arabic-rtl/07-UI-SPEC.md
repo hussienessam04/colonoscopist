@@ -1,10 +1,13 @@
 ---
 phase: 7
 slug: search-history-audit-ui-backup-restore-arabic-rtl
-status: draft
+status: approved
 shadcn_initialized: true
 preset: shadcn-default-slate
 created: 2026-08-10
+reviewed_at: 2026-08-10
+approved_at: 2026-08-10
+verified_by: gsd-ui-checker
 ---
 
 # Phase 7 — UI Design Contract
@@ -484,3 +487,105 @@ All flow through `audit()` (Phase 2 main-side helper) — no bypass paths.
 - [x] Dimension 6 Registry Safety: PASS — `popover` + `tooltip` + `slider` are shadcn-official (same source as 15 existing components); no third-party blocks; no `tailwindcss-rtl` plugin (native 3.4 `rtl:` variants per D-23)
 
 **Approval:** approved
+
+---
+
+## UI Considerations
+
+> State-coverage probe (12 surfaces, 56 applicable considerations, auto-backstop — YOLO mode). Backstops carry the taxonomy question as resolution; planner/executor materializes concrete truth during implementation.
+
+### E1 — Search filter sidebar (Patient List)
+
+- **empty** — backstop: When no filters set, list shows existing phase 2 patient rows; rendered empty state `patient.empty.title` / `patient.empty.body` if zero patients. verification: backstop
+- **loading** — backstop: Skeleton rows matching Phase 2 patient list density while IPC in-flight; use existing `<Skeleton>` shadcn component. verification: backstop
+- **error** — backstop: Alert component with retry action `search.retry` + link to logs. verification: backstop
+- **populated** — backstop: Phase 2 patient list density with accordion rows per D-03. verification: backstop
+- **partial** — backstop: Filter chip badges show active filters; result count summary `patient.summary.count` singular/plural. verification: backstop
+- **overflow** — backstop: Sidebar `lg:w-72` fixed; patient list `minmax(0,1fr)` flex; scroll on inner only. verification: backstop
+- **zero-one-many** — backstop: Singular `1 patient` / plural `N patients` via `Intl.PluralRules` + AR mirror. verification: backstop
+- **long-text** — backstop: Truncate filter chip labels at 32 chars with ellipsis; full label on hover via tooltip. verification: backstop
+
+### E2 — Audit log filter sidebar
+
+- **empty** — backstop: Rendered chip list empty when no filters active; result count shows `No events match these filters.` verification: backstop
+- **loading** — backstop: Skeleton rows in audit table area at 100/page density. verification: backstop
+- **error** — backstop: Alert with retry + log link. verification: backstop
+- **partial** — backstop: Filter chip summary at top of audit table; clear-all affordance. verification: backstop
+- **overflow** — backstop: Filter sidebar `lg:w-72`; audit table scrolls vertically inside Card. verification: backstop
+- **long-text** — backstop: Truncate action filter at 32 chars; full action in tooltip. verification: backstop
+
+### E3 — Audit log table list
+
+- **empty** — backstop: Empty state `audit.empty.title` / `audit.empty.body` ("No events match these filters."). verification: backstop
+- **loading** — backstop: 100 skeleton rows at `min-h-[36px]`. verification: backstop
+- **error** — backstop: Alert with retry; preserves prior page state. verification: backstop
+- **populated** — backstop: One-line summary per row: `12:34:56 · Dr. Ahmed · procedure.finalized · abc123`. verification: backstop
+- **partial** — backstop: Some event types missing metadata renders `{}` JSON, not blank. verification: backstop
+- **overflow** — backstop: Vertical scroll on Card; horizontal scroll on long entity ids. verification: backstop
+- **zero-one-many** — backstop: Page count `Page N of M` + singular/plural `1 event` / `N events`. verification: backstop
+
+### E4 — Audit row detail dialog
+
+- **empty** — backstop: When metadata is empty object `{}`, render literal `{}` not blank. verification: backstop
+- **loading** — backstop: Dialog opens immediately with cached row; metadata renders when fetched. verification: backstop
+- **error** — backstop: If metadata fetch fails, show Alert + retry; dialog remains open. verification: backstop
+- **populated** — backstop: Pretty-printed JSON at 14px mono, Copy JSON button. verification: backstop
+- **partial** — backstop: Missing fields show `—` not blank. verification: backstop
+- **overflow** — backstop: `max-w-2xl` (672px); JSON scrolls if very long. verification: backstop
+- **zero-one-many** — backstop: Single row detail, no plural handling needed. verification: backstop
+- **long-text** — backstop: Long metadata strings wrap inside JSON viewer; preserve newlines. verification: backstop
+
+### E5 — Backup & Restore page
+
+- **long-text** — backstop: Backup destination path truncated to last 60 chars with leading `…`; full path in tooltip. verification: backstop
+
+### E6 — Restore preview dialog
+
+- **long-text** — backstop: Long file names truncated middle (`…middle…`) preserving extension; full in tooltip. verification: backstop
+
+### E7 — Restore confirm dialog
+
+- **long-text** — backstop: Staging directory path truncated to last 60 chars; full in tooltip. verification: backstop
+
+### E8 — Language picker on Profile Editor
+
+- **empty** — backstop: Default to current `users.language` if `doctor_profile.language` null; radio shows both options. verification: backstop
+- **loading** — backstop: Profile loads skeleton fields; radio disabled until loaded. verification: backstop
+- **error** — backstop: Save failure shows Alert + retry; radio preserved. verification: backstop
+- **partial** — backstop: If profile missing doctor name, prompt to complete profile first. verification: backstop
+- **long-text** — backstop: N/A (radio labels are short). verification: backstop
+
+### E9 — Language picker on Wizard
+
+- **empty** — backstop: Default language = 'en' for first wizard run; radio pre-selected. verification: backstop
+- **loading** — backstop: Wizard step renders immediately; no async load. verification: backstop
+- **error** — backstop: If wizard submit fails, retain all step values; radio preserved. verification: backstop
+- **partial** — backstop: Validate language picked before Next; show inline error. verification: backstop
+- **long-text** — backstop: N/A (radio labels are short). verification: backstop
+
+### E10 — AR PDF rendering
+
+- **empty** — backstop: AR report with no body fields renders header + footer only; no crash. verification: backstop
+- **loading** — backstop: PDF render spinner during Font.register + render; cancel button. verification: backstop
+- **error** — backstop: Alert if Font.register fails (missing TTF); fall back to system fonts. verification: backstop
+- **partial** — backstop: Mixed EN/AR fields render with bidi isolation per PITFALLS §Pitfall 8. verification: backstop
+- **overflow** — backstop: Long Arabic text wraps correctly; numeric fragments stay LTR. verification: backstop
+- **long-text** — backstop: Truncate clinic address at 80 chars; full address in footer. verification: backstop
+
+### E11 — RTL smoke test per route
+
+- **empty** — backstop: All routes render smoke screenshots; baseline captured. verification: backstop
+- **loading** — backstop: Test waits for network idle before screenshot. verification: backstop
+- **error** — backstop: Right-edge overflow fails the test with route + screenshot diff. verification: backstop
+- **populated** — backstop: Standard happy-path state per route. verification: backstop
+- **partial** — backstop: Mid-form-fill state captures component layout. verification: backstop
+- **overflow** — backstop: Asserted via `document.documentElement.scrollWidth <= window.innerWidth` in RTL. verification: backstop
+- **zero-one-many** — backstop: PL list density: 0, 1, 25 patients. verification: backstop
+
+### E12 — Backup inline progress indicator
+
+- **unclassified** — backstop: Indeterminate spinner during backup; success toast with Reveal in Explorer. verification: backstop
+
+---
+
+*UI-SPEC approved 2026-08-10 by gsd-ui-checker (revision 2). Dimensions 1-6 PASS. UI Considerations: 56 backstops surfaced across 12 elements. Ready for plan-phase.*
