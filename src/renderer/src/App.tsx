@@ -17,6 +17,11 @@ import ProcedurePreview from './pages/ProcedurePreview';
 import ProcedureReview from './pages/ProcedureReview';
 import ProfileEditor from './pages/ProfileEditor';
 import ReportEditor from './pages/ReportEditor';
+// Phase 7 / Plan 07-03 — AUDIT-01 / AUDIT-02: read-only audit log
+// viewer (Route.audit). The page body lands here; the route variant
+// was added in Plan 07-02 so the SettingsSidebar's navigate() call
+// compiles.
+import Audit from './pages/Audit';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -89,6 +94,8 @@ export default function App(): JSX.Element {
       return <ProfileEditor />;
     case 'report-editor':
       return <ReportEditor procedureId={route.procedureId} reportId={route.reportId} />;
+    case 'audit':
+      return <Audit />;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit

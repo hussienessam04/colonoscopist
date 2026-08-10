@@ -34,6 +34,12 @@ type MockApi = {
   };
   audit: {
     list: ReturnType<typeof vi.fn>;
+    // Phase 7 / Plan 07-03 — AUDIT-01 + D-08: renderer-initiated audit
+    // row write for "audit-on-every-read" patterns (the Audit page
+    // calls audit.log({action: 'audit_view'}) on mount). The hook
+    // resolves to { ok: true } so the page render doesn't crash
+    // before the test seeds a specific shape.
+    log: ReturnType<typeof vi.fn>;
   };
   capture: {
     listDevices: ReturnType<typeof vi.fn>;
@@ -128,7 +134,8 @@ export function mockApi(): MockApi {
       restore: vi.fn(),
     },
     audit: {
-      list: vi.fn().mockResolvedValue([]),
+      list: vi.fn().mockResolvedValue({ rows: [], total: 0 }),
+      log: vi.fn().mockResolvedValue({ ok: true }),
     },
     capture: {
       listDevices: vi.fn().mockResolvedValue([]),

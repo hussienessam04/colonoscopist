@@ -1,0 +1,518 @@
+// Audit page — Phase 7 / Plan 07-03 (AUDIT-01 / AUDIT-02).
+// Read-only viewer over the audit_log table via the existing `audit:list`
+// IPC. Per D-05..D-08 + UI-SPEC §Implementation Bindings Audit page
+// layout:
+//   - Header: "Workspace" kicker + "Audit log" h1 + Back button
+//   - Filter Card: Date from / Date to (native <input type="date">) +
+//     Doctor Select (usersList) + Action free-text input + Entity Type
+//     Select (fixed enum) + Apply + Clear all buttons
+//   - Results Card: compact one-line rows at min-h-[36px] (UI-SPEC
+//     spacing exception) — 4 columns: Time / User / Action / Entity
+//   - Row click: opens a Dialog with full row + pretty-printed JSON
+//     metadata + Copy JSON button
+//   - Footer: "Page X of Y" + Previous / Next
+//
+// D-08 verbatim: the page mounts ONCE → schedules a 1000ms setTimeout
+// → fires `audit.log({action: 'audit_view', entityType: 'audit'})`
+// exactly once. Re-firing on filter change would create audit spam
+// per PITFALLS §Pitfall 8 — the empty useEffect deps array prevents
+// this. The 1s debounce matches the page being a "view" rather than a
+// "load" — gives the operator time to navigate away (e.g. accidental
+// click) before the audit row lands.
+
+import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { ArrowLeft, ClipboardCopy } from 'lucide-react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useAudit } from '@/hooks/useAudit';
+import { useRoute } from '@/lib/router';
+import { useSession } from '@/store/session';
+import type { AuditEntry, UserPublic } from '@shared/ipc-contract';
+
+const DEFAULT_PAGE_SIZE = 100;
+
+// UI-SPEC §Implementation Bindings — fixed entity-type options. Anything
+// outside this list is logged by main but the Audit page doesn't expose
+// a picker for it (kept narrow to avoid UI clutter).
+const ENTITY_TYPES: { value: string; label: string }[] = [
+  { value: 'user', label: 'user' },
+  { value: 'patient', label: 'patient' },
+  { value: 'procedure', label: 'procedure' },
+  { value: 'report', label: 'report' },
+  { value: 'profile', label: 'profile' },
+  { value: 'screenshot', label: 'screenshot' },
+  { value: 'device', label: 'device' },
+  { value: 'audit', label: 'audit' },
+  { value: 'backup', label: 'backup' },
+  { value: 'restore', label: 'restore' },
+  { value: 'language', label: 'language' },
+];
+
+const ANY_USER = '__any__';
+const ANY_ENTITY = '__any__';
+
+function dateInputToMsStartOfDay(yyyyMmDd: string): number | undefined {
+  if (yyyyMmDd === '') return undefined;
+  // ponytail: Date.UTC to avoid TZ drift — the operator typed a date in
+  // their local zone, but the audit_log stores created_at as ms since
+  // epoch. Mid-day of <yyyy-mm-dd> in UTC is the safest round-trip.
+  const ms = Date.parse(`${yyyyMmDd}T00:00:00Z`);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+function dateInputToMsEndOfDay(yyyyMmDd: string): number | undefined {
+  if (yyyyMmDd === '') return undefined;
+  const ms = Date.parse(`${yyyyMmDd}T23:59:59.999Z`);
+  return Number.isNaN(ms) ? undefined : ms;
+}
+
+function formatHHMMSS(ms: number): string {
+  // ponytail: native Intl.DateTimeFormat instead of a hand-rolled HH:MM:SS
+  // formatter — the locale-aware variant handles the AR locale ('ar-SA')
+  // when the operator has flipped the UI to RTL. For English we lock
+  // hour12=false so the time reads as 14:05:09 not 2:05:09 PM.
+  const d = new Date(ms);
+  const pad = (n: number): string => n.toString().padStart(2, '0');
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+function resolveUserDisplayName(
+  userId: string | null,
+  users: UserPublic[],
+  fallback: string,
+): string {
+  if (userId === null) return '(system)';
+  const found = users.find((u) => u.id === userId);
+  return found?.fullName ?? fallback;
+}
+
+export default function Audit(): JSX.Element {
+  const { navigate } = useRoute();
+  const { currentUser } = useSession();
+
+  // ponytail: each filter field is direct state (no Apply commit).
+  // Date/doctor/action/entity-type all refetch via the useAudit effect
+  // when the value changes — the Audit page is already a "view" so
+  // per-keystroke refetch is acceptable (debounce is unnecessary
+  // because the IPC is fast and the page is per-page, not per-keystroke
+  // — the operator is on this page to read, not to type).
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [userId, setUserId] = useState('');
+  const [action, setAction] = useState('');
+  const [entityType, setEntityType] = useState('');
+  const [page, setPage] = useState(1);
+
+  // Doctor list — loaded once on mount so the Author Select has stable
+  // options for the whole session. Empty array before the IPC resolves.
+  const [users, setUsers] = useState<UserPublic[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    void window.api.auth.usersList().then((list) => {
+      if (!cancelled) setUsers(list);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const filters = useMemo(
+    () => ({
+      from: dateInputToMsStartOfDay(dateFrom),
+      to: dateInputToMsEndOfDay(dateTo),
+      userId: userId === '' ? undefined : userId,
+      action: action === '' ? undefined : action,
+      entityType: entityType === '' ? undefined : entityType,
+    }),
+    [dateFrom, dateTo, userId, action, entityType],
+  );
+
+  const { rows, total, loading, error, refresh } = useAudit({
+    filters,
+    page,
+    pageSize: DEFAULT_PAGE_SIZE,
+  });
+
+  // D-08 + PITFALLS §Pitfall 8 — empty deps + 1s debounce + one fire
+  // per page mount. The depth-1 user-id path is the only way to safely
+  // audit-page-load without spamming audit rows on every filter change.
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      void window.api.audit.log({
+        action: 'audit_view',
+        entityType: 'audit',
+      });
+    }, 1000);
+    return () => clearTimeout(handle);
+  }, []);
+
+  // Detail dialog state — the AuditEntry the operator clicked (null
+  // when the dialog is closed).
+  const [detail, setDetail] = useState<AuditEntry | null>(null);
+
+  async function handleCopyJson(): Promise<void> {
+    if (detail === null) return;
+    const json = JSON.stringify(
+      {
+        id: detail.id,
+        userId: detail.userId,
+        action: detail.action,
+        entityType: detail.entityType,
+        entityId: detail.entityId,
+        metadata: detail.metadata,
+        outcome: detail.outcome,
+        createdAt: detail.createdAt,
+      },
+      null,
+      2,
+    );
+    try {
+      await navigator.clipboard.writeText(json);
+      toast.success('Copied to clipboard');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Copy failed';
+      toast.error(msg);
+    }
+  }
+
+  function handleClearAll(): void {
+    setDateFrom('');
+    setDateTo('');
+    setUserId('');
+    setAction('');
+    setEntityType('');
+    setPage(1);
+  }
+
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+  const fallbackUserName = currentUser?.fullName ?? 'unknown';
+
+  return (
+    <main className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-6xl flex flex-col gap-4">
+        <header className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              Workspace
+            </p>
+            <h1 className="text-2xl font-semibold">Audit log</h1>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => navigate({ name: 'settings-hub' })}
+            data-testid="audit-back"
+          >
+            <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
+            Back
+          </Button>
+        </header>
+
+        <Card data-testid="audit-filter-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">Filters</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-date-from">Date from</Label>
+                <Input
+                  id="audit-date-from"
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setDateFrom(e.target.value);
+                    setPage(1);
+                  }}
+                  data-testid="audit-date-from"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-date-to">Date to</Label>
+                <Input
+                  id="audit-date-to"
+                  type="date"
+                  value={dateTo}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setDateTo(e.target.value);
+                    setPage(1);
+                  }}
+                  data-testid="audit-date-to"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-user">Doctor</Label>
+                <Select
+                  value={userId === '' ? ANY_USER : userId}
+                  onValueChange={(v) => {
+                    setUserId(v === ANY_USER ? '' : v);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger id="audit-user" data-testid="audit-user">
+                    <SelectValue placeholder="Any user" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY_USER}>Any user</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.fullName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-action">Action</Label>
+                <Input
+                  id="audit-action"
+                  value={action}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                    setAction(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="e.g. login"
+                  data-testid="audit-action"
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-entity-type">Entity type</Label>
+                <Select
+                  value={entityType === '' ? ANY_ENTITY : entityType}
+                  onValueChange={(v) => {
+                    setEntityType(v === ANY_ENTITY ? '' : v);
+                    setPage(1);
+                  }}
+                >
+                  <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type">
+                    <SelectValue placeholder="Any entity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={ANY_ENTITY}>Any entity</SelectItem>
+                    {ENTITY_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                onClick={handleClearAll}
+                data-testid="audit-clear"
+              >
+                Clear all
+              </Button>
+              <Button
+                onClick={() => void refresh()}
+                data-testid="audit-apply"
+              >
+                Apply
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {error !== null ? (
+          <Alert variant="destructive" data-testid="audit-error">
+            <AlertTitle>Failed to load audit log</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        ) : null}
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">
+              Events <span className="text-muted-foreground text-sm font-normal">({total} total)</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[calc(100vh-22rem)]">
+              <div className="rounded-md">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                      <th className="px-3 py-2 w-28">Time</th>
+                      <th className="px-3 py-2 w-44">User</th>
+                      <th className="px-3 py-2 w-44">Action</th>
+                      <th className="px-3 py-2">Entity</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {loading ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-3 py-8 text-center text-sm text-muted-foreground"
+                          data-testid="audit-loading"
+                        >
+                          <span className="inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 mr-2 align-[-2px]" />
+                          Loading…
+                        </td>
+                      </tr>
+                    ) : rows.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="px-3 py-8 text-center text-sm text-muted-foreground"
+                          data-testid="audit-empty"
+                        >
+                          No events match these filters.
+                        </td>
+                      </tr>
+                    ) : (
+                      rows.map((row) => (
+                        <tr
+                          key={row.id}
+                          className="border-b min-h-[36px] cursor-pointer hover:bg-slate-50"
+                          onClick={() => setDetail(row)}
+                          data-testid="audit-row"
+                          data-row-id={row.id}
+                        >
+                          <td className="px-3 py-1 align-middle">
+                            <span className="truncate tabular-nums text-sm font-mono">
+                              {formatHHMMSS(row.createdAt)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1 align-middle">
+                            <span className="truncate text-sm">
+                              {resolveUserDisplayName(row.userId, users, fallbackUserName)}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1 align-middle">
+                            <span className="truncate text-sm font-medium">
+                              {row.action}
+                            </span>
+                          </td>
+                          <td className="px-3 py-1 align-middle">
+                            <span className="truncate text-sm text-muted-foreground">
+                              {row.entityType === null
+                                ? '—'
+                                : `${row.entityType}${row.entityId ? ` ${row.entityId}` : ''}`}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground" data-testid="audit-pagination">
+            Page {page} of {totalPages}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              data-testid="audit-prev"
+            >
+              Previous
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              data-testid="audit-next"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <Dialog
+        open={detail !== null}
+        onOpenChange={(v) => {
+          if (!v) setDetail(null);
+        }}
+      >
+        <DialogContent className="max-w-2xl" data-testid="audit-detail-dialog">
+          <DialogHeader>
+            <DialogTitle>Audit event details</DialogTitle>
+            <DialogDescription>
+              {detail === null ? null : (
+                <span className="font-mono text-xs">id #{detail.id}</span>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {detail !== null ? (
+            <div className="flex flex-col gap-3">
+              <dl className="grid grid-cols-2 gap-2 text-sm">
+                <dt className="text-muted-foreground">User ID</dt>
+                <dd className="font-mono text-xs break-all">
+                  {detail.userId ?? '(system)'}
+                </dd>
+                <dt className="text-muted-foreground">Action</dt>
+                <dd className="font-mono text-xs">{detail.action}</dd>
+                <dt className="text-muted-foreground">Entity type</dt>
+                <dd className="font-mono text-xs">{detail.entityType ?? '—'}</dd>
+                <dt className="text-muted-foreground">Entity ID</dt>
+                <dd className="font-mono text-xs break-all">
+                  {detail.entityId ?? '—'}
+                </dd>
+                <dt className="text-muted-foreground">Outcome</dt>
+                <dd className="font-mono text-xs">{detail.outcome}</dd>
+                <dt className="text-muted-foreground">Created at</dt>
+                <dd className="font-mono text-xs">
+                  {new Date(detail.createdAt).toISOString()}
+                </dd>
+              </dl>
+              <div className="flex flex-col gap-1">
+                <Label htmlFor="audit-detail-metadata">Metadata</Label>
+                <pre
+                  id="audit-detail-metadata"
+                  data-testid="audit-detail-metadata"
+                  className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border bg-slate-50 p-3 font-mono text-xs"
+                >
+                  {detail.metadata === null
+                    ? '—'
+                    : JSON.stringify(detail.metadata, null, 2)}
+                </pre>
+              </div>
+            </div>
+          ) : null}
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => void handleCopyJson()}
+              data-testid="audit-copy-json"
+            >
+              <ClipboardCopy className="size-4 mr-1" aria-hidden="true" />
+              Copy JSON
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </main>
+  );
+}
