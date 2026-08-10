@@ -74,10 +74,35 @@ describe('db migrations', () => {
       id: number;
       name: string;
     }[];
-    // Phase 6 / Plan 06-01 added migration 0004 (doctor_profile + reports
-    // + report_screenshots). Total now = 4.
-    expect(migrations).toHaveLength(4);
+    // Phase 7 / Plan 07-01 added migration 0007 (doctor_profile.language +
+    // users.language). Total now = 5.
+    expect(migrations).toHaveLength(5);
     expect(migrations[0].id).toBe(1);
+
+    // Phase 7 / Plan 07-01 — verify migration 0007 added the language
+    // columns to both tables in one migration.
+    const usersColumns = db.prepare(`PRAGMA table_info(users)`).all() as {
+      name: string;
+      type: string;
+      notnull: number;
+      dflt_value: string | null;
+    }[];
+    const usersLang = usersColumns.find((c) => c.name === 'language');
+    expect(usersLang).toBeDefined();
+    expect(usersLang?.type).toBe('TEXT');
+    expect(usersLang?.notnull).toBe(1);
+    expect(usersLang?.dflt_value).toBe("'en'");
+
+    const profileColumns = db.prepare(`PRAGMA table_info(doctor_profile)`).all() as {
+      name: string;
+      type: string;
+      notnull: number;
+    }[];
+    const profileLang = profileColumns.find((c) => c.name === 'language');
+    expect(profileLang).toBeDefined();
+    expect(profileLang?.type).toBe('TEXT');
+    // doctor_profile.language is nullable (NULL means "follow users.language").
+    expect(profileLang?.notnull).toBe(0);
 
     closeDb();
   });
@@ -87,13 +112,13 @@ describe('db migrations', () => {
 
     // First open
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(4);
+    expect(count).toBe(5);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(
@@ -101,6 +126,14 @@ describe('db migrations', () => {
     ).all() as { name: string }[]).map((r) => r.name);
     expect(tables).toEqual(expect.arrayContaining(['users', 'patients', 'audit_log', 'settings']));
 
+    // ponytail: re-running migrations on the same db is a no-op for
+    // 0007 — the _migrations row prevents the ALTER TABLEs from firing
+    // a second time (which would otherwise throw `duplicate column`).
+    closeDb();
+
+    // Third open — confirm migration count stays at 5 (idempotency).
+    const db3 = getDb();
+    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
     closeDb();
   });
 });

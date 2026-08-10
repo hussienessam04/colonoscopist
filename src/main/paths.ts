@@ -106,3 +106,15 @@ export function screenshotAbsPath(
 ): string {
   return path.join(app.getPath('userData'), filePath);
 }
+
+// Phase 7 / Plan 07-01 — Restore staging directory (D-14).
+// `<userData>/data-restore-<timestamp>/` is a SIBLING of the active `data/`
+// directory. The active data folder is NEVER overwritten by Phase 7 — only
+// an explicit "Activate this backup" button (v1.1 placeholder) would swap
+// directories. The doctor can inspect the staging dir with File Explorer
+// if the auto-restore hits a snag. No mkdir here — the caller creates the
+// directory on demand so staging dirs that never get used don't litter
+// the userData folder.
+export function restoreStagingDir(timestamp: number): string {
+  return path.join(app.getPath('userData'), `data-restore-${timestamp}`);
+}
