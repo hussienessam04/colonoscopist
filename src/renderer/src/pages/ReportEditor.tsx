@@ -53,39 +53,57 @@ import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
 import type { Report, Screenshot } from '@shared/ipc-contract';
 
-// ponytail: Phase 6 UAT G-06-11 — print preview. The iframe is keyed
-// by the resolved pdfPath + a cache-busting tick so each successful
-// (re)render produces a fresh iframe (the previous one is unmounted).
-// `print()` is called via ref to avoid re-renders.
-function PrintPreview({ pdfPath, mediaBaseUrl, patientId, procedureId }: {
-  pdfPath: string | null;
-  mediaBaseUrl: string | null;
-  patientId: string;
-  procedureId: string;
-}): JSX.Element | null {
+// ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
+// via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
+// the report PDF — it restricts to data/media/patients/ paths). The
+// bytes are wrapped in a Blob + ObjectURL which the iframe loads. The
+// iframe is keyed by the object URL string so re-renders (after a
+// regenPdf round-trip) re-mount the iframe with the new blob URL,
+// bypassing any browser cache.
+function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | null {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  // ponytail: append a cache-buster so a re-rendered PDF (after
-  // finalize → regenPdf round-trip) does not display the cached
-  // version. Same `pdfPath` value means same file on disk; we
-  // re-mount the iframe to force Chromium to re-fetch.
-  const cacheBust = useMemo(() => Date.now().toString(), [pdfPath]);
-  if (pdfPath === null || mediaBaseUrl === null || patientId === '' || procedureId === '') {
-    return null;
-  }
-  // Phase 5 P12 + Phase 6 G-06-14: /media/<patientId>/<procedureId>/<file>
-  // route on the MediaServer. The `cacheBust` query param prevents the
-  // browser from serving the previous PDF.
-  const src = `${mediaBaseUrl}/media/${patientId}/${procedureId}/${pdfPath.split('/').pop()}?t=${cacheBust}`;
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    if (reportId === null) {
+      setSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrlToRevoke: string | null = null;
+    (async (): Promise<void> => {
+      try {
+        const result = await window.api.reports?.getPdfBlob?.({ id: reportId });
+        if (cancelled || result === undefined || result === null) return;
+        // Wrap the bytes in a Blob → ObjectURL. The renderer owns the
+        // URL; revoke on unmount or when the PDF changes.
+        const blob = new Blob([result.bytes], { type: result.mime });
+        const url = URL.createObjectURL(blob);
+        objectUrlToRevoke = url;
+        setSrc(url);
+      } catch (err) {
+        // best-effort — PrintPreview is optional UX
+        if (!cancelled) {
+          console.warn('Failed to load PDF for print preview:', err);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrlToRevoke !== null) {
+        URL.revokeObjectURL(objectUrlToRevoke);
+      }
+    };
+  }, [reportId]);
+  if (src === null) return null;
   return (
     <iframe
       ref={iframeRef}
       src={src}
       title="PDF preview"
-      className="hidden"
       // ponytail: keep the iframe loaded so contentWindow.print() works
-      // synchronously on demand. Hidden via Tailwind (display:none
-      // would prevent print()). Width/height set so Chromium renders
-      // the PDF page at full size.
+      // synchronously on demand. Hidden via inline style (Tailwind's
+      // `hidden` = display:none would prevent print()). 1×1 px at
+      // opacity 0.01 keeps it loaded without occupying space.
       style={{ position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', border: 0, opacity: 0.01 }}
       data-testid="report-editor-pdf-iframe"
     />
@@ -357,14 +375,11 @@ export default function ReportEditor({
   return (
     <main className="min-h-screen bg-slate-100 p-6">
       {/* Phase 6 UAT G-06-11 — hidden iframe hosting the actual PDF for
-          `contentWindow.print()`. Mounted whenever a pdfPath exists. */}
-      <PrintPreview
-        key={`${report?.pdfPath ?? 'none'}`}
-        pdfPath={report?.pdfPath ?? null}
-        mediaBaseUrl={mediaUrl.url}
-        patientId={procedure?.patientId ?? ''}
-        procedureId={procedureId}
-      />
+          `contentWindow.print()`. Mounted whenever the report has a
+          pdfPath. The PDF bytes are fetched via the new getPdfBlob IPC
+          (the MediaServer doesn't serve the report PDF), wrapped in a
+          Blob ObjectURL, and loaded in the iframe. */}
+      <PrintPreview key={report?.pdfPath ?? 'none'} reportId={report?.id ?? null} />
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>

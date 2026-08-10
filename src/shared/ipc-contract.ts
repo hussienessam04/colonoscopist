@@ -89,6 +89,13 @@ export const IPC = {
   REPORTS_DETACH_SCREENSHOT: 'reports:detach-screenshot',
   REPORTS_REORDER_SCREENSHOTS: 'reports:reorder-screenshots',
   REPORTS_LIST_SCREENSHOTS: 'reports:list-screenshots',
+  // Phase 6 UAT G-06-11 — return the PDF bytes as a Uint8Array so the
+  // renderer can build a blob: URL and load it in an iframe for the
+  // Print preview button. The MediaServer only serves /media/...
+  // (patient/procedure media files), not the report PDF (which lives
+  // under data/reports/), so the renderer can't fetch the file via
+  // the MediaServer. The data bridge IPC is the cleanest path.
+  REPORTS_GET_PDF_BLOB: 'reports:get-pdf-blob',
 } as const;
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
@@ -473,6 +480,13 @@ export interface IpcContract {
     // Default (omit / false) preserves the "open in default viewer"
     // behavior so existing callers keep working.
     openPdf: (input: { id: string; reveal?: boolean }) => Promise<{ opened: true }>;
+    // Phase 6 UAT G-06-11 — returns the raw PDF bytes for the
+    // print-preview iframe. The renderer wraps the bytes in a blob: URL
+    // and loads it in a hidden iframe so `contentWindow.print()` opens
+    // the OS print dialog with the actual PDF as the print target.
+    // Throws IPC_NOT_FOUND if the PDF hasn't been rendered yet
+    // (report.pdfPath === null).
+    getPdfBlob: (input: { id: string }) => Promise<{ bytes: Uint8Array; mime: 'application/pdf' }>;
     attachScreenshot: (input: { id: string; screenshotId: number; sortOrder: number }) => Promise<{ ok: true }>;
     detachScreenshot: (input: { id: string; screenshotId: number }) => Promise<{ ok: true }>;
     reorderScreenshots: (input: { id: string; orderedIds: number[] }) => Promise<{ ok: true }>;

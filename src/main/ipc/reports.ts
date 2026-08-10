@@ -36,7 +36,7 @@ import { audit } from '../db/audit';
 import { session } from '../auth/session';
 import { renderReportPdf } from '../pdf/render-report-pdf';
 import { reportPdfPath } from '../paths';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -197,6 +197,38 @@ export function registerReportsIpc(): void {
         metadata: { pdfPath: result.pdfPath },
       });
       return result;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  // Phase 6 UAT G-06-11 — return the PDF bytes so the renderer can build
+  // a blob: URL and load it in the print-preview iframe. The PDF lives
+  // under <userData>/data/reports/<reportId>.pdf which the MediaServer
+  // does NOT serve (its path-safety check restricts to
+  // data/media/patients/). A direct IPC is the cleanest bridge.
+  ipcMain.handle(IPC.REPORTS_GET_PDF_BLOB, async (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const report = reportsRepo.getById(id);
+      if (report === null || report.pdfPath === null) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf not generated yet'),
+        );
+      }
+      const userData = app.getPath('userData');
+      const absPath = path.join(userData, report.pdfPath.split('/').join(path.sep));
+      if (!existsSync(absPath)) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf file is missing on disk'),
+        );
+      }
+      // readFileSync returns a Buffer; Uint8Array view lets the
+      // renderer wrap it in a blob: URL via URL.createObjectURL(new
+      // Blob([bytes], { type: 'application/pdf' })).
+      const bytes = readFileSync(absPath);
+      return { bytes: new Uint8Array(bytes), mime: 'application/pdf' as const };
     } catch (err) {
       throw asIpcError(err);
     }
