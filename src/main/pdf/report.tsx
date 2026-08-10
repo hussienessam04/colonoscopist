@@ -220,7 +220,6 @@ export function createReportPdfElement(
     procedureDurationLabel,
     findings,
     diagnosis,
-    recommendations,
     attachedScreenshots,
   } = input;
 
@@ -292,7 +291,10 @@ export function createReportPdfElement(
         React.createElement(P.Text, null, `Doctor: ${doctorName}`),
       ),
 
-      // Findings / Diagnosis / Recommendations
+      // Findings / Diagnosis. Recommendations + procedureDetails were
+      // removed in Phase 6 UAT G-06-10 — the doctor only fills these
+      // two; the two removed fields are still columns in the reports
+      // table (no migration) but no longer surfaced in the editor or PDF.
       React.createElement(
         P.View,
         { style: styles.section },
@@ -304,12 +306,6 @@ export function createReportPdfElement(
         { style: styles.section },
         React.createElement(P.Text, { style: styles.sectionTitle }, 'Diagnosis'),
         React.createElement(P.Text, { style: styles.body }, diagnosis || '—'),
-      ),
-      React.createElement(
-        P.View,
-        { style: styles.section },
-        React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendations'),
-        React.createElement(P.Text, { style: styles.body }, recommendations || '—'),
       ),
 
       // Phase 6 UAT G-06-4 — attached screenshots render as small

@@ -76,7 +76,9 @@ async function renderReportEditor(): Promise<void> {
 }
 
 describe('ReportEditor', () => {
-  it('renders 4 textareas with the expected labels', async () => {
+  // Phase 6 UAT G-06-10 — Recommendations + procedureDetails removed
+  // from the editor. Only Findings + Diagnosis remain.
+  it('renders 2 textareas (Findings + Diagnosis)', async () => {
     const api = getApi();
     api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
     await renderReportEditor();
@@ -85,8 +87,8 @@ describe('ReportEditor', () => {
     });
     expect(screen.getByTestId('report-editor-findings')).toBeInTheDocument();
     expect(screen.getByTestId('report-editor-diagnosis')).toBeInTheDocument();
-    expect(screen.getByTestId('report-editor-recommendations')).toBeInTheDocument();
-    expect(screen.getByTestId('report-editor-procedureDetails')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-editor-recommendations')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-editor-procedureDetails')).not.toBeInTheDocument();
   });
 
   it('draft textarea change fires api.reports.updateDraft after debounce', async () => {
@@ -96,8 +98,6 @@ describe('ReportEditor', () => {
       ...DRAFT_REPORT,
       findings: input.findings ?? '',
       diagnosis: input.diagnosis ?? '',
-      recommendations: input.recommendations ?? '',
-      procedureDetails: input.procedureDetails ?? '',
     }));
     await renderReportEditor();
     const findings = await screen.findByTestId('report-editor-findings');

@@ -51,7 +51,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScreenshotThumbnail } from '@/components/ScreenshotThumbnail';
 import { screenshotUrl } from '@/lib/screenshot-url';
-import type { ProcedureStatus, Screenshot } from '@shared/ipc-contract';
+import type { ProcedureStatus, ReportScreenshot, Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotTimelineProps = {
   // Procedure id is reserved for future scoping (Plan 03+). The timeline
@@ -83,7 +83,13 @@ export type ScreenshotTimelineProps = {
   // Phase 6 / Plan 02 — attach-to-report props. All optional; defaults
   // are safe no-ops for the legacy ProcedureReview / ProcedureRoom
   // callers.
+  // ponytail: prefer the rich `attached` prop (with sortOrder) over the
+  // bare Set. The rich form lets the timeline ORDER displayed
+  // thumbnails by sortOrder (the DB's sort_order is the source of
+  // truth for the PDF render order). Falls back to the Set for
+  // back-compat with callers that don't have sortOrder handy.
   attachedIds?: Set<number>;
+  attached?: ReportScreenshot[];
   onToggleAttach?: (screenshotId: number) => void;
   onReorder?: (orderedIds: number[]) => void;
   testId?: string;
@@ -110,22 +116,52 @@ export function ScreenshotTimeline({
   onAnnotate,
   onOpen,
   attachedIds,
+  attached,
   onToggleAttach,
   onReorder,
   testId,
 }: ScreenshotTimelineProps): JSX.Element {
   const canCapture = captureAllowed(status) && onCapture !== undefined;
-  const attached = attachedIds ?? new Set<number>();
+  // ponytail: prefer the rich `attached` prop (with sortOrder) for
+  // ordering; fall back to the legacy `attachedIds` Set for callers
+  // that don't have sortOrder handy. Either path yields the same
+  // attached-id Set for the move-button index computation.
+  const attachedIdsSet = attachedIds ?? new Set<number>(
+    attached ? attached.map((a) => a.screenshotId) : [],
+  );
   const toggleAttach = onToggleAttach;
   const reorder = onReorder;
   // ponytail: list of attached screenshot IDs in current display order.
-  // Re-derived from the screenshots prop on every render so React's
+  // Re-derived from the `attached` prop on every render so React's
   // diff picks up the new order when the parent refreshes the report
   // after onReorder. The move-left / move-right handlers compute the
   // next order from this list + the source id.
-  const attachedInOrder = screenshots
-    .map((s) => s.id)
-    .filter((id) => attached.has(id));
+  const attachedInOrder = attached
+    ? [...attached].sort((a, b) => a.sortOrder - b.sortOrder).map((a) => a.screenshotId)
+    : screenshots.map((s) => s.id).filter((id) => attachedIdsSet.has(id));
+
+  // ponytail: sort the displayed thumbnails so attached ones render
+  // FIRST in their persisted sort_order, then unattached ones in the
+  // natural timestampInVideoMs order. Without this, the visual order
+  // of the timeline follows the screenshot timestamp (from
+  // useProcedureScreenshots) and the move buttons would only update
+  // the DB — the user wouldn't see the change.
+  const sortOrderById = new Map<number, number>(
+    attached ? attached.map((a) => [a.screenshotId, a.sortOrder] as [number, number]) : [],
+  );
+  const orderedScreenshots = [...screenshots].sort((a, b) => {
+    const aOrder = sortOrderById.get(a.id);
+    const bOrder = sortOrderById.get(b.id);
+    // Both attached: order by sortOrder ASC.
+    if (aOrder !== undefined && bOrder !== undefined) {
+      return aOrder - bOrder;
+    }
+    // Only a attached: a first.
+    if (aOrder !== undefined) return -1;
+    if (bOrder !== undefined) return 1;
+    // Neither attached: timestampInVideoMs ASC.
+    return a.timestampInVideoMs - b.timestampInVideoMs;
+  });
 
   // Phase 6 UAT G-06-5 — move a screenshot one position to the left
   // in the attached list. When the source is already at the head,
@@ -156,8 +192,8 @@ export function ScreenshotTimeline({
       data-procedure-id={procedureId}
       role="list"
     >
-      {screenshots.map((s) => {
-        const isAttached = attached.has(s.id);
+      {orderedScreenshots.map((s) => {
+        const isAttached = attachedIdsSet.has(s.id);
         const attachedIdx = isAttached ? attachedInOrder.indexOf(s.id) : -1;
         const canMoveLeft = isAttached && attachedIdx > 0;
         const canMoveRight =
