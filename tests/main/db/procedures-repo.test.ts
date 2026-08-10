@@ -158,3 +158,133 @@ describe('proceduresRepo.updateVideoPath + restoreFromOriginal', () => {
     expect(restored.videoPath).toBe('video.mp4');
   });
 });
+
+// Phase 7 / Plan 07-02 — D-04 verbatim: proceduresRepo.list accepts
+// dateFrom / dateTo / doctorId. Date range applies to procedures.started_at
+// (canonical procedure date per Phase 4 D-10). Empty/missing filters
+// preserve the Phase 4 zero-config behavior.
+describe('proceduresRepo.list — Phase 7 date + doctor filters (D-04)', () => {
+  async function bootstrapWithTwoDoctors(): Promise<{
+    doctor1: string;
+    doctor2: string;
+    patientId: string;
+  }> {
+    const { getDb } = await import('../../../src/main/db');
+    const { wizardBootstrap, login } = await import('../../../src/main/auth');
+    const db = getDb();
+    const r = await wizardBootstrap({ fullName: 'Dr. A', clinicName: 'Clinic A', pin: '1234' });
+    await login({ userId: r.userId, pin: '1234' });
+    const doctor2 = '00000000-0000-4000-8000-000000000099';
+    db.prepare(
+      `INSERT INTO users (id, full_name, is_first_admin, pin_hash, failed_attempts, is_locked, created_at)
+       VALUES (?, ?, 0, 'h', 0, 0, ?)`,
+    ).run(doctor2, 'Dr. B', Date.now());
+    const patientId = '00000000-0000-4000-8000-000000000010';
+    db.prepare(
+      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
+       VALUES (?, ?, '1990-01-01', ?, ?)`,
+    ).run(patientId, 'Alice', Date.now(), Date.now());
+    return { doctor1: r.userId, doctor2, patientId };
+  }
+
+  function insertProc(
+    db: ReturnType<typeof import('../../../src/main/db').getDb>,
+    id: string,
+    patientId: string,
+    doctorId: string,
+    startedAt: number,
+  ): void {
+    db.prepare(
+      `INSERT INTO procedures
+        (id, patient_id, doctor_id, started_at, ended_at, duration_seconds, status,
+         video_path, preset_summary, audio_device_name, created_at)
+       VALUES (?, ?, ?, ?, ?, 60, 'completed', 'v.mp4', '{}', NULL, ?)`,
+    ).run(id, patientId, doctorId, startedAt, startedAt + 60_000, startedAt);
+  }
+
+  it('dateFrom/dateTo filters on procedures.started_at', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+    const { doctor1, patientId } = await bootstrapWithTwoDoctors();
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000a1',
+      patientId,
+      doctor1,
+      Date.UTC(2026, 7, 5, 10, 0, 0),
+    );
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000b1',
+      patientId,
+      doctor1,
+      Date.UTC(2026, 8, 10, 10, 0, 0),
+    );
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const aug = proceduresRepo.list({ dateFrom: '2026-08-01', dateTo: '2026-08-31' });
+    expect(aug.total).toBe(1);
+    expect(aug.rows[0]?.id).toBe('00000000-0000-4000-8000-0000000000a1');
+  });
+
+  it('doctorId filters on procedures.doctor_id', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+    const { doctor1, doctor2, patientId } = await bootstrapWithTwoDoctors();
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000a1',
+      patientId,
+      doctor1,
+      Date.UTC(2026, 7, 5, 10, 0, 0),
+    );
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000b1',
+      patientId,
+      doctor2,
+      Date.UTC(2026, 7, 6, 10, 0, 0),
+    );
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const d1Only = proceduresRepo.list({ doctorId: doctor1 });
+    expect(d1Only.total).toBe(1);
+    expect(d1Only.rows[0]?.id).toBe('00000000-0000-4000-8000-0000000000a1');
+  });
+
+  it('AND-combined: dateFrom + dateTo + doctorId = the intersection', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+    const { doctor1, doctor2, patientId } = await bootstrapWithTwoDoctors();
+    // a1 — Aug + doctor1 (matches all three filters)
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000a1',
+      patientId,
+      doctor1,
+      Date.UTC(2026, 7, 5, 10, 0, 0),
+    );
+    // b1 — Aug + doctor2 (doctor mismatch)
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000b1',
+      patientId,
+      doctor2,
+      Date.UTC(2026, 7, 6, 10, 0, 0),
+    );
+    // c1 — Sep + doctor1 (date mismatch)
+    insertProc(
+      db,
+      '00000000-0000-4000-8000-0000000000c1',
+      patientId,
+      doctor1,
+      Date.UTC(2026, 8, 5, 10, 0, 0),
+    );
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const intersected = proceduresRepo.list({
+      dateFrom: '2026-08-01',
+      dateTo: '2026-08-31',
+      doctorId: doctor1,
+    });
+    expect(intersected.total).toBe(1);
+    expect(intersected.rows[0]?.id).toBe('00000000-0000-4000-8000-0000000000a1');
+  });
+});

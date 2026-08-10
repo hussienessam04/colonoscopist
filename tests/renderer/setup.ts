@@ -86,6 +86,10 @@ type MockApi = {
   reports: {
     getOrCreate: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
+    // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup by
+    // procedureId (returns null when no report exists). Used by the
+    // Patient List accordion expansion.
+    getByProcedure: ReturnType<typeof vi.fn>;
     updateDraft: ReturnType<typeof vi.fn>;
     updateFinalized: ReturnType<typeof vi.fn>;
     finalize: ReturnType<typeof vi.fn>;
@@ -185,6 +189,7 @@ export function mockApi(): MockApi {
     reports: {
       getOrCreate: vi.fn().mockResolvedValue(null),
       get: vi.fn().mockResolvedValue(null),
+      getByProcedure: vi.fn().mockResolvedValue(null),
       updateDraft: vi.fn(),
       updateFinalized: vi.fn(),
       finalize: vi.fn(),

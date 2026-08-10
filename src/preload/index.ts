@@ -114,6 +114,11 @@ const api: IpcContract = {
   reports: {
     getOrCreate: (input) => ipcRenderer.invoke(IPC.REPORTS_GET_OR_CREATE, input),
     get: (input) => ipcRenderer.invoke(IPC.REPORTS_GET, input),
+    // Phase 7 / Plan 07-02 — read-only lookup by procedureId (no draft creation).
+    // Returns null when no report exists for the procedure; consumed by the
+    // Patient List accordion expansion (SRCH-03).
+    getByProcedure: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_GET_BY_PROCEDURE, input),
     updateDraft: (input) => ipcRenderer.invoke(IPC.REPORTS_UPDATE_DRAFT, input),
     updateFinalized: (input) =>
       ipcRenderer.invoke(IPC.REPORTS_UPDATE_FINALIZED, input),
