@@ -14,6 +14,11 @@ export type UserRow = {
   locked_until: number | null;
   is_locked: number;
   last_login_at: number | null;
+  // Phase 7 / Plan 07-01 — I18N-01 (per D-18): workstation-level
+  // language default. Set on wizard bootstrap; updated by users.create
+  // for new doctors. Read by the i18n resolver when
+  // doctor_profile.language IS NULL.
+  language: 'en' | 'ar';
   created_at: number;
   deleted_at: number | null;
 };
@@ -22,6 +27,8 @@ export type UserCreateInput = {
   fullName: string;
   pinHash: string;
   isFirstAdmin: boolean;
+  // Phase 7 / Plan 07-01 — I18N-01. Default 'en' if omitted.
+  language?: 'en' | 'ar';
 };
 
 type Stmt = Database.Statement;
@@ -45,9 +52,13 @@ function stmts() {
   if (cached) return cached;
   const db = getDb();
   cached = {
+    // Phase 7 / Plan 07-01 — I18N-01: include the language column on
+    // insert. The migration 0007 default of 'en' is the safe fallback
+    // if @language is somehow null (it shouldn't be — userRepo.create
+    // defaults it to 'en' on the TS side).
     insert: db.prepare(
-      `INSERT INTO users (id, full_name, is_first_admin, pin_hash, failed_attempts, is_locked, created_at)
-       VALUES (@id, @full_name, @is_first_admin, @pin_hash, 0, 0, @created_at)`,
+      `INSERT INTO users (id, full_name, is_first_admin, pin_hash, failed_attempts, is_locked, language, created_at)
+       VALUES (@id, @full_name, @is_first_admin, @pin_hash, 0, 0, @language, @created_at)`,
     ),
     softDelete: db.prepare('UPDATE users SET deleted_at = ? WHERE id = ? AND deleted_at IS NULL'),
     setPin: db.prepare('UPDATE users SET pin_hash = ? WHERE id = ?'),
@@ -82,8 +93,13 @@ export function __resetUserRepoCache(): void {
 }
 
 export const userRepo = {
-  create({ fullName, pinHash, isFirstAdmin }: UserCreateInput): UserRow {
+  create({ fullName, pinHash, isFirstAdmin, language }: UserCreateInput): UserRow {
     const id = randomUUID();
+    // ponytail: default 'en' is the silent fallback per D-18. The
+    // wizard bootstrap + users.create IPC handlers both default to 'en'
+    // before reaching this layer, but the inline default here guards
+    // against any other caller (tests, future code) skipping it.
+    const resolvedLanguage: 'en' | 'ar' = language ?? 'en';
     const row: UserRow = {
       id,
       full_name: fullName,
@@ -93,6 +109,7 @@ export const userRepo = {
       locked_until: null,
       is_locked: 0,
       last_login_at: null,
+      language: resolvedLanguage,
       created_at: Date.now(),
       deleted_at: null,
     };
@@ -101,6 +118,7 @@ export const userRepo = {
       full_name: row.full_name,
       is_first_admin: row.is_first_admin,
       pin_hash: row.pin_hash,
+      language: row.language,
       created_at: row.created_at,
     });
     return row;

@@ -100,12 +100,13 @@ describe('0002_procedures migration', () => {
 
     const db1 = getDb();
     // Phase 6 / Plan 06-01 added migration 0004 (doctor_profile + reports
-    // + report_screenshots). Total now = 4.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
+    // + report_screenshots). Phase 7 / Plan 07-01 added migration 0007
+    // (users.language + doctor_profile.language). Total now = 5.
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(4);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
 
     closeDb();
   });

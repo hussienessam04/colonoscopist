@@ -10,6 +10,8 @@ import { registerRecordingIpc } from './ipc/recording';
 import { registerScreenshotsIpc } from './ipc/screenshots';
 import { registerProfileIpc } from './ipc/profile';
 import { registerReportsIpc } from './ipc/reports';
+import { registerBackupIpc } from './ipc/backup';
+import { registerRestoreIpc } from './ipc/restore';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -76,6 +78,10 @@ app.whenReady().then(() => {
   // have, but the canonical ordering keeps the surface coherent).
   registerProfileIpc();
   registerReportsIpc();
+  // Phase 7 / Plan 07-01 — Backup/Restore IPC (SET-05, SET-06).
+  // Must register AFTER registerAuthIpc() so `requireSession()` resolves.
+  registerBackupIpc();
+  registerRestoreIpc();
   // Phase 5 / Plan 03 — boot the long-lived MediaServer so the renderer's
   // <video> element can compose `/media/<patientId>/<procedureId>/<file>`
   // URLs against `recording.getMediaUrl()`. The server stays bound across

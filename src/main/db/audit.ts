@@ -90,9 +90,31 @@ export function audit(opts: AuditInsertInput): void {
   });
 }
 
+// ponytail: same insert surfaced via the repo namespace so the
+// AUDIT_LOG IPC handler can call `auditRepo.append(...)` instead of
+// reaching into the free function. The shape mirrors AuditInsertInput
+// verbatim (no behaviour change) — the IPC layer doesn't need to know
+// about session defaults; it passes userId explicitly because
+// `requireSession()` already proved the caller is authenticated.
 const MAX_PAGE_SIZE = 200;
 
 export const auditRepo = {
+  // Append a single audit row. Mirrors the free `audit()` helper but
+  // routes through the repo namespace so the AUDIT_LOG IPC handler
+  // can use the same call shape as `auditRepo.list()`.
+  append(opts: AuditInsertInput): void {
+    const userId = opts.userId !== undefined ? opts.userId : session.currentUserId;
+    const metadataJson = opts.metadata ? JSON.stringify(opts.metadata) : null;
+    stmts().insert.run({
+      user_id: userId,
+      action: opts.action,
+      entity_type: opts.entityType ?? null,
+      entity_id: opts.entityId ?? null,
+      metadata: metadataJson,
+      outcome: opts.outcome ?? 'ok',
+      created_at: Date.now(),
+    });
+  },
   list(filter: AuditListInput): { rows: AuditListRow[]; total: number } {
     const page = filter.page && filter.page > 0 ? filter.page : 1;
     const pageSize = filter.pageSize && filter.pageSize > 0 ? filter.pageSize : 50;

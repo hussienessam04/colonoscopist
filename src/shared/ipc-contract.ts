@@ -96,7 +96,28 @@ export const IPC = {
   // under data/reports/), so the renderer can't fetch the file via
   // the MediaServer. The data bridge IPC is the cleanest path.
   REPORTS_GET_PDF_BLOB: 'reports:get-pdf-blob',
+  // Phase 7 / Plan 07-01 — Backup/Restore + audit.log channels
+  // (SET-05, SET-06, AUDIT-01). The audit:log channel is the
+  // renderer-side write path for "audit-on-every-read" patterns
+  // (D-08) — every renderer-initiated read of patient data writes a
+  // row. The backup:* / restore:* channels wrap the main-side module
+  // in src/main/backup/.
+  BACKUP_CREATE: 'backup:create',
+  BACKUP_REVEAL: 'backup:reveal',
+  RESTORE_PREVIEW: 'restore:preview',
+  RESTORE_UNPACK: 'restore:unpack',
+  AUDIT_LOG: 'audit:log',
 } as const;
+
+// Phase 7 / Plan 07-01 — Restore preview shape returned by
+// restore:preview (RESTORE_PREVIEW). Declared at the bottom of the
+// file so the IpcContract interface can reference it.
+export type RestorePreview = {
+  filename: string;
+  totalSize: number;
+  dbIntegrityCheck: string;
+  procedureCount: number;
+};
 
 // CAPT-10 / D-11 — canonical dshow device. `deviceId` is the canonical form
 // (NFC + trim + collapse-spaces) used everywhere; `rawName` is the original
@@ -132,6 +153,10 @@ export type LoginResult =
   | { ok: false; code: 'IPC_AUTH_FAILED' | 'IPC_RATE_LIMITED' | 'IPC_LOCKED'; retryAt?: number };
 
 // UserPublic — shape returned by auth.listUsers + login + users.create.
+// Phase 7 / Plan 07-01 — I18N-01: includes the workstation-level
+// language default (per D-18). The renderer can use this to set up the
+// initial i18n context before the per-doctor doctor_profile.language
+// has been resolved.
 export type UserPublic = {
   id: string;
   fullName: string;
@@ -139,6 +164,7 @@ export type UserPublic = {
   lastLoginAt: number | null;
   failedAttempts: number;
   lockedUntil: number | null;
+  language: 'en' | 'ar';
 };
 
 export type Patient = {
@@ -176,11 +202,16 @@ export type RecoveryResponse = {
 // Main registers the channel under IPC.AUTH_WIZARD (auth:wizard-bootstrap) and returns
 // { accepted: true, userId, clinicName } but does NOT log the user in — the renderer
 // then calls auth.login() to land on the patient list.
+//
+// Phase 7 / Plan 07-01 — I18N-01: optional `language` field (default 'en').
+// Persisted to users.language (per D-18). Per-doctor overrides live on
+// doctor_profile.language (D-17).
 export type WizardSubmitInput = {
   fullName: string;
   clinicName: string;
   pin: string;
   confirmPin: string;
+  language?: 'en' | 'ar';
 };
 
 export type WizardSubmitResult = {
@@ -251,6 +282,9 @@ export type Screenshot = {
 // bilingual EN+AR fields are parallel nullable columns; AR columns are
 // NULL until Phase 7 lands the per-doctor language preference. The
 // signature + logo paths are userData-relative per Anti-Pattern 2.
+//
+// Phase 7 / Plan 07-01 — I18N-01: `language` is the per-doctor
+// override (per D-17). NULL means "follow users.language".
 export type DoctorProfile = {
   id: string;
   userId: string;
@@ -262,6 +296,7 @@ export type DoctorProfile = {
   phone: string | null;
   signaturePath: string | null;
   logoPath: string | null;
+  language: 'en' | 'ar' | null;
   createdAt: number;
   updatedAt: number;
 };
@@ -324,7 +359,9 @@ export interface IpcContract {
     acceptRecoveryFile: () => Promise<{ accepted: true; verificationDeferred: true }>;
   };
   users: {
-    create: (input: { fullName: string; pin: string }) => Promise<UserPublic>;
+    // Phase 7 / Plan 07-01 — I18N-01: optional `language` field on
+    // users.create. Persisted to users.language (default 'en').
+    create: (input: { fullName: string; pin: string; language?: 'en' | 'ar' }) => Promise<UserPublic>;
     remove: (input: { userId: string }) => Promise<{ ok: true }>;
     resetPin: (input: { userId: string; newPin: string }) => Promise<{ ok: true }>;
   };
@@ -353,6 +390,16 @@ export interface IpcContract {
       page?: number;
       pageSize?: number;
     }) => Promise<{ rows: AuditEntry[]; total: number }>;
+    // Phase 7 / Plan 07-01 — AUDIT-01: renderer-initiated audit row
+    // for "audit-on-every-read" patterns (D-08). The handler routes
+    // through the audit() helper in main; no other write surface
+    // exists for audit_log.
+    log: (input: {
+      action: string;
+      entityType?: string;
+      entityId?: string;
+      metadata?: Record<string, unknown>;
+    }) => Promise<{ ok: true }>;
   };
   // Per D-01 + BLOCKER 4: setPreset / setDefaultDevice payloads do NOT include
   // a doctorId field. Main derives the doctorId from `requireSession()` and
@@ -442,6 +489,11 @@ export interface IpcContract {
       clinicNameAr: string | null;
       address: string | null;
       phone: string | null;
+      // Phase 7 / Plan 07-01 — I18N-01: per-doctor language override.
+      // NULL means "follow users.language" (the doctor has not picked
+      // their own preference yet). The i18n resolver reads this column
+      // first, then falls back to the session's users.language.
+      language?: 'en' | 'ar' | null;
     }) => Promise<DoctorProfile>;
         uploadSignature: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ signaturePath: string }>;
         uploadLogo: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ logoPath: string }>;
@@ -492,6 +544,35 @@ export interface IpcContract {
     reorderScreenshots: (input: { id: string; orderedIds: number[] }) => Promise<{ ok: true }>;
     listScreenshots: (input: { id: string }) => Promise<ReportScreenshot[]>;
   };
+  // Phase 7 / Plan 07-01 — Backup/Restore IPC (SET-05, SET-06). The
+  // renderer surfaces the user-data folder as the active `data/` is
+  // byte-identical before and after the operation (D-13..D-16). Per
+  // Phase 2 BLOCKER 4, the renderer never supplies a doctorId — main
+  // derives it from `requireSession()` for the audit row.
+  backup: {
+    create: (input: { destPath: string }) => Promise<{
+      path: string;
+      sizeBytes: number;
+      procedureCount: number;
+    }>;
+    reveal: (input: { path: string }) => Promise<{ ok: true }>;
+  };
+  restore: {
+    preview: (input: { zipPath: string; stagingDir: string }) => Promise<RestorePreview>;
+    unpack: (input: { zipPath: string; stagingDir: string }) => Promise<{
+      fileCount: number;
+      stagingDir: string;
+    }>;
+  };
+  // Phase 7 / Plan 07-01 — Audit log write channel (AUDIT-01). The
+  // renderer can write audit rows for "audit-on-every-read" patterns
+  // (e.g. viewing a patient profile). All writes route through the
+  // audit() helper in src/main/db/audit.ts — there is no other write
+  // path. SQLite triggers reject any UPDATE/DELETE on audit_log.
+  // NOTE: the `audit` namespace is already declared above (with
+  // `list`); the `log` method was added in place to keep the surface
+  // in one block. Plan 07-01 ships the AUDIT_LOG IPC channel as an
+  // extension of the existing audit.* namespace.
 }
 
 declare global {

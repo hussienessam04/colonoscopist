@@ -33,6 +33,11 @@ const api: IpcContract = {
   },
   audit: {
     list: (query) => ipcRenderer.invoke(IPC.AUDIT_LIST, query),
+    // Phase 7 / Plan 07-01 — AUDIT-01: renderer-initiated audit row
+    // for "audit-on-every-read" patterns (D-08). The handler routes
+    // through the audit() helper in main; no other write surface
+    // exists for audit_log.
+    log: (input) => ipcRenderer.invoke(IPC.AUDIT_LOG, input),
   },
   capture: {
     listDevices: () => ipcRenderer.invoke(IPC.CAPTURE_LIST_DEVICES),
@@ -124,6 +129,19 @@ const api: IpcContract = {
       ipcRenderer.invoke(IPC.REPORTS_REORDER_SCREENSHOTS, input),
     listScreenshots: (input) =>
       ipcRenderer.invoke(IPC.REPORTS_LIST_SCREENSHOTS, input),
+  },
+  // Phase 7 / Plan 07-01 — Backup/Restore bridge (SET-05, SET-06).
+  // The handlers in src/main/ipc/backup.ts + restore.ts own all
+  // filesystem writes; the renderer is sandboxed (Phase 1 security
+  // baseline) so it cannot pass arbitrary native paths beyond what the
+  // user picks via Electron's dialog.showSaveDialog in Plan 07-05.
+  backup: {
+    create: (input) => ipcRenderer.invoke(IPC.BACKUP_CREATE, input),
+    reveal: (input) => ipcRenderer.invoke(IPC.BACKUP_REVEAL, input),
+  },
+  restore: {
+    preview: (input) => ipcRenderer.invoke(IPC.RESTORE_PREVIEW, input),
+    unpack: (input) => ipcRenderer.invoke(IPC.RESTORE_UNPACK, input),
   },
 };
 

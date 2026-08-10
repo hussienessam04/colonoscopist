@@ -112,6 +112,11 @@ export function registerProfileIpc(): void {
     try {
       const userId = requireSession();
       const input = safeParse(doctorProfileUpdateSchema, raw);
+      // Phase 7 / Plan 07-01 — I18N-01: forward the optional
+      // `language` field. undefined means "leave the existing value";
+      // null means "clear the per-doctor override so the resolver
+      // falls back to users.language". The repo's upsert handles the
+      // undefined-vs-explicit distinction.
       const updated: DoctorProfile = doctorProfileRepo.upsert({
         userId,
         fullNameEn: input.fullNameEn,
@@ -120,6 +125,7 @@ export function registerProfileIpc(): void {
         clinicNameAr: input.clinicNameAr,
         address: input.address,
         phone: input.phone,
+        language: input.language,
       });
       const changedFields = Object.keys(input).filter(
         (k) => (input as Record<string, unknown>)[k] !== undefined,

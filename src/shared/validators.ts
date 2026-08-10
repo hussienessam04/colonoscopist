@@ -8,6 +8,10 @@ export const wizardInput = z.object({
   clinicName: z.string().min(1).max(120),
   pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
   confirmPin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
+  // Phase 7 / Plan 07-01 — I18N-01: workstation-level default language
+  // (per D-18). 'ar' enables RTL in the renderer; defaults to 'en' if
+  // omitted. Stored on users.language.
+  language: z.enum(['en', 'ar']).optional(),
 }).refine((d) => d.pin === d.confirmPin, { message: 'PIN and confirmation must match', path: ['confirmPin'] });
 
 export const pinInput = z.object({
@@ -18,6 +22,9 @@ export const pinInput = z.object({
 export const userInput = z.object({
   fullName: z.string().min(1).max(120),
   pin: z.string().regex(/^\d{4}$/, 'PIN must be exactly 4 digits'),
+  // Phase 7 / Plan 07-01 — I18N-01: per-doctor language preference.
+  // Stored on users.language; defaults to 'en' if omitted.
+  language: z.enum(['en', 'ar']).optional(),
 });
 
 export const userRemoveInput = z.object({
@@ -247,6 +254,12 @@ export const doctorProfileUpdateSchema = z
     clinicNameAr: z.string().max(160).nullable(),
     address: z.string().max(500).nullable(),
     phone: z.string().max(40).nullable(),
+    // Phase 7 / Plan 07-01 — I18N-01 (per D-17): doctor-profile-level
+    // language preference. NULL means "follow users.language" (the
+    // doctor has not picked their own preference yet). The renderer
+    // reads doctor_profile.language first, then falls back to
+    // users.language for the active session.
+    language: z.enum(['en', 'ar']).nullable().optional(),
   })
   .strict();
 
@@ -291,6 +304,58 @@ export type ReportUpdateInput = z.infer<typeof reportUpdateSchema>;
 export type ProfileUploadInput = z.infer<typeof profileUploadSchema>;
 export type ReportIdInput = z.infer<typeof reportIdSchema>;
 export type ReportProcedureInput = z.infer<typeof reportProcedureSchema>;
+
+// Phase 7 / Plan 07-01 — Backup/Restore + audit.log + language IPC
+// input validators (SET-05/06, AUDIT-01, I18N-01).
+
+// auditLogInput: payload for the audit:log IPC channel. Renderer-only
+// path (no other write surface to audit_log); all other writes route
+// through the audit() helper inside main. The metadata object is
+// validated to Record<string, unknown> at the IPC boundary so a
+// renderer-supplied payload can't smuggle function values that would
+// fail JSON.stringify downstream.
+export const auditLogInput = z
+  .object({
+    action: z.string().min(1).max(120),
+    entityType: z.string().min(1).max(60).optional(),
+    entityId: z.string().max(120).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
+  })
+  .strict();
+
+// backupCreateInput: destPath is bounded by .max(2000) per T-07-06 to
+// prevent DoS via long path strings. Renderer is sandboxed so the only
+// realistic caller is the `dialog.showSaveDialog` path in Plan 07-05.
+export const backupCreateInput = z.object({ destPath: z.string().min(1).max(2000) }).strict();
+
+// backupRevealInput: payload for backup:reveal. No path traversal
+// concerns (shell.showItemInFolder just highlights the file in the
+// OS file manager; it doesn't read the contents).
+export const backupRevealInput = z.object({ path: z.string().min(1).max(2000) }).strict();
+
+// restorePreviewInput / restoreUnpackInput: zipPath + stagingDir are
+// both userData-tree paths; no path-traversal concerns because the IPC
+// callers pass canonical `restoreStagingDir(timestamp)` paths from main.
+// Length cap is defense-in-depth against pathological renderer input.
+export const restorePreviewInput = z
+  .object({
+    zipPath: z.string().min(1).max(2000),
+    stagingDir: z.string().min(1).max(2000),
+  })
+  .strict();
+
+export const restoreUnpackInput = z
+  .object({
+    zipPath: z.string().min(1).max(2000),
+    stagingDir: z.string().min(1).max(2000),
+  })
+  .strict();
+
+export type AuditLogInput = z.infer<typeof auditLogInput>;
+export type BackupCreateInput = z.infer<typeof backupCreateInput>;
+export type BackupRevealInput = z.infer<typeof backupRevealInput>;
+export type RestorePreviewInput = z.infer<typeof restorePreviewInput>;
+export type RestoreUnpackInput = z.infer<typeof restoreUnpackInput>;
 
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);

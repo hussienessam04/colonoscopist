@@ -19,6 +19,9 @@ function stripPin(row: UserRow): UserPublic {
     lastLoginAt: row.last_login_at,
     failedAttempts: row.failed_attempts,
     lockedUntil: row.locked_until,
+    // Phase 7 / Plan 07-01 — I18N-01: surface language so the renderer
+    // can bootstrap i18n before any per-doctor override is resolved.
+    language: row.language,
   };
 }
 
@@ -33,7 +36,7 @@ function currentUserIsAdmin(): boolean {
   return row?.is_first_admin === 1;
 }
 
-export async function wizardBootstrap(input: { fullName: string; clinicName: string; pin: string }): Promise<{ accepted: true; userId: string; clinicName: string }> {
+export async function wizardBootstrap(input: { fullName: string; clinicName: string; pin: string; language?: 'en' | 'ar' }): Promise<{ accepted: true; userId: string; clinicName: string }> {
   // per D-01 — first launch only.
   if (userRepo.countActive() > 0) {
     throw new IpcErrorException(ipcError('IPC_VALIDATION', 'Wizard already completed; first launch only'));
@@ -43,15 +46,21 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
   const userId = randomUUID();
   const clinicName = input.clinicName;
   const now = Date.now();
+  // Phase 7 / Plan 07-01 — I18N-01 (per D-18): the workstation-level
+  // language default. 'ar' enables RTL; 'en' is the silent fallback.
+  const language: 'en' | 'ar' = input.language ?? 'en';
 
   // ponytail: single transaction wraps all five rows so any throw rolls back.
   const db = getDb();
   const txn = db.transaction(() => {
-    // INSERT users (admin = first user)
+    // INSERT users (admin = first user). Language column is the
+    // workstation default; doctor_profile.language is NULL on insert
+    // so the new admin falls back to users.language until they pick
+    // a per-doctor override via ProfileEditor.
     db.prepare(
-      `INSERT INTO users (id, full_name, is_first_admin, pin_hash, failed_attempts, is_locked, created_at)
-       VALUES (?, ?, 1, ?, 0, 0, ?)`,
-    ).run(userId, input.fullName, pinHash, now);
+      `INSERT INTO users (id, full_name, is_first_admin, pin_hash, failed_attempts, is_locked, language, created_at)
+       VALUES (?, ?, 1, ?, 0, 0, ?, ?)`,
+    ).run(userId, input.fullName, pinHash, language, now);
 
     // INSERT settings clinic_name
     db.prepare(
@@ -65,21 +74,32 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     ).run('schema_version', '1', now);
 
+    // INSERT settings language (the workstation default — duplicated on
+    // users.language so renderer code that only knows about settings can
+    // still resolve it). The renderer-side i18n resolver reads users
+    // first, this row is the Phase 7 second-source of truth.
+    db.prepare(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
+    ).run('language', language, now);
+
     // INSERT doctor_profile (Phase 6 / D-01..D-04). New admins get a
     // doctor_profile row alongside the users row so the ProfileEditor
     // has something to render. The migration 0004 backfill handles the
     // pre-Phase-6 upgrade case (existing users); this handles the
     // first-launch-after-Phase-6 case (the wizard itself).
+    // Phase 7 / Plan 07-01 — language column NULL on insert: no
+    // per-doctor override yet, falls back to users.language.
     db.prepare(
-      `INSERT INTO doctor_profile (id, user_id, full_name_en, clinic_name_en, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO doctor_profile (id, user_id, full_name_en, clinic_name_en, language, created_at, updated_at)
+       VALUES (?, ?, ?, ?, NULL, ?, ?)`,
     ).run(randomUUID(), userId, input.fullName, clinicName, now, now);
 
     // INSERT audit_log auth.bootstrap.completed
     db.prepare(
       `INSERT INTO audit_log (user_id, action, entity_type, entity_id, metadata, outcome, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).run(userId, 'auth.bootstrap.completed', 'user', userId, JSON.stringify({ clinicName }), 'ok', now);
+    ).run(userId, 'auth.bootstrap.completed', 'user', userId, JSON.stringify({ clinicName, language }), 'ok', now);
   });
   txn();
 
@@ -145,14 +165,26 @@ export function logout(): { ok: true } {
   return { ok: true };
 }
 
-export async function createUser(input: { fullName: string; pin: string }): Promise<UserPublic> {
+export async function createUser(input: { fullName: string; pin: string; language?: 'en' | 'ar' }): Promise<UserPublic> {
   // per D-03 — admin only.
   if (!currentUserIsAdmin()) {
     throw new IpcErrorException(ipcError('IPC_VALIDATION', 'Only the first admin can create users'));
   }
   const pinHash = await hashPin(input.pin);
-  const row = userRepo.create({ fullName: input.fullName, pinHash, isFirstAdmin: false });
-  audit({ action: 'users.create', entityType: 'user', entityId: row.id, metadata: { hasFullName: true } });
+  // Phase 7 / Plan 07-01 — I18N-01: persist language preference on the
+  // new user row. Defaults to 'en' if the caller (UI) omits it.
+  const row = userRepo.create({
+    fullName: input.fullName,
+    pinHash,
+    isFirstAdmin: false,
+    language: input.language,
+  });
+  audit({
+    action: 'users.create',
+    entityType: 'user',
+    entityId: row.id,
+    metadata: { hasFullName: true, language: row.language },
+  });
   return rowToPublic(row);
 }
 

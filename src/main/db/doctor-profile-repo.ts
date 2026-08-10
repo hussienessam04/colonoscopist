@@ -27,6 +27,12 @@ export type DoctorProfileRow = {
   phone: string | null;
   signature_path: string | null;
   logo_path: string | null;
+  // Phase 7 / Plan 07-01 — I18N-01 (per D-17): per-doctor language
+  // override. NULL means "follow users.language" (the doctor has not
+  // picked their own preference yet). The renderer-side i18n resolver
+  // reads this column first, then falls back to the active session's
+  // users.language row.
+  language: 'en' | 'ar' | null;
   created_at: number;
   updated_at: number;
 };
@@ -39,6 +45,10 @@ export type DoctorProfileUpsertInput = {
   clinicNameAr?: string | null;
   address?: string | null;
   phone?: string | null;
+  // Phase 7 / Plan 07-01 — I18N-01. Optional; undefined means "leave
+  // the existing value as-is", null means "clear the per-doctor
+  // override so the resolver falls back to users.language".
+  language?: 'en' | 'ar' | null;
 };
 
 type Stmt = Database.Statement;
@@ -56,14 +66,20 @@ function stmts(): NonNullable<typeof cached> {
   if (cached) return cached;
   const db = getDb();
   cached = {
+    // Phase 7 / Plan 07-01 — I18N-01: include the language column on
+    // insert. NULL on insert means "follow users.language" (the
+    // wizard doesn't seed a per-doctor override).
     insert: db.prepare(
       `INSERT INTO doctor_profile
         (id, user_id, full_name_en, full_name_ar, clinic_name_en, clinic_name_ar,
-         address, phone, signature_path, logo_path, created_at, updated_at)
+         address, phone, signature_path, logo_path, language, created_at, updated_at)
        VALUES
         (@id, @user_id, @full_name_en, @full_name_ar, @clinic_name_en, @clinic_name_ar,
-         @address, @phone, NULL, NULL, @created_at, @updated_at)`,
+         @address, @phone, NULL, NULL, @language, @created_at, @updated_at)`,
     ),
+    // Phase 7 / Plan 07-01 — I18N-01: language is part of the core
+    // update so a single profile.update IPC can flip the doctor's
+    // preferred language alongside other fields.
     updateCore: db.prepare(
       `UPDATE doctor_profile SET
          full_name_en = @full_name_en,
@@ -72,6 +88,7 @@ function stmts(): NonNullable<typeof cached> {
          clinic_name_ar = @clinic_name_ar,
          address = @address,
          phone = @phone,
+         language = @language,
          updated_at = @updated_at
        WHERE user_id = @user_id`,
     ),
@@ -107,6 +124,9 @@ function rowToProfile(row: DoctorProfileRow): DoctorProfile {
     phone: row.phone,
     signaturePath: row.signature_path,
     logoPath: row.logo_path,
+    // Phase 7 / Plan 07-01 — I18N-01: surface language for the
+    // renderer. NULL means "follow users.language".
+    language: row.language,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -119,6 +139,13 @@ export const doctorProfileRepo = {
   upsert(input: DoctorProfileUpsertInput): DoctorProfile {
     const existing = this.get(input.userId);
     const now = Date.now();
+    // ponytail: for the update branch, language defaults to "keep
+    // existing" if the caller passed `undefined`. For the insert branch,
+    // language defaults to NULL (the doctor's first row has no
+    // per-doctor override yet — they fall back to users.language).
+    const updateLanguage = input.language !== undefined
+      ? input.language
+      : existing?.language ?? null;
     if (existing) {
       stmts().updateCore.run({
         full_name_en: input.fullNameEn,
@@ -127,6 +154,7 @@ export const doctorProfileRepo = {
         clinic_name_ar: input.clinicNameAr ?? null,
         address: input.address ?? null,
         phone: input.phone ?? null,
+        language: updateLanguage,
         updated_at: now,
         user_id: input.userId,
       });
@@ -140,6 +168,7 @@ export const doctorProfileRepo = {
         clinic_name_ar: input.clinicNameAr ?? null,
         address: input.address ?? null,
         phone: input.phone ?? null,
+        language: input.language ?? null,
         created_at: now,
         updated_at: now,
       });

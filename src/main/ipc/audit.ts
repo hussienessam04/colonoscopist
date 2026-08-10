@@ -1,14 +1,84 @@
 // audit:* IPC handlers — read-only surface for Phase 7.
 // Per AUDIT-01 + Fix 5.
+//
+// Phase 7 / Plan 07-01 — adds AUDIT_LOG: the renderer-initiated audit
+// row write channel for "audit-on-every-read" patterns (D-08). The
+// handler routes through the existing audit() helper in db/audit.ts;
+// no other write surface exists for audit_log (Phase 2's append-only
+// triggers reject UPDATE/DELETE).
 
 import { ipcMain } from 'electron';
 import { IPC } from '@shared/ipc-contract';
 import { auditRepo } from '../db/audit';
-import { auditFilterInput } from '@shared/validators';
+import { auditFilterInput, auditLogInput } from '@shared/validators';
+import { session } from '../auth/session';
+import { IpcErrorException, ipcError } from '@shared/errors';
+import { z } from 'zod';
+
+// ponytail: copied from patients.ts + auth.ts — same gate shape across
+// all authenticated IPC handlers. Inline rather than a shared helper
+// because the imports would create a circular module graph.
+function requireSession(): string {
+  const id = session.currentUserId;
+  if (!id) {
+    throw new IpcErrorException(ipcError('IPC_AUTH_REQUIRED', 'Not authenticated'));
+  }
+  return id;
+}
+
+function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
+  const issue = err.issues[0];
+  const field = (issue?.path[0] as string | undefined) ?? fallbackField;
+  return new IpcErrorException(
+    ipcError('IPC_VALIDATION', issue?.message ?? 'Invalid input', field ? { field } : {}),
+  );
+}
+
+function safeParse<T>(schema: z.ZodType<T>, raw: unknown, fallbackField?: string): T {
+  try {
+    return schema.parse(raw);
+  } catch (err) {
+    if (err instanceof z.ZodError) throw fromZodError(err, fallbackField);
+    throw err;
+  }
+}
 
 export function registerAuditIpc(): void {
   ipcMain.handle(IPC.AUDIT_LIST, (_e, raw) => {
     const filter = auditFilterInput.parse(raw ?? {});
     return auditRepo.list(filter);
   });
+
+  // AUDIT-01 / D-08 — renderer-side "audit-on-every-read" channel.
+  // Requires a session (writes the row's user_id from session.currentUserId
+  // unless the caller explicitly passes a different one — but per Phase 2
+  // BLOCKER 4, the schema does NOT expose a userId field; session is the
+  // single source of truth for who is performing the action).
+  ipcMain.handle(IPC.AUDIT_LOG, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(auditLogInput, raw);
+      auditRepo.append({
+        action: input.action,
+        entityType: input.entityType ?? null,
+        entityId: input.entityId ?? null,
+        metadata: input.metadata ?? null,
+        userId,
+      });
+      return { ok: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+}
+
+function asIpcError(err: unknown): Error {
+  if (err instanceof z.ZodError) return asIpcError(fromZodError(err));
+  if (err instanceof IpcErrorException) {
+    const wrapped = new Error(err.ipc.message) as Error & { ipcError?: unknown };
+    wrapped.ipcError = err.ipc;
+    return wrapped;
+  }
+  if (err instanceof Error) return err;
+  return new Error(String(err));
 }
