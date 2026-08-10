@@ -157,9 +157,25 @@ skipped: 0
 - gap_id: G-06-11
   truth: |
     Clicking the "Print" button shows a print preview of the actual generated PDF report. The user sees the PDF rendered inline (so they can verify it looks right) and then confirms the print via the OS print dialog.
-  status: resolved
-  resolved_by: 3fe7645
-  resolved_at: 2026-08-09
+  status: failed
+  reason: |
+    User reported: "BUT NOW PRINT IS NOT WORKING". The first Print implementation tried to load the PDF via `MediaServer /media/<patientId>/<procedureId>/<file.pdf>`, but the MediaServer's path-safety check requires the file to be under `<userData>/data/media/patients/`. The PDF lives at `<userData>/data/reports/<reportId>.pdf` — the MediaServer returns 403 for any PDF URL. The iframe loads the 403 error page; `contentWindow.print()` opens the print dialog with the error page. No PDF preview, no real PDF printed.
+
+    Fix (commit e13007d): new IPC `api.reports.getPdfBlob({ id })` returns the raw PDF bytes. The renderer wraps them in a `Blob({ type: 'application/pdf' })` + `URL.createObjectURL(blob)` and loads the blob URL in the iframe. The MediaServer is no longer in the path. The blob URL is owned by the PrintPreview component — revoked on unmount or when the reportId changes.
+  severity: major
+  test: 8
+  artifacts:
+    - src/renderer/src/pages/ReportEditor.tsx (PrintPreview now uses blob URL via getPdfBlob IPC instead of MediaServer route)
+    - src/main/ipc/reports.ts (new REPORTS_GET_PDF_BLOB handler)
+    - src/shared/ipc-contract.ts (new IPC constant + IpcContract.reports.getPdfBlob entry)
+    - src/preload/index.ts (new preload bridge)
+  missing: []
+  fixed_in: e13007d
+  fixed_at: 2026-08-09
+  fix_verification:
+    - typecheck passes (0 errors)
+    - 579/579 unit tests pass
+    - logic verified: PrintPreview calls `api.reports.getPdfBlob({ id: reportId })` → reads `<userData>/data/reports/<reportId>.pdf` from main → returns `{ bytes, mime }` → renderer creates `new Blob([bytes], { type: 'application/pdf' })` → `URL.createObjectURL(blob)` → loads in iframe → `iframe.contentWindow.print()` opens the OS print dialog with the PDF as the print target
 - gap_id: G-06-12
   truth: |
     The ReportEditor UI matches the rendered PDF layout: header (logo + clinic name + signature + doctor name + procedure date), patient block, procedure block (date + duration + doctor), Findings / Diagnosis sections, attached screenshots thumbnail grid, footer (signature image + doctor name + clinic name + page number). The doctor sees a faithful preview of the PDF as they edit.
