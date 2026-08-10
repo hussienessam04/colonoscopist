@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 9
-name: Reveal in Explorer highlights PDF in OS file manager
+number: 10
+name: ProcedureReview "Generate report" / "Edit report" CTA navigates
 expected: |
-  Post-finalize, click "Reveal in Explorer" → Windows Explorer opens with the PDF file selected/highlighted in `<userData>/data/reports/`. The OS default viewer does NOT launch (this is the "show in folder" affordance, not the "open" affordance).
+  On a completed procedure, the right-rail Report section shows a "Generate report" or "Edit report" button. Click it → navigates to ReportEditor for that procedure. The button is disabled (or hidden) while procedure.status === 'recording'.
 awaiting: user response
 
 ## Tests
@@ -59,7 +59,7 @@ result: pass
 ### 9. Reveal in Explorer highlights PDF in OS file manager
 expected: |
   Post-finalize, click "Reveal in Explorer" → Windows Explorer opens with the PDF file selected/highlighted in `<userData>/data/reports/`. The OS default viewer does NOT launch (this is the "show in folder" affordance, not the "open" affordance).
-result: pending
+result: pass
 
 ### 10. ProcedureReview "Generate report" / "Edit report" CTA navigates
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 8
-issues: 0 (all gaps resolved; 4 tests pending)
-pending: 4
+passed: 9
+issues: 0 (all gaps resolved; 3 tests pending)
+pending: 3
 skipped: 0
 
 ## Gaps
