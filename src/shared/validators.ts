@@ -75,6 +75,18 @@ export const patientListQueryInput = z
     search: z.string().min(1).max(120).optional(),
     mrn: z.string().min(1).max(50).optional(),
     includeDeleted: z.boolean().optional(),
+    // Phase 7 / Plan 07-02 — SRCH-01..03 + D-01..D-03: cross-cutting
+    // Patient List filters. dateFrom/dateTo are yyyy-mm-dd strings parsed
+    // by main into ms-range bounds against procedures.started_at.
+    // doctorId is a UUID filter against procedures.doctor_id.
+    // procedureStatus is a multi-select across the canonical ProcedureStatus
+    // enum (per D-02). All four are AND-combined per D-02 verbatim.
+    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateFrom must be ISO yyyy-mm-dd').optional(),
+    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateTo must be ISO yyyy-mm-dd').optional(),
+    doctorId: z.string().uuid().optional(),
+    procedureStatus: z
+      .array(z.enum(['recording', 'completed', 'partial', 'crashed']))
+      .optional(),
     page: z.number().int().positive().optional(),
     pageSize: z.number().int().positive().max(200).optional(),
   })
@@ -142,6 +154,14 @@ export const proceduresListQueryInput = z
   .object({
     patientId: z.string().uuid().optional(),
     status: z.enum(['recording', 'completed', 'partial', 'crashed']).optional(),
+    // Phase 7 / Plan 07-02 — D-04 verbatim: extend the procedures.list
+    // query with the same date range + doctor filters as patients.list.
+    // procedureStatus is per-patient (filter sidebar); procedure.list
+    // takes status (single value) per Phase 4. Date range applies to
+    // procedures.started_at (per Phase 4 D-10 canonical date).
+    dateFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateFrom must be ISO yyyy-mm-dd').optional(),
+    dateTo: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'dateTo must be ISO yyyy-mm-dd').optional(),
+    doctorId: z.string().uuid().optional(),
     page: z.number().int().positive().max(200).optional(),
     pageSize: z.number().int().positive().max(200).optional(),
   })

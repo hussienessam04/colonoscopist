@@ -39,6 +39,17 @@ export type PatientListInput = {
   search?: string;
   mrn?: string;
   includeDeleted?: boolean;
+  // Phase 7 / Plan 07-02 — SRCH-01..03 + D-02: cross-cutting Patient
+  // List filters. dateFrom/dateTo are yyyy-mm-dd strings parsed to ms
+  // bounds against procedures.started_at (canonical procedure date per
+  // Phase 4 D-10). doctorId filters on procedures.doctor_id.
+  // procedureStatus is a multi-select against procedures.status. All
+  // four are AND-combined (per D-02 verbatim). Empty/missing = no
+  // constraint (preserves Phase 2 zero-config behavior).
+  dateFrom?: string;
+  dateTo?: string;
+  doctorId?: string;
+  procedureStatus?: ('recording' | 'completed' | 'partial' | 'crashed')[];
   page?: number;
   pageSize?: number;
 };
@@ -61,6 +72,16 @@ let cached: {
   listBySearchAll: Stmt;
   countBySearchActive: Stmt;
   countBySearchAll: Stmt;
+  // Phase 7 / Plan 07-02 — SRCH-01..03 + D-02: single combined
+  // prepared statement for the AND-combined filter matrix (search +
+  // MRN + dateFrom/dateTo + doctorId + procedureStatus). Per
+  // RESEARCH.md Pattern 1 "no per-filter statement explosion" — one
+  // prepared statement handles every combination via optional
+  // parameters + an EXISTS subquery against procedures.
+  listWithFiltersActive: Stmt;
+  listWithFiltersAll: Stmt;
+  countWithFiltersActive: Stmt;
+  countWithFiltersAll: Stmt;
   update: Stmt;
   softDelete: Stmt;
   restore: Stmt;
@@ -109,6 +130,92 @@ function stmts() {
     ),
     countBySearchAll: db.prepare(
       `SELECT COUNT(*) AS c FROM patients WHERE full_name LIKE @search COLLATE NOCASE`,
+    ),
+    // listWithFiltersActive — single statement handles all filter combos
+    // (SRCH-01..03 + D-02 AND-combined). @search / @mrn are NULL when no
+    // name/MRN filter; @dateFromMs / @dateToMs are NULL when no date
+    // range; @doctorId is NULL when no doctor filter; @hasStatus is
+    // 0/1 and @status0..@status3 are populated only when @hasStatus=1.
+    // The EXISTS subquery guarantees the predicate applies to procedures
+    // (per D-02: date range applies to procedures.started_at, doctorId
+    // applies to procedures.doctor_id, procedureStatus is a multi-select
+    // across procedures.status). Patients WITHOUT any matching
+    // procedure are excluded when any of the procedure-bound filters
+    // are set — matches the doctor's mental model of "find the patients
+    // whose procedures match these constraints".
+    //
+    // ponytail: "WHERE 1=1 AND" anchor lets us conditionally append
+    // clauses via the @searchTrimmed / @mrnTrimmed / @hasProcedures
+    // trick (each predicate evaluates to TRUE when the corresponding
+    // param is NULL/sentinel). This avoids the combinatorial explosion
+    // that a per-filter statement set would create.
+    listWithFiltersActive: db.prepare(
+      `SELECT * FROM patients
+       WHERE deleted_at IS NULL
+         AND (@searchTrimmed = '' OR full_name LIKE @search COLLATE NOCASE)
+         AND (@mrnTrimmed = '' OR mrn = @mrn)
+         AND (
+           @hasProcedures = 0
+           OR EXISTS (
+             SELECT 1 FROM procedures
+             WHERE procedures.patient_id = patients.id
+               AND (@dateFromMs IS NULL OR procedures.started_at >= @dateFromMs)
+               AND (@dateToMs IS NULL OR procedures.started_at <= @dateToMs)
+               AND (@doctorId IS NULL OR procedures.doctor_id = @doctorId)
+               AND (@hasStatus = 0 OR procedures.status IN (@status0, @status1, @status2, @status3))
+           )
+         )
+       ORDER BY full_name COLLATE NOCASE LIMIT @limit OFFSET @offset`,
+    ),
+    listWithFiltersAll: db.prepare(
+      `SELECT * FROM patients
+       WHERE (@searchTrimmed = '' OR full_name LIKE @search COLLATE NOCASE)
+         AND (@mrnTrimmed = '' OR mrn = @mrn)
+         AND (
+           @hasProcedures = 0
+           OR EXISTS (
+             SELECT 1 FROM procedures
+             WHERE procedures.patient_id = patients.id
+               AND (@dateFromMs IS NULL OR procedures.started_at >= @dateFromMs)
+               AND (@dateToMs IS NULL OR procedures.started_at <= @dateToMs)
+               AND (@doctorId IS NULL OR procedures.doctor_id = @doctorId)
+               AND (@hasStatus = 0 OR procedures.status IN (@status0, @status1, @status2, @status3))
+           )
+         )
+       ORDER BY full_name COLLATE NOCASE LIMIT @limit OFFSET @offset`,
+    ),
+    countWithFiltersActive: db.prepare(
+      `SELECT COUNT(*) AS c FROM patients
+       WHERE deleted_at IS NULL
+         AND (@searchTrimmed = '' OR full_name LIKE @search COLLATE NOCASE)
+         AND (@mrnTrimmed = '' OR mrn = @mrn)
+         AND (
+           @hasProcedures = 0
+           OR EXISTS (
+             SELECT 1 FROM procedures
+             WHERE procedures.patient_id = patients.id
+               AND (@dateFromMs IS NULL OR procedures.started_at >= @dateFromMs)
+               AND (@dateToMs IS NULL OR procedures.started_at <= @dateToMs)
+               AND (@doctorId IS NULL OR procedures.doctor_id = @doctorId)
+               AND (@hasStatus = 0 OR procedures.status IN (@status0, @status1, @status2, @status3))
+           )
+         )`,
+    ),
+    countWithFiltersAll: db.prepare(
+      `SELECT COUNT(*) AS c FROM patients
+       WHERE (@searchTrimmed = '' OR full_name LIKE @search COLLATE NOCASE)
+         AND (@mrnTrimmed = '' OR mrn = @mrn)
+         AND (
+           @hasProcedures = 0
+           OR EXISTS (
+             SELECT 1 FROM procedures
+             WHERE procedures.patient_id = patients.id
+               AND (@dateFromMs IS NULL OR procedures.started_at >= @dateFromMs)
+               AND (@dateToMs IS NULL OR procedures.started_at <= @dateToMs)
+               AND (@doctorId IS NULL OR procedures.doctor_id = @doctorId)
+               AND (@hasStatus = 0 OR procedures.status IN (@status0, @status1, @status2, @status3))
+           )
+         )`,
     ),
     update: db.prepare(
       `UPDATE patients
@@ -205,25 +312,85 @@ export const patientRepo = {
     const hasSearch = !!filter.search && filter.search.length > 0;
     const hasMrn = !!filter.mrn && filter.mrn.length > 0;
 
-    let listStmt: Stmt;
-    let countStmt: Stmt;
-    const params: Record<string, unknown> = { limit, offset };
+    // Phase 7 / Plan 07-02 — SRCH-01..03 + D-02: any of dateFrom,
+    // dateTo, doctorId, procedureStatus forces the AND-combined path
+    // via the EXISTS subquery. The Phase 2 zero-config surface (no
+    // filters set) still routes through the original single-column
+    // statements — no DB change when the new surface is unused.
+    const hasDateFrom = !!filter.dateFrom && filter.dateFrom.length > 0;
+    const hasDateTo = !!filter.dateTo && filter.dateTo.length > 0;
+    const hasDoctorId = !!filter.doctorId;
+    const hasStatus = !!filter.procedureStatus && filter.procedureStatus.length > 0;
+    const hasProceduresFilter = hasDateFrom || hasDateTo || hasDoctorId || hasStatus;
 
-    if (hasMrn) {
-      params.mrn = filter.mrn;
-      listStmt = includeDeleted ? stmts().listByMrnAll : stmts().listByMrnActive;
-      countStmt = includeDeleted ? stmts().countByMrnAll : stmts().countByMrnActive;
-    } else if (hasSearch) {
-      params.search = `%${filter.search}%`;
-      listStmt = includeDeleted ? stmts().listBySearchAll : stmts().listBySearchActive;
-      countStmt = includeDeleted ? stmts().countBySearchAll : stmts().countBySearchActive;
-    } else {
-      listStmt = includeDeleted ? stmts().listAll : stmts().listActive;
-      countStmt = includeDeleted ? stmts().countAll : stmts().countActive;
+    if (!hasProceduresFilter) {
+      // Phase 2 fast path — preserves the existing single-column
+      // statements so the common case (no cross-cutting filter) stays
+      // on the simple queries.
+      let listStmt: Stmt;
+      let countStmt: Stmt;
+      const params: Record<string, unknown> = { limit, offset };
+
+      if (hasMrn) {
+        params.mrn = filter.mrn;
+        listStmt = includeDeleted ? stmts().listByMrnAll : stmts().listByMrnActive;
+        countStmt = includeDeleted ? stmts().countByMrnAll : stmts().countByMrnActive;
+      } else if (hasSearch) {
+        params.search = `%${filter.search}%`;
+        listStmt = includeDeleted ? stmts().listBySearchAll : stmts().listBySearchActive;
+        countStmt = includeDeleted ? stmts().countBySearchAll : stmts().countBySearchActive;
+      } else {
+        listStmt = includeDeleted ? stmts().listAll : stmts().listActive;
+        countStmt = includeDeleted ? stmts().countAll : stmts().countActive;
+      }
+
+      const rows = listStmt.all(params) as PatientRow[];
+      const total = (countStmt.get(params) as { c: number }).c;
+      return { rows: rows.map(rowToPatient), total };
     }
 
-    const rows = listStmt.all(params) as PatientRow[];
-    const total = (countStmt.get(params) as { c: number }).c;
+    // Phase 7 combined path — single prepared statement handles every
+    // AND-combined filter combo (SRCH-01..03 + D-02). The @searchTrimmed
+    // and @mrnTrimmed sentinels let the EXISTS subquery be bypassed when
+    // no procedure-bound filter is set (preserves the no-procedure case
+    // for the legacy search-only filter combo).
+    const dateFromMs = hasDateFrom ? Date.parse(`${filter.dateFrom}T00:00:00.000Z`) : null;
+    const dateToMs = hasDateTo
+      ? Date.parse(`${filter.dateTo}T23:59:59.999Z`)
+      : null;
+    const params2: Record<string, unknown> = {
+      limit,
+      offset,
+      // @searchTrimmed / @mrnTrimmed — empty string means "no constraint"
+      // (matches the WHERE clause's `= ''` short-circuit). Search uses
+      // LIKE '%value%' so trim + percent-wrap happens here.
+      search: hasSearch ? `%${filter.search}%` : '%',
+      searchTrimmed: hasSearch ? 'x' : '',
+      mrn: hasMrn ? filter.mrn : '',
+      mrnTrimmed: hasMrn ? 'x' : '',
+      dateFromMs,
+      dateToMs,
+      doctorId: filter.doctorId ?? null,
+      hasStatus: hasStatus ? 1 : 0,
+      // Status array slot 0..3 — populated only when @hasStatus=1; the
+      // IN clause matches 1, 2, 3, or 4 of them; empty slots are
+      // coerced to a sentinel that the IN clause skips via !=@status0.
+      status0: hasStatus && filter.procedureStatus![0] ? filter.procedureStatus![0] : null,
+      status1: hasStatus && filter.procedureStatus![1] ? filter.procedureStatus![1] : null,
+      status2: hasStatus && filter.procedureStatus![2] ? filter.procedureStatus![2] : null,
+      status3: hasStatus && filter.procedureStatus![3] ? filter.procedureStatus![3] : null,
+    };
+
+    // @hasProcedures sentinel — short-circuits the EXISTS subquery when
+    // none of the procedure-bound filters are set. This keeps the
+    // combined path correct for the "search by name + status filter
+    // omitted" case (search applies, procedure EXISTS does NOT).
+    params2.hasProcedures = hasProceduresFilter ? 1 : 0;
+
+    const listStmt = includeDeleted ? stmts().listWithFiltersAll : stmts().listWithFiltersActive;
+    const countStmt = includeDeleted ? stmts().countWithFiltersAll : stmts().countWithFiltersActive;
+    const rows = listStmt.all(params2) as PatientRow[];
+    const total = (countStmt.get(params2) as { c: number }).c;
     return { rows: rows.map(rowToPatient), total };
   },
 

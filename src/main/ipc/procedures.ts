@@ -126,6 +126,9 @@ export function registerProceduresIpc(opts: {
       const parsed = safeParse(proceduresListQueryInput, raw ?? {});
       const userId = requireSession();
       const result = proceduresRepo.list(parsed);
+      // Phase 7 / Plan 07-02 — D-04: extended metadata with the new
+      // dateFrom / dateTo / doctorId fields. Per Fix 6 PII guard —
+      // metadata echoes filter shape, never patient/doctor names.
       audit({
         action: 'procedure.list',
         entityType: 'procedure',
@@ -134,6 +137,9 @@ export function registerProceduresIpc(opts: {
         metadata: {
           patientId: parsed.patientId ?? null,
           status: parsed.status ?? null,
+          dateFrom: parsed.dateFrom ?? null,
+          dateTo: parsed.dateTo ?? null,
+          doctorId: parsed.doctorId ?? null,
           page: parsed.page ?? 1,
           pageSize: parsed.pageSize ?? 25,
         },

@@ -80,6 +80,13 @@ export const IPC = {
   PROFILE_GET_ASSET_DATA_URL: 'profile:get-asset-data-url',
   REPORTS_GET_OR_CREATE: 'reports:get-or-create',
   REPORTS_GET: 'reports:get',
+  // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup of a
+  // report by its procedureId so the Patient List accordion can show
+  // the report status (Draft / Finalized / No report yet) without
+  // creating a draft as a side effect. Returns null when the
+  // procedure has no report row yet (vs REPORTS_GET_OR_CREATE which
+  // auto-creates a draft).
+  REPORTS_GET_BY_PROCEDURE: 'reports:get-by-procedure',
   REPORTS_UPDATE_DRAFT: 'reports:update-draft',
   REPORTS_UPDATE_FINALIZED: 'reports:update-finalized',
   REPORTS_FINALIZE: 'reports:finalize',
@@ -370,6 +377,13 @@ export interface IpcContract {
       search?: string;
       mrn?: string;
       includeDeleted?: boolean;
+      // Phase 7 / Plan 07-02 — SRCH-01..03 + D-02: AND-combined filters.
+      // dateFrom/dateTo are yyyy-mm-dd strings parsed by main; doctorId is
+      // a UUID; procedureStatus is a multi-select enum array.
+      dateFrom?: string;
+      dateTo?: string;
+      doctorId?: string;
+      procedureStatus?: ('recording' | 'completed' | 'partial' | 'crashed')[];
       page?: number;
       pageSize?: number;
     }) => Promise<{ rows: Patient[]; total: number }>;
@@ -420,6 +434,11 @@ export interface IpcContract {
     list: (input: {
       patientId?: string;
       status?: ProcedureStatus;
+      // Phase 7 / Plan 07-02 — D-04 verbatim: extend procedures.list
+      // with the same date range + doctor filters as patients.list.
+      dateFrom?: string;
+      dateTo?: string;
+      doctorId?: string;
       page?: number;
       pageSize?: number;
     }) => Promise<{ rows: Procedure[]; total: number }>;
@@ -511,6 +530,12 @@ export interface IpcContract {
   reports: {
     getOrCreate: (input: { procedureId: string }) => Promise<Report>;
     get: (input: { id: string }) => Promise<Report | null>;
+    // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup of a
+    // report by its procedureId. Returns null when the procedure has
+    // no report row yet. Used by the Patient List accordion expansion
+    // to render the report status chip + Open PDF button without
+    // triggering the getOrCreate side effect.
+    getByProcedure: (input: { procedureId: string }) => Promise<Report | null>;
     updateDraft: (input: {
       id: string;
       findings?: string;

@@ -142,6 +142,10 @@ export function listPatients(query: unknown): { rows: Patient[]; total: number }
   const result = patientRepo.list(parsed);
   // per Fix 6 + ROADMAP Phase 2 success criterion 5 — every read is auditable.
   // metadata echoes the filter, never patient data.
+  // Phase 7 / Plan 07-02 — extended metadata with the new filter fields
+  // (dateFrom / dateTo / doctorId / procedureStatus) so the audit row
+  // captures what was filtered (per D-02 verbatim AND-combined; per Fix 6
+  // PII guard — metadata echoes filter shape, never patient names).
   audit({
     action: 'patient_list',
     entityType: 'patient',
@@ -150,6 +154,10 @@ export function listPatients(query: unknown): { rows: Patient[]; total: number }
     metadata: {
       search: parsed.search ?? null,
       mrn: parsed.mrn ?? null,
+      dateFrom: parsed.dateFrom ?? null,
+      dateTo: parsed.dateTo ?? null,
+      doctorId: parsed.doctorId ?? null,
+      procedureStatus: parsed.procedureStatus ?? null,
       includeDeleted: parsed.includeDeleted ?? false,
       page: parsed.page ?? 1,
       pageSize: parsed.pageSize ?? 25,

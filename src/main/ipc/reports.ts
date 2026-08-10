@@ -113,6 +113,20 @@ export function registerReportsIpc(): void {
     }
   });
 
+  // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup of a
+  // report by procedureId. Returns null when no report exists (vs
+  // getOrCreate which would create a draft). Used by the Patient
+  // List accordion expansion.
+  ipcMain.handle(IPC.REPORTS_GET_BY_PROCEDURE, (_e, raw) => {
+    try {
+      requireSession();
+      const { procedureId } = safeParse(reportProcedureSchema, raw, 'procedureId');
+      return reportsRepo.getByProcedure(procedureId);
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
   ipcMain.handle(IPC.REPORTS_UPDATE_DRAFT, (_e, raw) => {
     try {
       const userId = requireSession();

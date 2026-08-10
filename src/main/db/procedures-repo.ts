@@ -65,6 +65,14 @@ export type ProcedureUpdateFinalizedInput = {
 export type ProceduresListFilter = {
   patientId?: string;
   status?: 'recording' | 'completed' | 'partial' | 'crashed';
+  // Phase 7 / Plan 07-02 — D-04 verbatim: extend procedures.list with
+  // the same date range + doctor filters as patients.list. Date range
+  // applies to procedures.started_at (per Phase 4 D-10 canonical
+  // date). doctorId filters on procedures.doctor_id. Empty/missing =
+  // no constraint (preserves Phase 4 zero-config behavior).
+  dateFrom?: string;
+  dateTo?: string;
+  doctorId?: string;
   page?: number;
   pageSize?: number;
 };
@@ -83,6 +91,13 @@ let cached: {
   listByPatient: Stmt;
   listByStatus: Stmt;
   listByPatientStatus: Stmt;
+  // Phase 7 / Plan 07-02 — D-04 verbatim: single combined prepared
+  // statement for date range + doctorId filter matrix. Same pattern as
+  // patients.ts listWithFilters — one statement handles every combo
+  // via @patientId / @status / @dateFromMs / @dateToMs / @doctorId
+  // sentinels.
+  listByFilters: Stmt;
+  countByFilters: Stmt;
   countAll: Stmt;
   countByPatient: Stmt;
   countByStatus: Stmt;
@@ -127,6 +142,27 @@ function stmts() {
     ),
     listByPatientStatus: db.prepare(
       `SELECT * FROM procedures WHERE patient_id = @patient_id AND status = @status ORDER BY started_at DESC LIMIT @limit OFFSET @offset`,
+    ),
+    // listByFilters — single statement handles every combo of
+    // patientId / status / dateFrom / dateTo / doctorId via the empty-
+    // string / null sentinel pattern. Matches Phase 4 listByPatientStatus
+    // style but expanded to the 5-dim matrix.
+    listByFilters: db.prepare(
+      `SELECT * FROM procedures
+       WHERE (@patientId IS NULL OR patient_id = @patientId)
+         AND (@status IS NULL OR status = @status)
+         AND (@dateFromMs IS NULL OR started_at >= @dateFromMs)
+         AND (@dateToMs IS NULL OR started_at <= @dateToMs)
+         AND (@doctorId IS NULL OR doctor_id = @doctorId)
+       ORDER BY started_at DESC LIMIT @limit OFFSET @offset`,
+    ),
+    countByFilters: db.prepare(
+      `SELECT COUNT(*) AS c FROM procedures
+       WHERE (@patientId IS NULL OR patient_id = @patientId)
+         AND (@status IS NULL OR status = @status)
+         AND (@dateFromMs IS NULL OR started_at >= @dateFromMs)
+         AND (@dateToMs IS NULL OR started_at <= @dateToMs)
+         AND (@doctorId IS NULL OR doctor_id = @doctorId)`,
     ),
     countAll: db.prepare(`SELECT COUNT(*) AS c FROM procedures`),
     countByPatient: db.prepare(`SELECT COUNT(*) AS c FROM procedures WHERE patient_id = @patient_id`),
@@ -327,31 +363,65 @@ export const proceduresRepo = {
     const offset = (page - 1) * limit;
     const hasPatient = !!filter.patientId;
     const hasStatus = !!filter.status;
+    // Phase 7 / Plan 07-02 — D-04 verbatim: any of dateFrom / dateTo /
+    // doctorId routes to the combined filter statement. Phase 4 surface
+    // (patientId + status only) still hits the original listByPatient*
+    // / listByStatus / listAll statements — no DB change when the
+    // new surface is unused.
+    const hasDateFrom = !!filter.dateFrom && filter.dateFrom.length > 0;
+    const hasDateTo = !!filter.dateTo && filter.dateTo.length > 0;
+    const hasDoctorId = !!filter.doctorId;
+    const hasFilter = hasDateFrom || hasDateTo || hasDoctorId;
+
+    if (!hasFilter) {
+      const params: Record<string, unknown> = {
+        limit,
+        offset,
+        patient_id: filter.patientId ?? null,
+        status: filter.status ?? null,
+      };
+
+      let listStmt: Stmt;
+      let countStmt: Stmt;
+      if (hasPatient && hasStatus) {
+        listStmt = stmts().listByPatientStatus;
+        countStmt = stmts().countByPatientStatus;
+      } else if (hasPatient) {
+        listStmt = stmts().listByPatient;
+        countStmt = stmts().countByPatient;
+      } else if (hasStatus) {
+        listStmt = stmts().listByStatus;
+        countStmt = stmts().countByStatus;
+      } else {
+        listStmt = stmts().listAll;
+        countStmt = stmts().countAll;
+      }
+
+      const rows = listStmt.all(params) as ProcedureRow[];
+      const total = (countStmt.get(params) as { c: number }).c;
+      return { rows: rows.map(rowToProcedure), total };
+    }
+
+    // Combined path — single prepared statement handles every combo
+    // of patientId / status / dateFrom / dateTo / doctorId via
+    // IS-NULL / equals sentinels. @dateFromMs / @dateToMs are parsed
+    // from yyyy-mm-dd into ms-range bounds (00:00:00 UTC start /
+    // 23:59:59 UTC end for inclusive end-of-day semantics).
+    const dateFromMs = hasDateFrom ? Date.parse(`${filter.dateFrom}T00:00:00.000Z`) : null;
+    const dateToMs = hasDateTo
+      ? Date.parse(`${filter.dateTo}T23:59:59.999Z`)
+      : null;
     const params: Record<string, unknown> = {
       limit,
       offset,
-      patient_id: filter.patientId ?? null,
+      patientId: filter.patientId ?? null,
       status: filter.status ?? null,
+      dateFromMs,
+      dateToMs,
+      doctorId: filter.doctorId ?? null,
     };
-
-    let listStmt: Stmt;
-    let countStmt: Stmt;
-    if (hasPatient && hasStatus) {
-      listStmt = stmts().listByPatientStatus;
-      countStmt = stmts().countByPatientStatus;
-    } else if (hasPatient) {
-      listStmt = stmts().listByPatient;
-      countStmt = stmts().countByPatient;
-    } else if (hasStatus) {
-      listStmt = stmts().listByStatus;
-      countStmt = stmts().countByStatus;
-    } else {
-      listStmt = stmts().listAll;
-      countStmt = stmts().countAll;
-    }
-
-    const rows = listStmt.all(params) as ProcedureRow[];
-    const total = (countStmt.get(params) as { c: number }).c;
+    const rows = stmts().listByFilters.all(params) as ProcedureRow[];
+    const total = (stmts().countByFilters.get(params) as { c: number }).c;
     return { rows: rows.map(rowToProcedure), total };
   },
 
