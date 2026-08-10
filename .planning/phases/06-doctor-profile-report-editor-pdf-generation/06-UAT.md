@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 5
-name: Screenshot attach toggle + blue border + drag-reorder
+number: 6
+name: Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
-  In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
+  In ReportEditor with a draft, click "Finalize report (auto-generates PDF)" → success toast → status badge flips to "Finalized · last edited by <admin name>". Findings/Diagnosis remain editable (per CONTEXT.md D-07 — any signed-in doctor can edit after finalize). procedure_id / doctor_id / finalized_at are NOT editable. PDF file is automatically generated (per G-06-9).
 awaiting: user response
 
 ## Tests
@@ -39,11 +39,7 @@ result: pass
 ### 5. Screenshot attach toggle + blue border + drag-reorder
 expected: |
   In ReportEditor, the screenshot list shows all procedure screenshots with an "Attach" toggle button. Click Attach → thumbnail gets a blue border + "Attached" state. The Screenshot panel shows attached count. Drag attached thumbnails to reorder → sort_order persists across navigation.
-result: issue
-reported: |
-  Reorder still doesn't work — the new ‹ / › buttons don't change the order. (Pointer-event fix was abandoned; replaced with Move buttons. But the parent (useReport) is not seeing the new order — `reorder` callback in the ReportEditor wires the update to `reportScreenshotsRepo.reorder` which writes to DB. The DOM re-render needs `screenshots` prop to reflect the new sort_order, which only happens after a refetch.)
-severity: major
-status: resolved via commit 3fe7645 — awaiting re-test
+result: pass
 
 ### 6. Finalize button locks state + shows "Finalized · last edited by <X>" badge
 expected: |
@@ -83,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 4
-issues: 0 (5 gaps resolved via commits 3fe7645 + e13007d + ad6ca0d; 8 tests still pending re-test)
-pending: 8
+passed: 5
+issues: 0 (all gaps resolved; 7 tests pending)
+pending: 7
 skipped: 0
 
 ## Gaps
