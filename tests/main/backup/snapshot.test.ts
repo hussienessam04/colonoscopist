@@ -38,7 +38,7 @@ describe('snapshot', () => {
     expect(db.pragma('journal_mode', { simple: true })).toBe('wal');
   });
 
-  it('dbBackup writes a complete DB file then cleans up the temp file', async () => {
+  it('dbBackup writes a complete DB file and leaves it on disk for the caller to consume', async () => {
     // Seed the source db.
     db.exec('CREATE TABLE things (id INTEGER PRIMARY KEY, name TEXT NOT NULL)');
     db.prepare('INSERT INTO things (name) VALUES (?)').run('a');
@@ -47,11 +47,20 @@ describe('snapshot', () => {
     const outPath = path.join(tmpDir, 'backup.db');
     await dbBackup(db, outPath);
 
-    // ponytail: dbBackup's `finally` unlinks the file as a safety net,
-    // but the caller's contract is "the caller zips the file then unlinks."
-    // The snapshot test asserts the FINALLY cleanup ran (file absent after
-    // the helper returns).
-    expect(existsSync(outPath)).toBe(false);
+    // ponytail: dbBackup's contract is "the caller zips the file then unlinks".
+    // The helper does NOT clean up the temp file (D-10) — cleanup belongs to
+    // the caller (createBackup in backup/index.ts owns the post-zip unlink).
+    expect(existsSync(outPath)).toBe(true);
+    expect(statSync(outPath).size).toBeGreaterThan(0);
+
+    // Open the backup and confirm the rows are there.
+    const backup = new Database(outPath, { readonly: true });
+    try {
+      const rows = backup.prepare('SELECT count(*) AS c FROM things').get() as { c: number };
+      expect(rows.c).toBe(2);
+    } finally {
+      backup.close();
+    }
   });
 
   it('dbBackup writes to a file when called without try/finally wrapper', async () => {

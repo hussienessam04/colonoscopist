@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { existsSync, mkdtempSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import yauzl from 'yauzl';
 
 let tmpDir: string;
 
@@ -65,6 +66,14 @@ describe('createBackup', () => {
     // The temp db file must NOT linger next to the zip.
     const tempDb = `${destZip}.db.tmp`;
     expect(existsSync(tempDb)).toBe(false);
+
+    // Must-have: the zip actually contains `app.db` as the canonical entry
+    // (D-09 + D-10). Read the central directory via yauzl and assert.
+    const entries = await readZipEntries(destZip);
+    expect(entries.some((e) => e === 'app.db')).toBe(true);
+    // The empty-data bootstrap means media/profiles/reports dirs may or may
+    // not be present (archiver skips empty directories). What MUST be present
+    // is app.db — that's the must-have for a usable backup.
   });
 
   it('cleanups up the temp file even when the source data is empty', async () => {
@@ -75,8 +84,33 @@ describe('createBackup', () => {
 
     expect(result.sizeBytes).toBeGreaterThan(0); // zip headers + app.db at minimum
     expect(existsSync(`${destZip}.db.tmp`)).toBe(false);
+
+    // must-have: app.db is in the zip regardless of source-data emptiness
+    const entries = await readZipEntries(destZip);
+    expect(entries.some((e) => e === 'app.db')).toBe(true);
   });
 });
+
+/** ponytail: walk a zip's central directory via yauzl and return entry names.
+ * Used by the must-have assertions above. */
+function readZipEntries(zipPath: string): Promise<string[]> {
+  return new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
+      if (err || !zip) {
+        reject(err ?? new Error('yauzl.open returned null'));
+        return;
+      }
+      const names: string[] = [];
+      zip.on('error', reject);
+      zip.on('end', () => resolve(names));
+      zip.on('entry', (entry: yauzl.Entry) => {
+        names.push(entry.fileName);
+        zip.readEntry();
+      });
+      zip.readEntry();
+    });
+  });
+}
 
 describe('revealBackup', () => {
   it('does not throw when invoked outside Electron', async () => {

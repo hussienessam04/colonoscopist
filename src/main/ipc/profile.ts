@@ -23,7 +23,7 @@ import { doctorProfileUpdateSchema, profileUploadSchema } from '@shared/validato
 import { doctorProfileRepo } from '../db/doctor-profile-repo';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
-import { profileAssetPath, profileDir, dataDir } from '../paths';
+import { profileAssetPath, profileDir } from '../paths';
 import { detectImageFormat, extensionForFormat } from '../pdf/embed-image';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {

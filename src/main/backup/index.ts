@@ -61,18 +61,19 @@ export async function createBackup(opts: {
 
   archive.pipe(output);
 
-  // Per D-10 — zip the temp db as the canonical `app.db` entry. After the
-  // stream closes we unlink the temp file (cleaned up by dbBackup's `finally`
-  // already, but belt-and-suspenders).
-  archive.file(tempDbPath, { name: 'app.db' });
-
-  // Per D-09 — media/ + profiles/ + reports/ subtrees stream as directories.
-  archive.directory(mediaDir(), 'media');
-  archive.directory(profilesDir(), 'profiles');
-  archive.directory(reportsDir(), 'reports');
-
+  // Per D-10 — checkpoint + backup FIRST, then register the file entry.
+  // archiver calls lstat synchronously inside archive.file() to capture
+  // size/mode metadata; if the temp file doesn't exist yet (because
+  // dbBackup hasn't run), the entry is silently dropped with a warning.
+  // Reordering: backup → register → finalize guarantees the canonical
+  // `app.db` entry actually lands in the zip.
   try {
     await dbBackup(db, tempDbPath);
+    archive.file(tempDbPath, { name: 'app.db' });
+    // Per D-09 — media/ + profiles/ + reports/ subtrees stream as directories.
+    archive.directory(mediaDir(), 'media');
+    archive.directory(profilesDir(), 'profiles');
+    archive.directory(reportsDir(), 'reports');
     void archive.finalize();
     await closed;
   } catch (err) {

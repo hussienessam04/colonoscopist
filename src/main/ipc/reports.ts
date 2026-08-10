@@ -19,7 +19,8 @@
 // renderReportPdf orchestrator writes the pdf_path + pdf_generated_at
 // + emits report.pdf_generated (see pdf/render-report-pdf.ts).
 
-import { ipcMain, shell } from 'electron';
+import { ipcMain, shell, app } from 'electron';
+import path from 'node:path';
 
 import { z } from 'zod';
 import {
@@ -209,7 +210,12 @@ export function registerReportsIpc(): void {
   // data/media/patients/). A direct IPC is the cleanest bridge.
   ipcMain.handle(IPC.REPORTS_GET_PDF_BLOB, async (_e, raw) => {
     try {
-      const userId = requireSession();
+      // ponytail: requireSession() is invoked for its gate side-effect (throws
+      // IPC_AUTH_REQUIRED if no session). The userId itself isn't needed in
+      // this read-only handler — there's no audit row to attribute the read
+      // to. The phase-7 audit.log IPC channel is the right path if/when a
+      // render-time audit row is desired.
+      requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
       const report = reportsRepo.getById(id);
       if (report === null || report.pdfPath === null) {

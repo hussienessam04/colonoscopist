@@ -12,7 +12,6 @@
 // so tests can use them on in-memory better-sqlite3 databases directly.
 
 import type Database from 'better-sqlite3';
-import { existsSync, unlinkSync } from 'node:fs';
 
 /**
  * Synchronous `PRAGMA wal_checkpoint(TRUNCATE)` against the open DB.
@@ -31,21 +30,18 @@ export function walCheckpoint(db: Database.Database): void {
 /**
  * Copy the live DB to `outPath` via SQLite Online Backup API.
  * better-sqlite3 v11's `db.backup(path)` returns a promise; resolves when
- * the backup is complete. Cleans up the temp file in `finally` so a half-
- * written temp file never lingers on disk.
- *
- * Per D-10 — the caller zips `outPath` as `app.db` then unlinks it.
+ * the backup is complete. The file is LEFT ON DISK after this returns —
+ * the caller (e.g. `createBackup` in backup/index.ts) consumes it
+ * (zips it as `app.db`) and then cleans it up. Cleanup is the caller's
+ * responsibility, NOT this helper's, because the cleanup-before-zip
+ * ordering would otherwise delete the file while archiver is still
+ * streaming it into the zip (PITFALLS §Pitfall 9 + D-10).
  */
 export async function dbBackup(db: Database.Database, outPath: string): Promise<void> {
-  try {
-    await db.backup(outPath);
-  } finally {
-    if (existsSync(outPath)) {
-      try {
-        unlinkSync(outPath);
-      } catch {
-        // ponytail: best-effort cleanup; the caller unlinks again after zip closes.
-      }
-    }
-  }
+  await db.backup(outPath);
+  // ponytail: caller-owned lifecycle. If the caller throws before
+  // reading the file, the file lingers on disk — that's acceptable for
+  // v1 because the destination is the same userData tree and the next
+  // backup overwrites it. A safety-net unlink would silently delete
+  // the file before the zipping caller could read it (Bug H-07-01).
 }
