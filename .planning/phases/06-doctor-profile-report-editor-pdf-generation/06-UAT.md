@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 7
-name: Re-render PDF button works after post-finalize edit
+number: 8
+name: Open PDF launches OS default viewer
 expected: |
-  After finalize, edit a textarea → blur → the inline save indicator updates → click "Re-render PDF" → success toast → the PDF file at `<userData>/data/reports/<reportId>.pdf` updates (modify time changes; size changes if body content changed).
+  Post-finalize, click "Open PDF" → the OS default PDF viewer opens with the file. The PDF shows: header with logo top-left + clinic name, signature top-right + doctor name + procedure date; patient block (Name/MRN/DOB/Gender); procedure block (Date + Duration HH:MM:SS + Doctor); Findings / Diagnosis sections; attached screenshots each on their own page with "Fig. N" caption; footer with "Page X of Y" + clinic name. MRN: 12345 displays as 12345 (no bidi reversal — Phase 6 PDF is English-only per D-10).
 awaiting: user response
 
 ## Tests
@@ -49,7 +49,7 @@ result: pass
 ### 7. Re-render PDF button works after post-finalize edit
 expected: |
   After finalize, edit a textarea → blur → the inline save indicator updates → click "Re-render PDF" → success toast → the PDF file at `<userData>/data/reports/<reportId>.pdf` updates (modify time changes; size changes if body content changed).
-result: pending
+result: pass
 
 ### 8. Open PDF launches OS default viewer
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 6
-issues: 0 (all gaps resolved; 6 tests pending)
-pending: 6
+passed: 7
+issues: 0 (all gaps resolved; 5 tests pending)
+pending: 5
 skipped: 0
 
 ## Gaps
