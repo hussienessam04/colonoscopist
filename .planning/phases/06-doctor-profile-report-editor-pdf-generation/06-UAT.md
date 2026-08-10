@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 11
-name: SettingsHub Profile card + sidebar entry navigate to ProfileEditor
+number: 12
+name: AR columns on doctor_profile accept + persist Arabic text
 expected: |
-  Click header Settings → land on SettingsHub. See a "Doctor profile" card with a clinic-name preview. Click it → ProfileEditor. Also: the sidebar shows a "Profile" nav entry → click it → ProfileEditor. The active highlight moves to "Profile".
+  In ProfileEditor, fill "Full name (AR)" with Arabic text (e.g., "د. ليلى") + "Clinic name (AR)" with Arabic text → blur → "Saved at HH:MM:SS". Reopen → AR fields persist. Note: PDF does NOT use these AR fields in Phase 6 (deferred to Phase 7) — only the EN fields land in the PDF header.
 awaiting: user response
 
 ## Tests
@@ -69,7 +69,7 @@ result: pass
 ### 11. SettingsHub Profile card + sidebar entry navigate to ProfileEditor
 expected: |
   Click header Settings → land on SettingsHub. See a "Doctor profile" card with a clinic-name preview. Click it → ProfileEditor. Also: the sidebar shows a "Profile" nav entry → click it → ProfileEditor. The active highlight moves to "Profile".
-result: pending
+result: pass
 
 ### 12. AR columns on doctor_profile accept + persist Arabic text
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 10
-issues: 0 (all gaps resolved; 2 tests pending)
-pending: 2
+passed: 11
+issues: 0 (all gaps resolved; 1 test pending)
+pending: 1
 skipped: 0
 
 ## Gaps
