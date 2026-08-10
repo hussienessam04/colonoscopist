@@ -199,12 +199,28 @@ Plans:
 **Plans:** 6 plans
 
 Plans:
+**Wave 1**
 
 - [ ] 07-01-PLAN.md — Tracer: Migration 0007 (users.language + doctor_profile.language) + src/main/backup/{snapshot,index,restore}.ts (archiver zip + yauzl unpack + PRAGMA integrity_check) + 3 shadcn primitives install (popover, tooltip, slider) + IPC contract extensions (backup.* + restore.* + audit.log) + profile.update(extends language) + wizard bootstrap(extends language) + users.create(extends language); full real archiver round-trip + yauzl entry-path filter tests (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 07-02-PLAN.md — Patient List filter sidebar (name + MRN + date range + doctor + procedure status, AND-combined) + PatientRow accordion expansion (procedure row → procedure-review, report row → reports.openPdf) + SettingsSidebar visual entries for Audit + Backup & Restore (Wave 2, depends_on: 07-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 07-03-PLAN.md — Audit page (compact one-line rows, 100/page, filter bar, detail Dialog) + audit_view self-audit emit on mount (debounced 1s) + useAudit SWR-style hook + ProfileEditor language picker Card (EN/AR radio → doctor_profile.language, emits language.changed audit row) (Wave 3, depends_on: 07-01)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 07-04-PLAN.md — i18next bundles (en/ar) + useLanguage hook flips <html dir> on change + Wizard step 4 (language radio submits users.language) + AR PDF via Font.register(NotoSansArabic) + bidi <Text direction='rtl'> wrappers + numeric fragment <Text direction='ltr'> isolation per Pitfall 8 + D-24 parity check Vitest + integration smoke (file > 50KB + PDF magic bytes) (Wave 4, depends_on: 07-01)
+
+**Wave 5** *(blocked on Wave 4 completion)*
+
 - [ ] 07-05-PLAN.md — BackupRestore page (Backup Card with pickDestination + create + Reveal in Explorer toast + inline warning Alert) + Restore Card with two-step flow (Choose backup → Preview with counts + integrity check → Restore to staging via ConfirmDialog) + Activate this backup v1.1 disabled placeholder (Wave 5, depends_on: 07-01)
+
+**Wave 6** *(blocked on Wave 5 completion)*
+
 - [ ] 07-06-PLAN.md — Playwright RTL smoke per route (8 tests: dir='rtl' + scrollWidth check + screenshot) + backup → restore roundtrip integration test (RUN_SMOKE=1, integrity_check === 'ok') + AR PDF magic bytes integration test (RUN_SMOKE=1, file > 50KB + '%PDF' magic) + 07-UAT.md phase acceptance plan (Wave 6, depends_on: 07-02, 07-03, 07-04, 07-05)
 
 ---
