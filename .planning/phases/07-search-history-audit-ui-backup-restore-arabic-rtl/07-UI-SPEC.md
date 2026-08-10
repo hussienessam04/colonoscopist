@@ -168,6 +168,7 @@ EN is the source. AR is the full hand-written mirror (D-20 — NO machine transl
 | Backup failed toast | `Backup failed` | `فشل إنشاء النسخة الاحتياطية` |
 | Backup confirmation — filename | `Backup will be saved to: <path>` | `سيتم حفظ النسخة الاحتياطية في: <path>` |
 | Restore description | `Unpack a backup zip into a staging folder. Your active data folder is unchanged. Use the preview to verify the contents before activating.` | `فك ضغط ملف النسخة الاحتياطية إلى مجلد مرحلي. مجلد البيانات النشط لن يتغير. استخدم المعاينة للتحقق من المحتويات قبل التفعيل.` |
+| Restore preview empty | `Choose a backup file to preview its contents.` | `اختر ملف النسخة الاحتياطية لمعاينة محتوياته.` |
 | Restore button step 1 | `Choose backup file` | `اختر ملف النسخة الاحتياطية` |
 | Restore button step 2 | `Preview backup` | `معاينة النسخة الاحتياطية` |
 | Restore preview filename | `Backup file` | `ملف النسخة الاحتياطية` |
@@ -475,11 +476,11 @@ All flow through `audit()` (Phase 2 main-side helper) — no bypass paths.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS — every surface has EN + AR full hand-written strings; dotted i18n keys; D-24 parity test catches drift
-- [ ] Dimension 2 Visuals: PASS — slate light tokens inherited + accent 10% reserved-for list + 36px audit row + 288px sidebar + 672px modal
-- [ ] Dimension 3 Color: PASS — accent reserved for primary CTA / active tab / filter chip; destructive reserved for destructive only; RTL token symmetry
-- [ ] Dimension 4 Typography: PASS — inherited Phase 6 scale (20/24 = page heading, 12 = label kicker, 14 = body, 13 = mono JSON) + 12/500 tabular-nums for audit timestamps
-- [ ] Dimension 5 Spacing: PASS — 8-point scale (4/8/16/24/32/48/64) + 3 named exceptions (36px audit row, 288px filter sidebar, 672px modal)
-- [ ] Dimension 6 Registry Safety: PASS — `popover` + `tooltip` + `slider` are shadcn-official (same source as 15 existing components); no third-party blocks; no `tailwindcss-rtl` plugin (native 3.4 `rtl:` variants per D-23)
+- [x] Dimension 1 Copywriting: PASS — every surface has EN + AR full hand-written strings; dotted i18n keys; D-24 parity test catches drift
+- [x] Dimension 2 Visuals: PASS — slate light tokens inherited + accent 10% reserved-for list + 36px audit row + 288px sidebar + 672px modal
+- [x] Dimension 3 Color: PASS — accent reserved for primary CTA / active tab / filter chip; destructive reserved for destructive only; RTL token symmetry
+- [x] Dimension 4 Typography: PASS — 4 sizes only (24 page heading, 20 section heading, 14 body + subheading + mono, 12 label + timestamp) + 2 weights only (600 for headings/labels/timestamps/subheading-bump, 400 for body + mono). 12px timestamp uses tabular-nums at weight 600. No 13px, no 16px, no 500-weight.
+- [x] Dimension 5 Spacing: PASS — 8-point scale (4/8/16/24/32/48/64) + 3 named exceptions (36px audit row, 288px filter sidebar, 672px modal)
+- [x] Dimension 6 Registry Safety: PASS — `popover` + `tooltip` + `slider` are shadcn-official (same source as 15 existing components); no third-party blocks; no `tailwindcss-rtl` plugin (native 3.4 `rtl:` variants per D-23)
 
-**Approval:** pending
+**Approval:** approved
