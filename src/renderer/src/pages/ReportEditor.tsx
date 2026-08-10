@@ -223,27 +223,25 @@ export default function ReportEditor({
     }
   }, [report]);
 
-  // Phase 6 UAT G-06-11 — print the actual PDF (not the on-screen
-  // editor DOM). Triggers the OS print dialog with the PDF as the
-  // print target, which gives the doctor a real PDF preview.
-  const handlePrint = useCallback((): void => {
-    // The iframe is mounted in the JSX below. After the PDF path
-    // changes, the iframe re-mounts (cacheBust key); we wait one
-    // frame for the PDF to load before calling print(). Cheap and
-    // sufficient for a desktop app where the user just clicked Print.
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        const iframe = document.querySelector<HTMLIFrameElement>(
-          '[data-testid="report-editor-pdf-iframe"]',
-        );
-        if (iframe === null || iframe.contentWindow === null) {
-          toast.error('PDF not ready — click Re-render PDF first');
-          return;
-        }
-        iframe.contentWindow.print();
-      });
-    });
-  }, []);
+  // Phase 6 UAT G-06-11 — print the actual PDF. We open the PDF in the
+  // OS's default PDF viewer (Adobe Reader, Edge, Chrome's built-in,
+  // etc.) which has a built-in print preview + dialog. The user
+  // clicks Print in the viewer toolbar. This is more reliable than
+  // iframe.contentWindow.print() in Electron (the iframe approach hit
+  // several edge cases: blob URL revoke races, sandbox issues,
+  // Chromium-version-specific print bugs).
+  const handlePrint = useCallback(async (): Promise<void> => {
+    if (report === null) return;
+    try {
+      // Reuse the openPdf IPC — opens the PDF in the OS default
+      // viewer. The print affordance is in the viewer's toolbar.
+      await window.api.reports.openPdf({ id: report.id, reveal: false });
+      toast.success('PDF opened — use the viewer toolbar to print');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Print failed';
+      toast.error(msg);
+    }
+  }, [report]);
 
   const handleToggleAttach = useCallback(
     (screenshotId: number): void => {
@@ -413,7 +411,7 @@ export default function ReportEditor({
                   data-testid="report-editor-print"
                 >
                   <Printer className="size-4 mr-1" aria-hidden="true" />
-                  Print
+                  Print (opens PDF)
                 </Button>
                 <Button
                   variant="outline"
