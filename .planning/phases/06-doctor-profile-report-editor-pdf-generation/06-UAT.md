@@ -8,11 +8,15 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 12
-name: AR columns on doctor_profile accept + persist Arabic text
-expected: |
-  In ProfileEditor, fill "Full name (AR)" with Arabic text (e.g., "د. ليلى") + "Clinic name (AR)" with Arabic text → blur → "Saved at HH:MM:SS". Reopen → AR fields persist. Note: PDF does NOT use these AR fields in Phase 6 (deferred to Phase 7) — only the EN fields land in the PDF header.
-awaiting: user response
+[testing complete — 12/12 tests passed, 0 issues]
+
+## Summary
+
+| Result | Count |
+|--------|-------|
+| Passed | 12    |
+| Issues | 0     |
+| Skipped| 0     |
 
 ## Tests
 
@@ -74,14 +78,14 @@ result: pass
 ### 12. AR columns on doctor_profile accept + persist Arabic text
 expected: |
   In ProfileEditor, fill "Full name (AR)" with Arabic text (e.g., "د. ليلى") + "Clinic name (AR)" with Arabic text → blur → "Saved at HH:MM:SS". Reopen → AR fields persist. Note: PDF does NOT use these AR fields in Phase 6 (deferred to Phase 7) — only the EN fields land in the PDF header.
-result: pending
+result: pass
 
 ## Summary
 
 total: 12
-passed: 11
-issues: 0 (all gaps resolved; 1 test pending)
-pending: 1
+passed: 12
+issues: 0
+pending: 0
 skipped: 0
 
 ## Gaps
