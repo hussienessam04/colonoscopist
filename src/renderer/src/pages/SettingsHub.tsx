@@ -7,6 +7,11 @@
 //
 // Phase 6 / Plan 02 — Profile card. The doctor can pre-fill the clinic
 // name + jump straight into the bilingual profile editor from the hub.
+//
+// Phase 7 / Plan 07-02 — Audit + Backup & Restore descriptions. The
+// actual page bodies land in Plan 07-03 (Audit) + Plan 07-05 (Backup &
+// Restore). These paragraphs pre-introduce the surfaces so the doctor
+// knows what the sidebar entries do.
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,9 +59,9 @@ export default function SettingsHub(): JSX.Element {
             <CardHeader>
               <CardTitle>Settings</CardTitle>
               <CardDescription>
-                Choose a section from the sidebar. Capture + Profile are
-                available to every authenticated doctor; Users is
-                available to the first admin.
+                Choose a section from the sidebar. Capture, Profile, Audit,
+                and Backup &amp; restore are available to every authenticated
+                doctor; Users is available to the first admin.
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
@@ -79,6 +84,18 @@ export default function SettingsHub(): JSX.Element {
                 >
                   Open profile editor
                 </Button>
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Audit</span> —
+                review the read + write log for every action the system
+                recorded, filter by date or doctor, and export for a periodic
+                compliance review.
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Backup &amp; restore</span> —
+                snapshot the entire patient database + media to a zip on the
+                workstation, or unpack a previous backup into a staging folder
+                for review before activating.
               </p>
               <p>
                 <span className="font-medium text-foreground">Users</span> — add

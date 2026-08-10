@@ -141,3 +141,55 @@ describe('SettingsSidebar', () => {
     expect(getRoute().name).toBe('patients');
   });
 });
+
+// Phase 7 / Plan 07-02 — D-05 + D-11: Audit + Backup & Restore visual
+// entries. The route union extends in router.ts; the buttons live on the
+// shared SettingsSidebar so every Settings sub-page inherits them. The
+// active highlight keys on `route.name === 'audit'` (or 'backup-restore')
+// since those pages have no `activeTab` prop yet.
+describe('SettingsSidebar — Phase 7 Audit + Backup & Restore entries', () => {
+  it('renders the Audit + Backup & Restore buttons alongside the existing entries', async () => {
+    setAdminSession();
+    await session.refresh();
+    render(<SettingsSidebar />);
+    const audit = await screen.findByTestId('settings-hub-audit');
+    const backup = await screen.findByTestId('settings-hub-backup-restore');
+    expect(audit).toBeInTheDocument();
+    expect(backup).toBeInTheDocument();
+    // Icons render inline; presence of the data-testid + a <svg> child
+    // is sufficient — keeps the assertion copy-independent of icon
+    // refactors.
+    expect(audit.querySelector('svg')).not.toBeNull();
+    expect(backup.querySelector('svg')).not.toBeNull();
+  });
+
+  it('clicking Audit navigates to {name: "audit"}', async () => {
+    setRoute({ name: 'patients' });
+    setAdminSession();
+    await session.refresh();
+    const user = userEvent.setup();
+    render(<SettingsSidebar />);
+    await user.click(await screen.findByTestId('settings-hub-audit'));
+    await waitFor(() => expect(getRoute().name).toBe('audit'));
+  });
+
+  it('clicking Backup & Restore navigates to {name: "backup-restore"}', async () => {
+    setRoute({ name: 'patients' });
+    setAdminSession();
+    await session.refresh();
+    const user = userEvent.setup();
+    render(<SettingsSidebar />);
+    await user.click(await screen.findByTestId('settings-hub-backup-restore'));
+    await waitFor(() => expect(getRoute().name).toBe('backup-restore'));
+  });
+
+  it('Audit + Backup & Restore are NOT admin-gated (every doctor sees them)', async () => {
+    setNonAdminSession();
+    await session.refresh();
+    render(<SettingsSidebar />);
+    const audit = await screen.findByTestId('settings-hub-audit');
+    const backup = await screen.findByTestId('settings-hub-backup-restore');
+    expect(audit).not.toBeDisabled();
+    expect(backup).not.toBeDisabled();
+  });
+});

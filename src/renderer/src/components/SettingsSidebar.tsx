@@ -14,13 +14,19 @@
 // lives alongside Capture + Users in the sidebar. The active highlight
 // keys on route.name === 'profile-edit' since the profile page has no
 // `activeTab` prop.
+//
+// Phase 7 / Plan 07-02 — D-05 + D-11: Audit + Backup & Restore entries.
+// Visual only — the page bodies land in Plan 07-03 (Audit) and Plan 07-05
+// (Backup & Restore). Audit + Backup & Restore buttons are NOT admin-gated
+// per UI-SPEC §Implementation Bindings — every doctor sees them. Visual
+// order is Capture → Profile → Audit → Backup & Restore → Users.
 
-import { Shield, UserCircle, Video } from 'lucide-react';
+import { FileSearch, HardDrive, Shield, UserCircle, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
 import { useRoute } from '@/lib/router';
 
-export type SettingsTab = 'capture' | 'users' | 'profile';
+export type SettingsTab = 'capture' | 'users' | 'profile' | 'audit' | 'backup-restore';
 
 export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX.Element {
   const { navigate } = useRoute();
@@ -51,6 +57,26 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <UserCircle className="size-4 mr-2" aria-hidden="true" />
         Profile
+      </Button>
+      <Button
+        variant={activeTab === 'audit' ? 'default' : 'outline'}
+        className="justify-start"
+        onClick={() => navigate({ name: 'audit' })}
+        data-testid="settings-hub-audit"
+        data-active={activeTab === 'audit' ? 'true' : 'false'}
+      >
+        <FileSearch className="size-4 mr-2" aria-hidden="true" />
+        Audit
+      </Button>
+      <Button
+        variant={activeTab === 'backup-restore' ? 'default' : 'outline'}
+        className="justify-start"
+        onClick={() => navigate({ name: 'backup-restore' })}
+        data-testid="settings-hub-backup-restore"
+        data-active={activeTab === 'backup-restore' ? 'true' : 'false'}
+      >
+        <HardDrive className="size-4 mr-2" aria-hidden="true" />
+        Backup &amp; restore
       </Button>
       <Button
         variant={activeTab === 'users' ? 'default' : 'outline'}

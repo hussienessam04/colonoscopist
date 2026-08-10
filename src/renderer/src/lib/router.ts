@@ -19,7 +19,14 @@ export type Route =
   // renderer can navigate with the resolved id after `getOrCreate` —
   // avoids a second round-trip on every report editor mount.
   | { name: 'profile-edit' }
-  | { name: 'report-editor'; procedureId: string; reportId?: string };
+  | { name: 'report-editor'; procedureId: string; reportId?: string }
+  // Phase 7 / Plan 07-02 — D-05 + D-11: SettingsSidebar visual entries for
+  // Audit (Plan 07-03 fills the page) + Backup & Restore (Plan 07-05 fills
+  // the page). The route variants exist NOW so the sidebar's `navigate()`
+  // calls compile; the page bodies land in the later plans. No admin gate
+  // per UI-SPEC §Implementation Bindings — every doctor sees them.
+  | { name: 'audit' }
+  | { name: 'backup-restore' };
 
 export const initialRoute: Route = { name: 'login' };
 
