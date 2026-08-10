@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 10
-name: ProcedureReview "Generate report" / "Edit report" CTA navigates
+number: 11
+name: SettingsHub Profile card + sidebar entry navigate to ProfileEditor
 expected: |
-  On a completed procedure, the right-rail Report section shows a "Generate report" or "Edit report" button. Click it → navigates to ReportEditor for that procedure. The button is disabled (or hidden) while procedure.status === 'recording'.
+  Click header Settings → land on SettingsHub. See a "Doctor profile" card with a clinic-name preview. Click it → ProfileEditor. Also: the sidebar shows a "Profile" nav entry → click it → ProfileEditor. The active highlight moves to "Profile".
 awaiting: user response
 
 ## Tests
@@ -64,7 +64,7 @@ result: pass
 ### 10. ProcedureReview "Generate report" / "Edit report" CTA navigates
 expected: |
   On a completed procedure, the right-rail Report section shows a "Generate report" or "Edit report" button. Click it → navigates to ReportEditor for that procedure. The button is disabled (or hidden) while procedure.status === 'recording'.
-result: pending
+result: pass
 
 ### 11. SettingsHub Profile card + sidebar entry navigate to ProfileEditor
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 9
-issues: 0 (all gaps resolved; 3 tests pending)
-pending: 3
+passed: 10
+issues: 0 (all gaps resolved; 2 tests pending)
+pending: 2
 skipped: 0
 
 ## Gaps
