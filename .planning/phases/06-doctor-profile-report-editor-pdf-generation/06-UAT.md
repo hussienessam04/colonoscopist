@@ -8,10 +8,10 @@ updated: 2026-08-09T02:30:00.000Z
 
 ## Current Test
 
-number: 8
-name: Open PDF launches OS default viewer
+number: 9
+name: Reveal in Explorer highlights PDF in OS file manager
 expected: |
-  Post-finalize, click "Open PDF" → the OS default PDF viewer opens with the file. The PDF shows: header with logo top-left + clinic name, signature top-right + doctor name + procedure date; patient block (Name/MRN/DOB/Gender); procedure block (Date + Duration HH:MM:SS + Doctor); Findings / Diagnosis sections; attached screenshots each on their own page with "Fig. N" caption; footer with "Page X of Y" + clinic name. MRN: 12345 displays as 12345 (no bidi reversal — Phase 6 PDF is English-only per D-10).
+  Post-finalize, click "Reveal in Explorer" → Windows Explorer opens with the PDF file selected/highlighted in `<userData>/data/reports/`. The OS default viewer does NOT launch (this is the "show in folder" affordance, not the "open" affordance).
 awaiting: user response
 
 ## Tests
@@ -53,8 +53,8 @@ result: pass
 
 ### 8. Open PDF launches OS default viewer
 expected: |
-  Post-finalize, click "Open PDF" → the OS default PDF viewer opens with the file. The PDF shows: header with clinic logo top-left + clinic name, signature top-right + doctor name + procedure date; patient block (Name/MRN/DOB/Gender); procedure block (Date + Duration HH:MM:SS + Doctor); Findings / Diagnosis / Recommendations sections; attached screenshots each on their own page with "Fig. N" caption; footer with "Page X of Y" + clinic name. MRN: 12345 displays as 12345 (no bidi reversal — Phase 6 PDF is English-only per D-10).
-result: pending
+  Post-finalize, click "Open PDF" → the OS default PDF viewer opens with the file. The PDF shows: header with logo top-left + clinic name, signature top-right + doctor name + procedure date; patient block (Name/MRN/DOB/Gender); procedure block (Date + Duration HH:MM:SS + Doctor); Findings / Diagnosis sections; attached screenshots each on their own page with "Fig. N" caption; footer with "Page X of Y" + clinic name. MRN: 12345 displays as 12345 (no bidi reversal — Phase 6 PDF is English-only per D-10).
+result: pass
 
 ### 9. Reveal in Explorer highlights PDF in OS file manager
 expected: |
@@ -79,9 +79,9 @@ result: pending
 ## Summary
 
 total: 12
-passed: 7
-issues: 0 (all gaps resolved; 5 tests pending)
-pending: 5
+passed: 8
+issues: 0 (all gaps resolved; 4 tests pending)
+pending: 4
 skipped: 0
 
 ## Gaps
