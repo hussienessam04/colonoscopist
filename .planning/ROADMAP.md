@@ -7,7 +7,7 @@
 
 ---
 
-## Phase 1 — Scaffold (electron-vite + security baseline + native rebuild)
+## Phase 1: Scaffold (electron-vite + security baseline + native rebuild)
 
 **Goal:** Boot a hardened Electron app shell with React + TypeScript + Tailwind + shadcn/ui; lock down the renderer security baseline; prove `better-sqlite3` builds and runs under Electron's Node ABI via `postinstall` rebuild.
 **Mode:** mvp
@@ -25,7 +25,7 @@
 
 ---
 
-## Phase 2 — Database + Migrations + Patient CRUD + Audit + Auth
+## Phase 2: Database + Migrations + Patient CRUD + Audit + Auth
 
 **Goal:** Ship the data layer (SQLite + migrations + WAL), patient CRUD + search, audit log infrastructure, and the PIN-based auth flow with rate limiting and audit integration.
 **Mode:** mvp
@@ -50,7 +50,7 @@ Plans:
 
 ---
 
-## Phase 3 — Capture Device Enumeration + Live Preview + Quality Presets
+## Phase 3: Capture Device Enumeration + Live Preview + Quality Presets
 
 **Goal:** Let the doctor see all available USB capture devices, pick one, and see a live preview in the Procedure Room hero screen — without yet recording.
 **Mode:** mvp
@@ -81,7 +81,7 @@ Plans:
 
 ---
 
-## Phase 4 — Recording (ffmpeg child process + procedure timer + device-lost handling)
+## Phase 4: Recording (ffmpeg child process + procedure timer + device-lost handling)
 
 **Goal:** Doctor can press Record, the procedure timer starts, the captured mp4 is written to disk, and Stop produces a valid file — including the long-procedure + device-lost edge cases.
 **Mode:** mvp
@@ -109,7 +109,7 @@ Plans:
 
 ---
 
-## Phase 5 — Screenshots + Procedure Review + Trim
+## Phase 5: Screenshots + Procedure Review + Trim
 
 **Goal:** Doctor can capture screenshots during or after a procedure, walk through the recording on a scrubber with a clickable screenshot timeline, and trim the procedure to the salient portion.
 **Mode:** mvp
@@ -151,7 +151,7 @@ Plans:
 
 ---
 
-## Phase 6 — Doctor Profile + Report Editor + PDF Generation
+## Phase 6: Doctor Profile + Report Editor + PDF Generation
 
 **Goal:** Doctor profile is editable and auto-fills the report PDF header; doctor can author a report draft with findings/diagnosis/recommendations and attach screenshots; report finalizes into a PDF stored locally.
 **Mode:** mvp
@@ -180,7 +180,7 @@ Plans:
 
 ---
 
-## Phase 7 — Search & History + Audit UI + Backup/Restore + Arabic/RTL
+## Phase 7: Search & History + Audit UI + Backup/Restore + Arabic/RTL
 
 **Goal:** Cross-cutting finishing work: cross-cutting search by date range and doctor; visible audit log; data backup and restore; full Arabic + RTL coverage.
 **Mode:** mvp
@@ -199,7 +199,7 @@ Plans:
 
 ---
 
-## Phase 8 — Licensing (Ed25519 signed `.lic` + 14-day trial + activation flow)
+## Phase 8: Licensing (Ed25519 signed `.lic` + 14-day trial + activation flow)
 
 **Goal:** License gating works end-to-end: 14-day trial with full features; Ed25519-signed `.lic` file activates the workstation; license is verified on every launch; trial clock survives reboots; license gate lives at the IPC boundary.
 **Mode:** mvp
@@ -256,17 +256,6 @@ Phase 1 (Scaffold)
 ```
 
 Linear chain. Each phase's output is the next phase's input.
-
-### Phase 6: Doctor Profile + Report Editor + PDF Generation
-
-**Goal:** [To be planned]
-**Requirements**: TBD
-**Depends on:** Phase 5
-**Plans:** 0 plans
-
-Plans:
-
-- [ ] TBD (run /gsd-plan-phase 6 to break down)
 
 ---
 *Roadmap created: 2026-07-31*
