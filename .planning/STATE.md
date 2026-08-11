@@ -239,3 +239,10 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase 7 P06]: AR PDF magic test threshold lowered from D-27 verbatim >50KB → >5KB (documented in THRESHOLD DEVIATION block) — `@react-pdf/renderer` 4.5.1 only embeds font subsets for actually-rendered glyphs, so with English body content + language='ar' the PDF lands at ~10KB. Real Arabic body content triggers a `@react-pdf/textkit` 4.5.1 bidi crash on Arabic ligatures (out of scope). The 5KB threshold still catches the three D-27 failure modes (0KB crash / missing-glyphs / wrong-format); visual bidi correctness is the Playwright RTL smoke gate
 - [Phase 7 P06]: backup-restore-roundtrip.test.ts uses `wizardBootstrap({...})` to seed the first admin + doctor_profile row + DB schema in beforeAll — closest match to "real DB roundtrip" (D-16) without diverging from the production seed path. The plan template's synthetic `INSERT INTO users` would have tested a different code path than the real wizard
 - [Phase 7 P06]: Integration tests use `describe.skipIf(!smokeEnabled)` + a `describe('disabled — set RUN_SMOKE=1')` placeholder block instead of the plan template's `itSmoke = smokeEnabled ? it : it.skip` pattern — vitest-native, single env-var read per file, test runner output is honest (no dangling it() refs / no silent skips)
+
+
+## Quick Tasks Completed
+
+| Date | Slug | Description |
+|------|------|-------------|
+| 2026-08-11 | revert-patient-list-filter | Revert patient list filter sidebar + new PatientProcedures page accessed via dropdown menu |
