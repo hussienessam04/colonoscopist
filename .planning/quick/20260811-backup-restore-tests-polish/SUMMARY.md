@@ -304,3 +304,18 @@ None - no external service configuration required.
 
 *Quick task: backup-restore-tests-polish*
 *Completed: 2026-08-11*
+
+## Self-Check: PASSED
+
+- [x] `src/renderer/src/pages/BackupRestore.tsx` — exists, polished + last-backup indicator
+- [x] `src/renderer/src/i18n/en/translation.json` — 3 new keys (lastBackup, lastBackupNever, noBackupSelectedYet)
+- [x] `src/renderer/src/i18n/ar/translation.json` — 3 new keys mirrored (D-24 parity)
+- [x] `tests/renderer/pages/BackupRestore.test.tsx` — 18 tests total (8 original + 10 new)
+- [x] `tests/main/ipc/backup.test.ts` — NEW file, 5 tests
+- [x] `tests/main/ipc/restore.test.ts` — NEW file, 7 tests
+- [x] `.planning/quick/20260811-backup-restore-tests-polish/SUMMARY.md` — created
+- [x] Commit `8ad8b9d` (feat(quick): BackupRestore UI polish + 9 renderer tests + 2 main-side IPC handler tests + last-backup indicator) — present
+- [x] Commit `2b45b09` (docs(quick): complete backup-restore-tests-polish plan) — present
+- [x] Typecheck (node + web) — clean
+- [x] Targeted tests — 35/35 pass across 4 files
+- [x] Contract checks — security-baseline / no-any / ipc-contract all OK
