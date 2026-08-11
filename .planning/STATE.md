@@ -3,27 +3,27 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 current_plan: 07-05
-status: in_progress
-stopped_at: Phase 07 Plan 4 complete
+status: complete
+stopped_at: Phase 07 Plan 5 complete
 paused_at: —
-last_updated: "2026-08-11T04:05:00.000Z"
+last_updated: "2026-08-11T04:50:00.000Z"
 last_activity: 2026-08-11
-last_activity_desc: Phase 7 Plan 4 complete — bilingual EN+AR UI + RTL + AR PDF
+last_activity_desc: Phase 7 Plan 5 complete — BackupRestore page + picker IPC channels
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 40
-  completed_plans: 38
+  completed_plans: 39
 ---
 
 **Current Plan:** 07-05
 **Total Plans in Phase:** 6
 **Last Activity:** 2026-08-11
-**Last Activity Description:** Phase 7 Plan 4 complete — bilingual EN+AR UI + RTL + AR PDF
+**Last Activity Description:** Phase 7 Plan 5 complete — BackupRestore page + picker IPC channels
 **Status:** Phase 7 in progress
 **Paused At:** —
 
-**Progress:** [████████░░░] 80%
+**Progress:** [█████████░] 83%
 
 # State: Colonoscopist
 
@@ -164,6 +164,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-11 | Gap closure (G-05-14): extend `MEDIA_ROUTE_RE` with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + add `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` allow-list defense-in-depth (404 BEFORE filesystem access); handler reads `subdir = match[3] ?? ''` and joins it into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment: `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion | complete (515/515 tests pass across 64 files; 4 new contract-guard assertions; no regressions) |
 | 05-12 | Gap closure (G-05-15): extract shared `screenshotUrl({ mediaBaseUrl, patientId, procedureId, filePath })` helper at `src/renderer/src/lib/screenshot-url.ts` — single source of truth for the screenshot `<img>` src (leaf-filename regex + literal `screenshots/` subdir + `/media/` route shape) — returns `null` when `mediaBaseUrl` is `null` for graceful degrade; ScreenshotTimeline adds `mediaBaseUrl: string \| null` + `patientId: string` props and composes each thumbnail's `thumbnailSrc` via the helper (the `<img>` element mounts at ~120×110px — no more 'FRAME' placeholder); ScreenshotLightbox canonicalized onto the same helper (no third copy of the leaf-filename regex); ScreenshotThumbnail gains `data-testid="screenshot-thumbnail-img"` for the new contract-guard test seam; ProcedureRoom gains a `useMediaUrl()` hook call so the mid-procedure gallery is visually populated; 1 new contract-guard test (timeline `<img>` src composition) + 4 new helper tests (null-safety + happy-path + Windows backslash + forward-slash leaf extraction) | complete (520/520 tests pass across 65 files; 5 new contract-guard assertions; no regressions) |
 | 07-04 | i18next bundles (en/ar) + useLanguage hook flips `<html dir>` on change + Wizard step 4 (language radio submits users.language) + 5-page useTranslation wiring (PatientsList + Audit + ProfileEditor + ProcedureReview + ReportEditor) + AR PDF via Font.register(NotoSansArabic) + bidi `<Text direction='rtl'>` wrappers + numeric fragment `<Text direction='ltr'>` isolation per Pitfall 8 + D-24 parity check Vitest + RUN_SMOKE=1 integration smoke (file > 50KB + PDF magic bytes) | complete (649/652 tests pass across 88 files; 14 new tests + 5 pre-existing PDF smoke failures unrelated to Phase 7; 4 auto-fixed bugs: unused useState, dead STATUS_OPTIONS, ReportEditableFields missing fields, ProcedureReview race condition) |
+| 07-05 | BackupRestore page (two side-by-side Cards per UI-SPEC §Implementation Bindings) + 3 new picker IPC channels (BACKUP_PICK_DESTINATION / RESTORE_PICK_ZIP / RESTORE_REVEAL_STAGING) wrapping Electron dialog APIs + zod .strict() validators with bounded strings + restore preview Dialog with integrity check display (green Passed / red Failed:) + v1.1 activate placeholder (DISABLED button + tooltip) + inline D-12 warning Alert (warn but don't block) + ConfirmDialog gating Restore to staging + 8 test cases covering all 6 must-have truths + AGENTS.md prohibition contract (renderer never sends a data/ path) | complete (657/660 tests pass across 89 files; 8 new tests; 3 pre-existing PDF smoke failures unrelated to Plan 05; 3 auto-fixed: duplicated `{{` typo + `shell.openPath` is async (TS2339) + unused AlertTitle import). BackupRestore uses pre-existing `backup.*` i18n keys from Plan 07-04 — no new translation work needed. |
 
 ---
 *State last updated: 2026-08-08 after 05-12-PLAN.md completed (G-05-15 closed: timeline thumbnails broken — `ScreenshotTimeline.tsx` was silently dropping `thumbnailSrc` since Plan 05-07 (placeholder fall-through was masking the missing wiring); Plan 12 extracted the URL composition into a shared `screenshotUrl` helper, wired `mediaBaseUrl` + `patientId` props through ScreenshotTimeline + ProcedureReview + ProcedureRoom, canonicalized ScreenshotLightbox onto the same helper (no third copy), added `data-testid="screenshot-thumbnail-img"` for the new contract-guard test, and gave ProcedureRoom its first `useMediaUrl()` call so the mid-procedure gallery is visually populated; 1 new ScreenshotTimeline contract-guard test + 4 new `screenshotUrl` helper tests; 520/520 tests across 65 files)*
@@ -187,6 +188,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 05 P11 | 6 min | 2 tasks | 5 files (preview-server.ts + ScreenshotLightbox.tsx + 3 test files) |
 | Phase 05 P12 | 6 min | 3 tasks | 8 files (screenshot-url.ts [new] + ScreenshotTimeline.tsx + ScreenshotThumbnail.tsx + ScreenshotLightbox.tsx + ProcedureReview.tsx + ProcedureRoom.tsx + 2 test files; 1 new test file) |
 | Phase 07 P04 | ~45 min | 2 tasks + 1 fix commit | 8 created + 12 modified + 1 TTF binary (i18n bundles + useLanguage + Wizard step 4 + AR PDF + 5-page useTranslation wiring) |
+| Phase 07 P05 | ~25 min | 1 task (tracer) | 2 created (BackupRestore.tsx + 8-case test file) + 8 modified (IPC contract + validators + backup IPC + restore IPC + preload + App.tsx + setup.ts + .planning/SUMMARY.md) |
 
 ## Decisions
 

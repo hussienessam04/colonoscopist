@@ -218,7 +218,8 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
-- [ ] 07-05-PLAN.md — BackupRestore page (Backup Card with pickDestination + create + Reveal in Explorer toast + inline warning Alert) + Restore Card with two-step flow (Choose backup → Preview with counts + integrity check → Restore to staging via ConfirmDialog) + Activate this backup v1.1 disabled placeholder (Wave 5, depends_on: 07-01)
+- [x] 07-05-PLAN.md — BackupRestore page (Backup Card with pickDestination + create + Reveal in Explorer toast + inline warning Alert) + Restore Card with two-step flow (Choose backup → Preview with counts + integrity check → Restore to staging via ConfirmDialog) + Activate this backup v1.1 disabled placeholder (Wave 5, depends_on: 07-01)
+  - **Verification:** 657/660 tests pass across 89 files; 8 new tests in `tests/renderer/pages/BackupRestore.test.tsx`; 3 pre-existing PDF smoke failures unrelated to Plan 05 (carry-over from Plan 06-03); 3 auto-fixed bugs (duplicated `{{` typo in import + `shell.openPath` is async TS2339 + unused AlertTitle import); SET-05 + SET-06 completed. BackupRestore uses pre-existing `backup.*` i18n keys from Plan 07-04 — no new translation work needed.
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
