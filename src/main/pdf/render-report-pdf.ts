@@ -14,6 +14,13 @@
 // screenshots one-per-page, footer with "Page X of Y" + clinic name.
 // Plan 06-03 Task 3 extends this with logo/signature/screenshot loading
 // + multi-page footer + size sanity check.
+//
+// Phase 7 / Plan 07-04 — I18N-03 + RPT-06: AR PDF rendering per
+// D-25..D-27 + Pitfall 8. The signature accepts an `opts.language` arg
+// ('en' | 'ar'). When 'ar', main calls
+// `Font.register({family: 'NotoSansArabic', src: <ttf path>})` exactly
+// once per process (module-scope guard). Language resolution per D-26
+// verbatim: doctor_profile.language → users.language → 'en'.
 
 import { createWriteStream, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -53,23 +60,46 @@ function loadReactPdf(): Promise<typeof import('@react-pdf/renderer')> {
   return _reactPdfCache;
 }
 
-// Same dynamic-import treatment for `./report.tsx` because the
-// `ReportPdf` component module also pulls in @react-pdf/renderer
-// transitively (its `Document` / `Page` / `Text` / `View` / `Image` /
-// `StyleSheet` / `Font` imports). Caching keeps subsequent renders
-// warm.
-// ponytail: removed — `report.tsx` now uses `createReportPdfElement`
-// which has zero static @react-pdf/renderer imports. The build emits
-// no chunk with a top-level require("@react-pdf/renderer"), so
-// dynamic-importing `./report` is no longer necessary. Only the
-// @react-pdf/renderer module itself is ESM and must be dynamically
-// imported.
-
 // ponytail: minimum size sanity check threshold per Plan 06-03 Task 3
 // step 7. A report with at least one attached screenshot renders well
 // above this; a render under this size indicates a silent PDF failure
 // (e.g. empty template, image embed error).
 const MIN_PDF_BYTES = 5_000;
+
+// Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-25: register the bundled
+// Noto Sans Arabic TTF exactly once per process. The Font.register API
+// is idempotent on the same family+src but the file read + parse is
+// not free, so a module-scope guard prevents redundant work. If the
+// TTF is missing (user_setup skipped in dev), the register call throws
+// and the AR render degrades to Helvetica (the fallback renders as
+// 'tofu' boxes for Arabic glyphs — manual smoke step per D-27).
+let _notoArabicRegistered = false;
+let _notoArabicAvailable: boolean | null = null;
+function registerNotoArabicIfNeeded(reactPdf: typeof import('@react-pdf/renderer')): boolean {
+  if (_notoArabicRegistered) return _notoArabicAvailable ?? false;
+  _notoArabicRegistered = true;
+  // Resolve relative to this compiled module's location. electron-vite
+  // emits main/* into out/main/, and we copy the fonts/ subdir alongside
+  // via electron-builder's `extraResources`. In dev (electron-vite dev)
+  // __dirname is the source-tree src/main/pdf/, so the same relative
+  // path resolves either way.
+  const ttfPath = path.join(__dirname, 'fonts', 'NotoSansArabic-Regular.ttf');
+  try {
+    reactPdf.Font.register({
+      family: 'NotoSansArabic',
+      src: ttfPath,
+    });
+    _notoArabicAvailable = true;
+  } catch (err) {
+    // ponytail: degrade gracefully. The AR report will render with
+    // Helvetica (no Arabic glyphs) but the IPC contract holds — the
+    // renderer still receives a pdfPath + size sanity check.
+    _notoArabicAvailable = false;
+    // eslint-disable-next-line no-console
+    console.warn('[render-report-pdf] NotoSansArabic TTF registration failed:', err);
+  }
+  return _notoArabicAvailable;
+}
 
 // ponytail: HH:MM:SS duration formatter. Mirrors the format used in
 // REC-04 / ProcedureReview. durationSeconds is the canonical
@@ -83,8 +113,15 @@ function formatHHMMSS(durationSeconds: number): string {
   return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
+export type ReportLanguage = 'en' | 'ar';
+
+export interface RenderReportPdfOptions {
+  language?: ReportLanguage;
+}
+
 export async function renderReportPdf(
   reportId: string,
+  opts: RenderReportPdfOptions = {},
 ): Promise<{ pdfPath: string }> {
   mkdirSync(reportsDir(), { recursive: true });
 
@@ -108,6 +145,17 @@ export async function renderReportPdf(
     throw new Error(`Doctor ${report.doctorId} not found`);
   }
   const profile = doctorProfileRepo.get(report.doctorId);
+
+  // Phase 7 / Plan 07-04 — I18N-03 + D-26 verbatim: resolve language
+  // doctor_profile.language → users.language → 'en'. The renderer never
+  // supplies language to this orchestrator (the IPC handler forwards
+  // its own resolved value via opts); this is the safety-net when the
+  // IPC handler didn't pass a language.
+  const language: ReportLanguage =
+    opts.language ??
+    profile?.language ??
+    doctor.language ??
+    'en';
 
   // Plan 06-03 Task 3 — load the logo + signature ImageBox buffers
   // (null when the doctor hasn't uploaded the asset; the template
@@ -166,6 +214,7 @@ export async function renderReportPdf(
     diagnosis: report.diagnosis,
     recommendations: report.recommendations,
     attachedScreenshots,
+    language,
   };
 
   const pdfPath = reportPdfPath(reportId);
@@ -178,6 +227,15 @@ export async function renderReportPdf(
   // parameter and builds the React tree with `React.createElement`.
   const reactPdf = await loadReactPdf();
   const { pdf } = reactPdf;
+
+  // Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-25: register the
+  // Noto Sans Arabic TTF once per process when language === 'ar'.
+  // The orchestrator doesn't pass the font into the factory — the
+  // factory references it by family name ('NotoSansArabic') and
+  // @react-pdf/renderer resolves it via the registered map.
+  if (language === 'ar') {
+    registerNotoArabicIfNeeded(reactPdf);
+  }
 
   // Render via @react-pdf/renderer's Node entry.
   // ponytail: @react-pdf/renderer 4.5.1 ships with a known bug in
@@ -215,7 +273,7 @@ export async function renderReportPdf(
     entityType: 'report',
     entityId: reportId,
     userId: session.currentUserId,
-    metadata: { pdfPath: relPdfPath },
+    metadata: { pdfPath: relPdfPath, language },
   });
 
   return { pdfPath };

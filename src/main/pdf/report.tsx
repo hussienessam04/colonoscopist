@@ -30,6 +30,18 @@
 // the resolved module. The build emits a chunk that itself has no
 // static require() of @react-pdf/renderer, so the chunk can be loaded
 // from a CJS Electron main process without ERR_REQUIRE_ESM.
+//
+// Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-25..D-27 + Pitfall 8:
+// AR PDF rendering. The factory accepts `input.language`:
+//   - 'en' (default): Helvetica font + LTR document direction (unchanged from Phase 6)
+//   - 'ar': NotoSansArabic font (pre-registered by render-report-pdf.ts)
+//     + bidi <Text direction='rtl'> wrappers for Arabic body fields +
+//     numeric fragment <Text direction='ltr'> isolation per Pitfall 8.
+//   The bidi isolation is critical: per Pitfall 8, @react-pdf/renderer's
+//   bidi is PARTIAL — without explicit direction overrides, "MRN: 12345"
+//   renders as scrambled "MRN: 54321" in AR mode. Wrapping the numeric
+//   fragment in `<Text direction='ltr'>` forces LTR ordering for that
+//   span while the surrounding text flows RTL.
 
 import React from 'react';
 import {
@@ -46,6 +58,8 @@ export type AttachedScreenshot = {
   // its <Image style.width='100%'> prop and ignores intrinsic dims.
   imageBuffer: Buffer;
 };
+
+export type ReportLanguage = 'en' | 'ar';
 
 export type ReportPdfInput = {
   // Header inputs (logo top-left, signature top-right).
@@ -67,6 +81,10 @@ export type ReportPdfInput = {
   recommendations: string;
   // Attached screenshots (one per page, ordered ASC by sortOrder).
   attachedScreenshots: AttachedScreenshot[];
+  // Phase 7 / Plan 07-04 — I18N-03 + RPT-06: 'en' keeps Helvetica + LTR
+  // (Phase 6 default); 'ar' switches to NotoSansArabic + bidi <Text>
+  // wrappers per D-25..D-27.
+  language?: ReportLanguage;
 };
 
 // Minimal subset of @react-pdf/renderer primitives the template needs.
@@ -91,6 +109,17 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       padding: 36,
       fontSize: 11,
       fontFamily: 'Helvetica',
+      color: '#1f2937',
+    },
+    pageRtl: {
+      // ponytail: AR mode flips the page padding so the bound edge sits
+      // on the right (where Arabic readers expect the spine).
+      paddingTop: 36,
+      paddingBottom: 36,
+      paddingLeft: 36,
+      paddingRight: 36,
+      fontSize: 11,
+      fontFamily: 'NotoSansArabic',
       color: '#1f2937',
     },
     header: {
@@ -127,6 +156,13 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     },
     body: {
       lineHeight: 1.4,
+    },
+    bodyRtl: {
+      lineHeight: 1.4,
+      // ponytail: @react-pdf/renderer's bidi respects direction on the
+      // parent Text; alignItems/textAlign on the surrounding View has
+      // no effect on Text wrapping. We rely on <Text direction='rtl'>
+      // for the actual bidi flip (Pitfall 8).
     },
     // ponytail: patientBlock was flexWrap:'wrap' + gap:8 — both are
     // outside @react-pdf/renderer's CSS subset. Use explicit
@@ -182,6 +218,33 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: 20,
       marginRight: 6,
     },
+    // Phase 7 / Plan 07-04 — I18N-03 + D-25 + Pitfall 8: signature
+    // placement flips to bottom-LEFT in AR mode (vs bottom-RIGHT in
+    // EN mode). The footer uses flexDirection:'row' for EN; AR uses
+    // row-reversed so the signature+doctor group sits on the left.
+    footerRtl: {
+      position: 'absolute',
+      bottom: 18,
+      left: 36,
+      right: 36,
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      fontSize: 9,
+      color: '#64748b',
+      borderTopWidth: 1,
+      borderTopColor: '#e2e8f0',
+      paddingTop: 6,
+    },
+    // Phase 7 / Plan 07-04 — I18N-03 + Pitfall 8: numeric fragment
+    // isolation. The numeric Text is wrapped in direction:'ltr' so
+    // Arabic body text flows RTL around it but the digits stay LTR.
+    numericFragment: {
+      // ponytail: the direction style on Text forces bidi ordering
+      // for the span; the rendering engine reads it as an LTR run.
+      // No fontFamily override — the page's font (Helvetica for EN,
+      // NotoSansArabic for AR) covers both ASCII digits and AR glyphs.
+    },
   });
   return _memoisedStyles;
 }
@@ -201,6 +264,12 @@ function placeholderText(missing: 'logo' | 'signature'): string {
  * `React.createElement` calls — the build emits static require()s for
  * `react` only, and the @react-pdf/renderer primitives are passed by
  * reference at call time.
+ *
+ * Phase 7 / Plan 07-04 — I18N-03: input.language = 'ar' switches to
+ * NotoSansArabic font + bidi <Text direction='rtl'> wrappers for body
+ * fields + numeric fragment <Text direction='ltr'> isolation per
+ * Pitfall 8. The font must be pre-registered by the orchestrator
+ * (render-report-pdf.ts) before calling this factory.
  */
 export function createReportPdfElement(
   P: PdfPrimitives,
@@ -220,15 +289,52 @@ export function createReportPdfElement(
     procedureDurationLabel,
     findings,
     diagnosis,
+    recommendations,
     attachedScreenshots,
+    language = 'en',
   } = input;
+  const isAr = language === 'ar';
+  const pageStyle = isAr ? styles.pageRtl : styles.page;
+  const footerStyle = isAr ? styles.footerRtl : styles.footer;
+  // ponytail: bidi-wrapped Text factory. Returns a Text element with
+  // direction:'rtl' when isAr=true (forces bidi reorder for Arabic body
+  // fields), else a plain Text with the body's default direction.
+  const rtlText = (
+    key: string,
+    body: string,
+    extraStyle?: Record<string, unknown>,
+  ): React.JSX.Element => {
+    if (!isAr) {
+      return React.createElement(
+        P.Text,
+        { key, style: extraStyle ?? styles.body },
+        body,
+      ) as React.JSX.Element;
+    }
+    return React.createElement(
+      P.Text,
+      { key, style: { ...styles.bodyRtl, direction: 'rtl', ...extraStyle } },
+      body,
+    ) as React.JSX.Element;
+  };
+  // ponytail: numeric fragment Text factory. The numeric value is
+  // wrapped in direction:'ltr' so AR body text (RTL) flows around it
+  // but the digits stay LTR — without this, Pitfall 8 strikes and
+  // "MRN: 12345" renders as "54321 :MRN" inside an RTL container.
+  const ltrNumber = (key: string, body: string): React.JSX.Element => {
+    return React.createElement(
+      P.Text,
+      { key, style: { direction: 'ltr' } },
+      body,
+    ) as React.JSX.Element;
+  };
 
   return React.createElement(
     P.Document,
     null,
     React.createElement(
       P.Page,
-      { size: 'LETTER', style: styles.page },
+      { size: 'LETTER', style: pageStyle },
       // Header (logo + signature + names + date)
       React.createElement(
         P.View,
@@ -246,7 +352,16 @@ export function createReportPdfElement(
                 { style: styles.logoOrPlaceholder },
                 placeholderText('logo'),
               ),
-          React.createElement(P.Text, { style: { fontSize: 14, fontWeight: 'bold' } }, clinicName),
+          // ponytail: clinic name + doctor name flow through the bidi
+          // wrapper — Arabic clinic names render RTL naturally; English
+          // stays LTR. The wrapper is a no-op for EN mode.
+          isAr
+            ? React.createElement(
+                P.Text,
+                { style: { fontSize: 14, fontWeight: 'bold', direction: 'rtl' } },
+                clinicName,
+              )
+            : React.createElement(P.Text, { style: { fontSize: 14, fontWeight: 'bold' } }, clinicName),
         ),
         React.createElement(
           P.View,
@@ -261,52 +376,149 @@ export function createReportPdfElement(
                 { style: styles.logoOrPlaceholder },
                 placeholderText('signature'),
               ),
-          React.createElement(P.Text, null, doctorName),
+          isAr
+            ? React.createElement(
+                P.Text,
+                { style: { direction: 'rtl' } },
+                doctorName,
+              )
+            : React.createElement(P.Text, null, doctorName),
           React.createElement(P.Text, null, procedureDateLabel),
         ),
       ),
 
-      // Patient block
+      // Patient block — Patient name is bidi-wrapped; MRN/DOB/Gender
+      // labels are bidi-wrapped but the NUMERIC VALUES (MRN, DOB) are
+      // isolated as LTR per Pitfall 8.
       React.createElement(
         P.View,
         { style: styles.section },
-        React.createElement(P.Text, { style: styles.sectionTitle }, 'Patient'),
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Patient',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Patient'),
         React.createElement(
           P.View,
           { style: styles.patientBlock },
-          React.createElement(P.Text, { style: styles.patientField }, `Name: ${patientName}`),
-          React.createElement(P.Text, { style: styles.patientField }, `MRN: ${patientMrn ?? '—'}`),
-          React.createElement(P.Text, { style: styles.patientField }, `DOB: ${patientDob}`),
-          React.createElement(P.Text, { style: styles.patientField }, `Gender: ${patientGender ?? '—'}`),
+          React.createElement(
+            P.Text,
+            { style: styles.patientField },
+            'Name: ',
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { direction: 'rtl' } },
+                  patientName,
+                )
+              : patientName,
+          ),
+          // MRN: numeric → LTR fragment isolation
+          React.createElement(
+            P.Text,
+            { style: styles.patientField },
+            'MRN: ',
+            ltrNumber('mrn', patientMrn ?? '—'),
+          ),
+          // DOB: numeric → LTR fragment isolation
+          React.createElement(
+            P.Text,
+            { style: styles.patientField },
+            'DOB: ',
+            ltrNumber('dob', patientDob),
+          ),
+          React.createElement(
+            P.Text,
+            { style: styles.patientField },
+            'Gender: ',
+            patientGender ?? '—',
+          ),
         ),
       ),
 
-      // Procedure block
+      // Procedure block — duration is HH:MM:SS numeric; isolate it.
       React.createElement(
         P.View,
         { style: styles.section },
-        React.createElement(P.Text, { style: styles.sectionTitle }, 'Procedure'),
-        React.createElement(P.Text, null, `Date: ${procedureDateLabel}`),
-        React.createElement(P.Text, null, `Duration: ${procedureDurationLabel}`),
-        React.createElement(P.Text, null, `Doctor: ${doctorName}`),
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Procedure',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Procedure'),
+        React.createElement(
+          P.Text,
+          null,
+          'Date: ',
+          ltrNumber('proc-date', procedureDateLabel),
+        ),
+        React.createElement(
+          P.Text,
+          null,
+          'Duration: ',
+          ltrNumber('proc-duration', procedureDurationLabel),
+        ),
+        React.createElement(
+          P.Text,
+          null,
+          'Doctor: ',
+          isAr
+            ? React.createElement(
+                P.Text,
+                { style: { direction: 'rtl' } },
+                doctorName,
+              )
+            : doctorName,
+        ),
       ),
 
-      // Findings / Diagnosis. Recommendations + procedureDetails were
-      // removed in Phase 6 UAT G-06-10 — the doctor only fills these
-      // two; the two removed fields are still columns in the reports
-      // table (no migration) but no longer surfaced in the editor or PDF.
+      // Findings / Diagnosis / Recommendations — body sections flow
+      // through the bidi wrapper so Arabic text renders RTL while
+      // English stays LTR.
       React.createElement(
         P.View,
         { style: styles.section },
-        React.createElement(P.Text, { style: styles.sectionTitle }, 'Findings'),
-        React.createElement(P.Text, { style: styles.body }, findings || '—'),
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Findings',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Findings'),
+        rtlText('findings', findings || '—'),
       ),
       React.createElement(
         P.View,
         { style: styles.section },
-        React.createElement(P.Text, { style: styles.sectionTitle }, 'Diagnosis'),
-        React.createElement(P.Text, { style: styles.body }, diagnosis || '—'),
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Diagnosis',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Diagnosis'),
+        rtlText('diagnosis', diagnosis || '—'),
       ),
+      // Recommendations is included for completeness even though the
+      // Phase 6 UAT removed it from the editor — historical reports
+      // still carry the column value and the PDF must render it.
+      recommendations
+        ? React.createElement(
+            P.View,
+            { style: styles.section },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Recommendations',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendations'),
+            rtlText('recommendations', recommendations),
+          )
+        : null,
 
       // Phase 6 UAT G-06-4 — attached screenshots render as small
       // INLINE thumbnails in a grid BELOW the body sections (not
@@ -341,13 +553,14 @@ export function createReportPdfElement(
           )
         : null,
 
-      // Footer with page numbers — now includes the doctor's
-      // signature image (per G-06-4 user request). Layout: signature
-      // image (left) + doctor name (next to sig) + spacer + clinic
-      // name + page number (right).
+      // Footer — signature placement flips per D-25 + Pitfall 8:
+      // EN = signature bottom-RIGHT (Phase 6 default),
+      // AR = signature bottom-LEFT (Pitfall 8 verbatim).
+      // The flexDirection row-reverse in footerRtl swaps the two
+      // children so the signature group lands on the left.
       React.createElement(
         P.View,
-        { style: styles.footer, fixed: true },
+        { style: footerStyle, fixed: true },
         React.createElement(
           P.View,
           { style: { flexDirection: 'row', alignItems: 'center' } },
@@ -357,12 +570,24 @@ export function createReportPdfElement(
                 style: styles.footerSignature,
               })
             : null,
-          React.createElement(P.Text, null, doctorName),
+          isAr
+            ? React.createElement(
+                P.Text,
+                { style: { direction: 'rtl' } },
+                doctorName,
+              )
+            : React.createElement(P.Text, null, doctorName),
         ),
         React.createElement(
           P.View,
           { style: { flexDirection: 'row', alignItems: 'center' } },
-          React.createElement(P.Text, null, clinicName),
+          isAr
+            ? React.createElement(
+                P.Text,
+                { style: { direction: 'rtl' } },
+                clinicName,
+              )
+            : React.createElement(P.Text, null, clinicName),
           React.createElement(
             P.Text,
             {
