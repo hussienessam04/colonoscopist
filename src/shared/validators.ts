@@ -374,11 +374,13 @@ export const restoreUnpackInput = z
 // Phase 7 / Plan 07-05 — D-11 verbatim: backup.pickDestination and
 // restore.pickZip take NO payload (they wrap Electron's dialog
 // pickers). The handlers return either an absolute path or null when
-// the user cancels. Empty-object .strict() so any future renderer drift
-// (e.g. adding a typed field) fails the IPC_VALIDATION gate up-front
-// instead of crashing the handler.
-export const pickDestinationInput = z.object({}).strict();
-export const pickZipInput = z.object({}).strict();
+// the user cancels. The renderer calls them with no argument, which
+// Electron's IPC layer delivers as `undefined`; the validator accepts
+// either `undefined` or an empty object so a future renderer that
+// passes `{}` explicitly still validates, while a stray non-object
+// payload still fails the IPC_VALIDATION gate.
+export const pickDestinationInput = z.union([z.object({}).strict(), z.undefined()]);
+export const pickZipInput = z.union([z.object({}).strict(), z.undefined()]);
 
 // Phase 7 / Plan 07-05 — restore.revealStaging: the renderer sends the
 // staging directory (which the renderer itself composed as
