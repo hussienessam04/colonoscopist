@@ -56,12 +56,6 @@ const EMPTY_SIDEBAR: SidebarFilters = {
   status: [],
 };
 
-const STATUS_OPTIONS: { value: ProcedureStatus; label: string }[] = [
-  { value: 'completed', label: 'Completed' },
-  { value: 'partial', label: 'Partial' },
-  { value: 'recording', label: 'Recording' },
-];
-
 const ANY_DOCTOR = '__any__';
 
 export default function PatientsList(): JSX.Element {

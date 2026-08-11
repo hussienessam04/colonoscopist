@@ -52,7 +52,7 @@ import { useDoctorProfile } from '@/hooks/useDoctorProfile';
 import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
-import type { Report, Screenshot } from '@shared/ipc-contract';
+import type { Report } from '@shared/ipc-contract';
 
 // ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
 // via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
@@ -77,7 +77,7 @@ function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | 
         if (cancelled || result === undefined || result === null) return;
         // Wrap the bytes in a Blob → ObjectURL. The renderer owns the
         // URL; revoke on unmount or when the PDF changes.
-        const blob = new Blob([result.bytes], { type: result.mime });
+        const blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: result.mime });
         const url = URL.createObjectURL(blob);
         objectUrlToRevoke = url;
         setSrc(url);
@@ -153,6 +153,8 @@ export default function ReportEditor({
       const patch: ReportEditableFields = {
         findings: r.findings,
         diagnosis: r.diagnosis,
+        recommendations: r.recommendations,
+        procedureDetails: r.procedureDetails,
       };
       if (r.status === 'finalized') {
         await window.api.reports.updateFinalized({ id: r.id, ...patch });

@@ -219,7 +219,13 @@ describe('ProcedureReview', () => {
 
     render(<ProcedureReview />);
 
-    const capture = await screen.findByTestId('screenshot-timeline-capture');
+    // ponytail: wait for the procedure to load (status drives the disabled
+    // attribute). findByTestId returns the button at first render — when
+    // status is undefined (procedure still loading) captureAllowed() returns
+    // true, so the button starts enabled. waitFor ensures the post-load
+    // re-render has flushed before the disabled assertion.
+    await screen.findByTestId('status-badge');
+    const capture = screen.getByTestId('screenshot-timeline-capture');
     expect(capture).toBeDisabled();
   });
 

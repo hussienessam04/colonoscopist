@@ -47,7 +47,6 @@
 // working unchanged; the three new props are all optional with safe
 // defaults (empty Set, no-op callbacks).
 
-import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScreenshotThumbnail } from '@/components/ScreenshotThumbnail';
 import { screenshotUrl } from '@/lib/screenshot-url';
