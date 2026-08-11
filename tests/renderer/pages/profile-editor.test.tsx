@@ -33,6 +33,9 @@ const PROFILE: DoctorProfile = {
   phone: '+20-2-1234-5678',
   signaturePath: 'data/profiles/099/signature.png',
   logoPath: 'data/profiles/099/logo.png',
+  // Phase 7 / Plan 07-03 — I18N-01 (D-17): per-doctor language override.
+  // Tests that flip the language override this to 'ar' before mounting.
+  language: 'en',
   createdAt: 1_000,
   updatedAt: 1_000,
 };
@@ -231,5 +234,82 @@ describe('ProfileEditor', () => {
     } finally {
       globalThis.FileReader = origFileReader;
     }
+  });
+
+  // Phase 7 / Plan 07-03 — I18N-01 (D-17): per-doctor language picker
+  // card. Selects EN/AR via radio, persists via profile.update, emits
+  // a 'language.changed' audit row. The existing PROFILE shape carries
+  // language: 'en' so the radio hydrates to English on first render.
+  it('language picker Card mounts with EN + AR radio and initial value matches profile.language', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue(PROFILE);
+    await renderProfileEditor();
+    const card = await screen.findByTestId('profile-editor-language-card');
+    expect(card).toBeInTheDocument();
+    const en = (await screen.findByTestId('profile-editor-language-en')) as HTMLInputElement;
+    const ar = (await screen.findByTestId('profile-editor-language-ar')) as HTMLInputElement;
+    expect(en).toBeInTheDocument();
+    expect(ar).toBeInTheDocument();
+    // PROFILE.language === 'en' → EN radio is checked.
+    expect(en.checked).toBe(true);
+    expect(ar.checked).toBe(false);
+  });
+
+  it('selecting AR radio persists language="ar" to profile.update + emits language.changed audit row (D-17 + audit hooks)', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue(PROFILE);
+    api.profile.update.mockImplementation(async (input) => ({
+      ...PROFILE,
+      ...input,
+    }));
+    await renderProfileEditor();
+    const ar = await screen.findByTestId('profile-editor-language-ar');
+    fireEvent.click(ar);
+    await waitFor(() => {
+      // ponytail: both calls fire in parallel via Promise.all. We wait
+      // for the audit row first (auditable side-effect) — profile.update
+      // is asserted via its mock call history.
+      expect(api.audit.log).toHaveBeenCalledWith({
+        action: 'language.changed',
+        entityType: 'language',
+        metadata: { from: 'en', to: 'ar', scope: 'profile' },
+      });
+    });
+    const updateCall = api.profile.update.mock.calls.at(-1)![0] as {
+      language?: 'en' | 'ar';
+    };
+    expect(updateCall.language).toBe('ar');
+    // The existing fields are forwarded too (handler uses the current
+    // profile as the base for the patch).
+    expect(updateCall).toMatchObject({
+      fullNameEn: PROFILE.fullNameEn,
+      clinicNameEn: PROFILE.clinicNameEn,
+    });
+  });
+
+  it('selecting the same language is a no-op (does NOT emit a duplicate audit row)', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue(PROFILE);
+    await renderProfileEditor();
+    const en = await screen.findByTestId('profile-editor-language-en');
+    // EN is already checked (PROFILE.language === 'en'). Clicking it
+    // again must NOT fire profile.update or audit.log.
+    fireEvent.click(en);
+    await new Promise((r) => setTimeout(r, 100));
+    expect(api.profile.update).not.toHaveBeenCalled();
+    expect(api.audit.log).not.toHaveBeenCalled();
+  });
+
+  it('language=null (no per-doctor override) defaults the radio to EN', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue({ ...PROFILE, language: null });
+    await renderProfileEditor();
+    const en = await screen.findByTestId('profile-editor-language-en');
+    const ar = await screen.findByTestId('profile-editor-language-ar');
+    // Initial state defaults to 'en' when the override is null (the
+    // i18n resolver falls back to users.language which is 'en' by
+    // default).
+    expect(en.checked).toBe(true);
+    expect(ar.checked).toBe(false);
   });
 });

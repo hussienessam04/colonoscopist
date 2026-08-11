@@ -110,6 +110,68 @@ export default function ProfileEditor(): JSX.Element {
     },
   });
 
+  // Phase 7 / Plan 07-03 — I18N-01: per-doctor language preference is
+  // its own state machine (not auto-save-on-blur) because the picker is
+  // a binary radio, not a free-text field. The handler fires
+  // `profile.update` + `audit.log('language.changed')` in parallel on
+  // each selection change. Default to 'en' when the per-doctor
+  // override is null (the resolver falls back to users.language).
+  const [selectedLang, setSelectedLang] = useState<'en' | 'ar'>(
+    profile?.language ?? 'en',
+  );
+  // ponytail: stale-ref so the click handler always captures the
+  // committed value (the closure approach would race the React state
+  // update on rapid selects).
+  const selectedLangRef = useRef<'en' | 'ar'>(selectedLang);
+  selectedLangRef.current = selectedLang;
+
+  // Sync the radio when the profile loads (initial render has
+  // profile === null, so the radio defaults to 'en' per the spec; once
+  // the IPC resolves we hydrate the user's actual preference).
+  // Skip the sync if the user has already made a manual selection
+  // (the local state is the source of truth for the UI surface).
+  // null language = "follow users.language" — leave the radio on its
+  // current value (defaults to 'en' until the picker is touched).
+  useEffect(() => {
+    const lang = profile?.language;
+    if (lang === null || lang === undefined) return;
+    if (lang !== selectedLangRef.current) {
+      setSelectedLang(lang);
+    }
+  }, [profile?.language]);
+
+  const handleLanguageChange = useCallback(
+    async (newLang: 'en' | 'ar'): Promise<void> => {
+      const from = selectedLangRef.current;
+      if (from === newLang) return;
+      setSelectedLang(newLang);
+      try {
+        await Promise.all([
+          window.api.profile.update({
+            fullNameEn: profile?.fullNameEn ?? '',
+            fullNameAr: profile?.fullNameAr ?? null,
+            clinicNameEn: profile?.clinicNameEn ?? '',
+            clinicNameAr: profile?.clinicNameAr ?? null,
+            address: profile?.address ?? null,
+            phone: profile?.phone ?? null,
+            language: newLang,
+          }),
+          window.api.audit.log({
+            action: 'language.changed',
+            entityType: 'language',
+            metadata: { from, to: newLang, scope: 'profile' },
+          }),
+        ]);
+        void refresh();
+        toast.success(newLang === 'ar' ? 'Language: العربية' : 'Language: English');
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Language change failed';
+        toast.error(msg);
+      }
+    },
+    [profile, refresh],
+  );
+
   // The signature + logo hidden file inputs.
   const signatureInputRef = useRef<HTMLInputElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
@@ -431,6 +493,50 @@ export default function ProfileEditor(): JSX.Element {
                 <ImagePlus className="size-4 mr-1" aria-hidden="true" />
                 Upload clinic logo
               </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Phase 7 / Plan 07-03 — I18N-01 per-doctor language preference
+            (D-17). EN/AR radio fires profile.update + audit.log
+            ('language.changed') in parallel. Sits BELOW the Assets Card
+            so the existing profile-editor tests for the upper Cards
+            remain green. */}
+        <Card data-testid="profile-editor-language-card">
+          <CardHeader>
+            <CardTitle>Language</CardTitle>
+            <CardDescription>
+              Choose the language for the clinic chrome. Report PDFs use
+              the language chosen per-procedure.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  id="profile-editor-language-en"
+                  type="radio"
+                  name="profile-editor-language"
+                  value="en"
+                  checked={selectedLang === 'en'}
+                  onChange={() => void handleLanguageChange('en')}
+                  data-testid="profile-editor-language-en"
+                />
+                <Label htmlFor="profile-editor-language-en">English</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  id="profile-editor-language-ar"
+                  type="radio"
+                  name="profile-editor-language"
+                  value="ar"
+                  dir="rtl"
+                  checked={selectedLang === 'ar'}
+                  onChange={() => void handleLanguageChange('ar')}
+                  data-testid="profile-editor-language-ar"
+                />
+                <Label htmlFor="profile-editor-language-ar">العربية</Label>
+              </div>
             </div>
           </CardContent>
         </Card>
