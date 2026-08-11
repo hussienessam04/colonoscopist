@@ -142,8 +142,9 @@ describe('PatientsList', () => {
     const aliceMenu = screen.getByRole('button', { name: /actions for alice carter/i });
     await user.click(aliceMenu);
     await user.click(await screen.findByRole('menuitem', { name: /^delete$/i }));
-    // Confirm dialog appears
-    expect(await screen.findByText(/delete patient\?/i)).toBeInTheDocument();
+    // Confirm dialog appears — Phase 7 / Plan 07-04 renamed the title to
+    // "Archive patient?" per UI-SPEC §Copywriting Contract.
+    expect(await screen.findByText(/archive patient\?/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /^archive$/i }));
     await waitFor(() => expect(api.patients.softDelete).toHaveBeenCalledTimes(1));
     expect(api.patients.softDelete).toHaveBeenCalledWith(patients[0]!.id);

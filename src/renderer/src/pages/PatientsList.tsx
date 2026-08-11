@@ -18,6 +18,7 @@
 //   4. Doctor (Select against usersList; Apply only)
 //   5. Procedure status (multi-select: completed/partial/recording; Apply only)
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Plus, Search, Settings as SettingsIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -66,6 +67,12 @@ const ANY_DOCTOR = '__any__';
 export default function PatientsList(): JSX.Element {
   const { navigate } = useRoute();
   const { currentUser } = useSession();
+  // ponytail: useTranslation is the standard react-i18next hook.
+  // The Patient List page has the most visible strings on the app —
+  // every label, button, and empty-state copy is sourced from the
+  // bundles. The D-24 parity test (tests/renderer/i18n/parity.test.ts)
+  // enforces that every key added here has a matching AR value.
+  const { t } = useTranslation();
   const [rows, setRows] = useState<Patient[]>([]);
   const [total, setTotal] = useState(0);
   // Phase 2 surface — search + MRN are direct state that debounce-refetch
@@ -252,26 +259,38 @@ export default function PatientsList(): JSX.Element {
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const canRestore = currentUser?.isFirstAdmin ?? false;
 
+  // ponytail: translate the Status options once per render. The
+  // STATUS_OPTIONS array is module-scoped for stable references (the
+  // toggling logic doesn't depend on the label), so we rebuild the
+  // label-on-demand instead.
+  const statusOptions = [
+    { value: 'completed' as const, label: t('patient.filtersStatusCompleted') },
+    { value: 'partial' as const, label: t('patient.filtersStatusPartial') },
+    { value: 'recording' as const, label: t('patient.filtersStatusRecording') },
+  ];
+
   return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-6xl flex flex-col gap-4">
         <header className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-semibold">Patients</h1>
-            <p className="text-sm text-muted-foreground">{total} total</p>
+            <h1 className="text-2xl font-semibold">{t('patient.pageTitle')}</h1>
+            <p className="text-sm text-muted-foreground">
+              {t('patient.total', { count: total })}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              title="Settings"
+              title={t('common.settings')}
               data-testid="settings-trigger"
               onClick={() => navigate({ name: 'settings-hub' })}
             >
               <SettingsIcon className="size-4 mr-1" aria-hidden="true" />
-              Settings
+              {t('common.settings')}
             </Button>
             <Button onClick={() => navigate({ name: 'patient-new' })}>
-              <Plus className="size-4 mr-1" /> New patient
+              <Plus className="size-4 mr-1" /> {t('patient.newPatient')}
             </Button>
           </div>
         </header>
@@ -281,17 +300,17 @@ export default function PatientsList(): JSX.Element {
               visual density: 18rem column + Card with CardHeader + CardContent. */}
           <Card className="h-fit" data-testid="patient-filter-sidebar">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Search &amp; filter</CardTitle>
+              <CardTitle className="text-base">{t('patient.filtersTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="filter-search">Search by name</Label>
+                <Label htmlFor="filter-search">{t('patient.searchByName')}</Label>
                 <div className="relative">
                   <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
                   <Input
                     id="filter-search"
                     className="pl-8"
-                    placeholder="Last name or full name…"
+                    placeholder={t('patient.searchPlaceholder')}
                     value={search}
                     onChange={(e) => {
                       setSearch(e.target.value);
@@ -302,7 +321,7 @@ export default function PatientsList(): JSX.Element {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="filter-mrn">MRN (exact)</Label>
+                <Label htmlFor="filter-mrn">{t('patient.mrnExact')}</Label>
                 <Input
                   id="filter-mrn"
                   value={mrn}
@@ -315,7 +334,7 @@ export default function PatientsList(): JSX.Element {
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="filter-date-from">From</Label>
+                  <Label htmlFor="filter-date-from">{t('patient.filtersDateFrom')}</Label>
                   <Input
                     id="filter-date-from"
                     type="date"
@@ -327,7 +346,7 @@ export default function PatientsList(): JSX.Element {
                   />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="filter-date-to">To</Label>
+                  <Label htmlFor="filter-date-to">{t('patient.filtersDateTo')}</Label>
                   <Input
                     id="filter-date-to"
                     type="date"
@@ -340,7 +359,7 @@ export default function PatientsList(): JSX.Element {
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="filter-doctor">Doctor</Label>
+                <Label htmlFor="filter-doctor">{t('patient.filtersDoctor')}</Label>
                 <Select
                   value={pendingFilters.doctorId || ANY_DOCTOR}
                   onValueChange={(v) =>
@@ -351,10 +370,10 @@ export default function PatientsList(): JSX.Element {
                   }
                 >
                   <SelectTrigger id="filter-doctor" data-testid="filter-doctor">
-                    <SelectValue placeholder="Any doctor" />
+                    <SelectValue placeholder={t('patient.filtersDoctorPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ANY_DOCTOR}>Any doctor</SelectItem>
+                    <SelectItem value={ANY_DOCTOR}>{t('patient.filtersDoctorPlaceholder')}</SelectItem>
                     {doctors.map((d) => (
                       <SelectItem key={d.id} value={d.id}>
                         {d.fullName}
@@ -364,8 +383,8 @@ export default function PatientsList(): JSX.Element {
                 </Select>
               </div>
               <div className="flex flex-col gap-2">
-                <Label>Procedure status</Label>
-                {STATUS_OPTIONS.map((opt) => {
+                <Label>{t('patient.filtersStatus')}</Label>
+                {statusOptions.map((opt) => {
                   const checked = pendingFilters.status.includes(opt.value);
                   return (
                     <div key={opt.value} className="flex items-center gap-2">
@@ -392,7 +411,7 @@ export default function PatientsList(): JSX.Element {
                   }}
                 />
                 <Label htmlFor="filter-include-deleted" className="text-sm">
-                  Show deleted
+                  {t('patient.showDeleted')}
                 </Label>
               </div>
               <div className="flex items-center gap-2 pt-3">
@@ -402,14 +421,14 @@ export default function PatientsList(): JSX.Element {
                   onClick={handleClear}
                   data-testid="filter-clear"
                 >
-                  Clear filters
+                  {t('patient.filtersClear')}
                 </Button>
                 <Button
                   className="flex-1"
                   onClick={handleApply}
                   data-testid="filter-apply"
                 >
-                  Apply filters
+                  {t('patient.filtersApply')}
                 </Button>
               </div>
             </CardContent>
@@ -445,13 +464,13 @@ export default function PatientsList(): JSX.Element {
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        Loading…
+                        {t('common.loading')}
                       </td>
                     </tr>
                   ) : rows.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        No patients match the current filters.
+                        {t('patient.resultsEmpty')}
                       </td>
                     </tr>
                   ) : (
@@ -481,7 +500,7 @@ export default function PatientsList(): JSX.Element {
 
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
-                Page {page} of {totalPages}
+                {t('common.page')} {page} {t('common.of')} {totalPages}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -490,7 +509,7 @@ export default function PatientsList(): JSX.Element {
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                 >
-                  Previous
+                  {t('common.previous')}
                 </Button>
                 <Button
                   variant="outline"
@@ -498,7 +517,7 @@ export default function PatientsList(): JSX.Element {
                   disabled={page >= totalPages}
                   onClick={() => setPage((p) => p + 1)}
                 >
-                  Next
+                  {t('common.next')}
                 </Button>
               </div>
             </div>
@@ -508,14 +527,14 @@ export default function PatientsList(): JSX.Element {
 
       <ConfirmDialog
         open={confirmDelete !== null}
-        title="Delete patient?"
+        title={t('patient.archiveConfirmTitle')}
         description={
           confirmDelete
-            ? `${confirmDelete.fullName} will be archived. An admin can restore from Settings.`
+            ? t('patient.archiveConfirmBody')
             : ''
         }
-        confirmLabel={deleting ? 'Archiving…' : 'Archive'}
-        cancelLabel="Cancel"
+        confirmLabel={deleting ? t('patient.archiving') : t('patient.archive')}
+        cancelLabel={t('common.cancel')}
         destructive
         onConfirm={() => {
           if (confirmDelete) void handleDelete(confirmDelete);

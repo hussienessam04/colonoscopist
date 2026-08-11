@@ -21,6 +21,7 @@
 // click) before the audit row lands.
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ClipboardCopy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -109,6 +110,9 @@ function resolveUserDisplayName(
 export default function Audit(): JSX.Element {
   const { navigate } = useRoute();
   const { currentUser } = useSession();
+  // ponytail: every visible string on this page is sourced from the
+  // i18next bundles. D-24 parity test enforces EN↔AR key coverage.
+  const { t } = useTranslation();
 
   // ponytail: each filter field is direct state (no Apply commit).
   // Date/doctor/action/entity-type all refetch via the useAudit effect
@@ -188,7 +192,7 @@ export default function Audit(): JSX.Element {
     );
     try {
       await navigator.clipboard.writeText(json);
-      toast.success('Copied to clipboard');
+      toast.success(t('audit.copySuccess'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Copy failed';
       toast.error(msg);
@@ -213,9 +217,9 @@ export default function Audit(): JSX.Element {
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Workspace
+              {t('audit.pageKicker')}
             </p>
-            <h1 className="text-2xl font-semibold">Audit log</h1>
+            <h1 className="text-2xl font-semibold">{t('audit.pageTitle')}</h1>
           </div>
           <Button
             variant="outline"
@@ -223,18 +227,18 @@ export default function Audit(): JSX.Element {
             data-testid="audit-back"
           >
             <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
-            Back
+            {t('common.back')}
           </Button>
         </header>
 
         <Card data-testid="audit-filter-card">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Filters</CardTitle>
+            <CardTitle className="text-base">{t('audit.filtersTitle')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-date-from">Date from</Label>
+                <Label htmlFor="audit-date-from">{t('audit.filterDateFrom')}</Label>
                 <Input
                   id="audit-date-from"
                   type="date"
@@ -247,7 +251,7 @@ export default function Audit(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-date-to">Date to</Label>
+                <Label htmlFor="audit-date-to">{t('audit.filterDateTo')}</Label>
                 <Input
                   id="audit-date-to"
                   type="date"
@@ -260,7 +264,7 @@ export default function Audit(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-user">Doctor</Label>
+                <Label htmlFor="audit-user">{t('audit.filterUser')}</Label>
                 <Select
                   value={userId === '' ? ANY_USER : userId}
                   onValueChange={(v) => {
@@ -269,10 +273,10 @@ export default function Audit(): JSX.Element {
                   }}
                 >
                   <SelectTrigger id="audit-user" data-testid="audit-user">
-                    <SelectValue placeholder="Any user" />
+                    <SelectValue placeholder={t('audit.filterUserPlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ANY_USER}>Any user</SelectItem>
+                    <SelectItem value={ANY_USER}>{t('audit.filterUserPlaceholder')}</SelectItem>
                     {users.map((u) => (
                       <SelectItem key={u.id} value={u.id}>
                         {u.fullName}
@@ -282,7 +286,7 @@ export default function Audit(): JSX.Element {
                 </Select>
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-action">Action</Label>
+                <Label htmlFor="audit-action">{t('audit.filterAction')}</Label>
                 <Input
                   id="audit-action"
                   value={action}
@@ -290,12 +294,12 @@ export default function Audit(): JSX.Element {
                     setAction(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="e.g. login"
+                  placeholder={t('audit.filterActionPlaceholder')}
                   data-testid="audit-action"
                 />
               </div>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-entity-type">Entity type</Label>
+                <Label htmlFor="audit-entity-type">{t('audit.filterEntityType')}</Label>
                 <Select
                   value={entityType === '' ? ANY_ENTITY : entityType}
                   onValueChange={(v) => {
@@ -304,13 +308,13 @@ export default function Audit(): JSX.Element {
                   }}
                 >
                   <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type">
-                    <SelectValue placeholder="Any entity" />
+                    <SelectValue placeholder={t('audit.filterEntityTypePlaceholder')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={ANY_ENTITY}>Any entity</SelectItem>
-                    {ENTITY_TYPES.map((t) => (
-                      <SelectItem key={t.value} value={t.value}>
-                        {t.label}
+                    <SelectItem value={ANY_ENTITY}>{t('audit.filterEntityTypePlaceholder')}</SelectItem>
+                    {ENTITY_TYPES.map((entityOpt) => (
+                      <SelectItem key={entityOpt.value} value={entityOpt.value}>
+                        {t(`audit.entityTypes.${entityOpt.value}`)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -323,13 +327,13 @@ export default function Audit(): JSX.Element {
                 onClick={handleClearAll}
                 data-testid="audit-clear"
               >
-                Clear all
+                {t('audit.clearAll')}
               </Button>
               <Button
                 onClick={() => void refresh()}
                 data-testid="audit-apply"
               >
-                Apply
+                {t('common.apply')}
               </Button>
             </div>
           </CardContent>
@@ -337,7 +341,7 @@ export default function Audit(): JSX.Element {
 
         {error !== null ? (
           <Alert variant="destructive" data-testid="audit-error">
-            <AlertTitle>Failed to load audit log</AlertTitle>
+            <AlertTitle>{t('common.genericError')}</AlertTitle>
             <AlertDescription>{error}</AlertDescription>
           </Alert>
         ) : null}
@@ -345,7 +349,10 @@ export default function Audit(): JSX.Element {
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-base">
-              Events <span className="text-muted-foreground text-sm font-normal">({total} total)</span>
+              {t('audit.sectionTitle')}{' '}
+              <span className="text-muted-foreground text-sm font-normal">
+                ({t('patient.total', { count: total })})
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -354,10 +361,10 @@ export default function Audit(): JSX.Element {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                      <th className="px-3 py-2 w-28">Time</th>
-                      <th className="px-3 py-2 w-44">User</th>
-                      <th className="px-3 py-2 w-44">Action</th>
-                      <th className="px-3 py-2">Entity</th>
+                      <th className="px-3 py-2 w-28">{t('audit.columnTime')}</th>
+                      <th className="px-3 py-2 w-44">{t('audit.columnUser')}</th>
+                      <th className="px-3 py-2 w-44">{t('audit.columnAction')}</th>
+                      <th className="px-3 py-2">{t('audit.columnEntity')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -369,7 +376,7 @@ export default function Audit(): JSX.Element {
                           data-testid="audit-loading"
                         >
                           <span className="inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 mr-2 align-[-2px]" />
-                          Loading…
+                          {t('common.loading')}
                         </td>
                       </tr>
                     ) : rows.length === 0 ? (
@@ -379,7 +386,7 @@ export default function Audit(): JSX.Element {
                           className="px-3 py-8 text-center text-sm text-muted-foreground"
                           data-testid="audit-empty"
                         >
-                          No events match these filters.
+                          {t('audit.empty')}
                         </td>
                       </tr>
                     ) : (
@@ -425,7 +432,7 @@ export default function Audit(): JSX.Element {
 
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground" data-testid="audit-pagination">
-            Page {page} of {totalPages}
+            {t('audit.pageInfo', { page, totalPages })}
           </span>
           <div className="flex gap-2">
             <Button
@@ -435,7 +442,7 @@ export default function Audit(): JSX.Element {
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               data-testid="audit-prev"
             >
-              Previous
+              {t('common.previous')}
             </Button>
             <Button
               variant="outline"
@@ -444,7 +451,7 @@ export default function Audit(): JSX.Element {
               onClick={() => setPage((p) => p + 1)}
               data-testid="audit-next"
             >
-              Next
+              {t('common.next')}
             </Button>
           </div>
         </div>
@@ -458,7 +465,7 @@ export default function Audit(): JSX.Element {
       >
         <DialogContent className="max-w-2xl" data-testid="audit-detail-dialog">
           <DialogHeader>
-            <DialogTitle>Audit event details</DialogTitle>
+            <DialogTitle>{t('audit.detailDialogTitle')}</DialogTitle>
             <DialogDescription>
               {detail === null ? null : (
                 <span className="font-mono text-xs">id #{detail.id}</span>
@@ -468,27 +475,27 @@ export default function Audit(): JSX.Element {
           {detail !== null ? (
             <div className="flex flex-col gap-3">
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-muted-foreground">User ID</dt>
+                <dt className="text-muted-foreground">{t('audit.detailUser')}</dt>
                 <dd className="font-mono text-xs break-all">
                   {detail.userId ?? '(system)'}
                 </dd>
-                <dt className="text-muted-foreground">Action</dt>
+                <dt className="text-muted-foreground">{t('audit.detailAction')}</dt>
                 <dd className="font-mono text-xs">{detail.action}</dd>
-                <dt className="text-muted-foreground">Entity type</dt>
+                <dt className="text-muted-foreground">{t('audit.detailEntityType')}</dt>
                 <dd className="font-mono text-xs">{detail.entityType ?? '—'}</dd>
-                <dt className="text-muted-foreground">Entity ID</dt>
+                <dt className="text-muted-foreground">{t('audit.detailEntityId')}</dt>
                 <dd className="font-mono text-xs break-all">
                   {detail.entityId ?? '—'}
                 </dd>
-                <dt className="text-muted-foreground">Outcome</dt>
+                <dt className="text-muted-foreground">{t('audit.detailOutcome')}</dt>
                 <dd className="font-mono text-xs">{detail.outcome}</dd>
-                <dt className="text-muted-foreground">Created at</dt>
+                <dt className="text-muted-foreground">{t('audit.detailTime')}</dt>
                 <dd className="font-mono text-xs">
                   {new Date(detail.createdAt).toISOString()}
                 </dd>
               </dl>
               <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-detail-metadata">Metadata</Label>
+                <Label htmlFor="audit-detail-metadata">{t('audit.detailMetadata')}</Label>
                 <pre
                   id="audit-detail-metadata"
                   data-testid="audit-detail-metadata"
@@ -508,7 +515,7 @@ export default function Audit(): JSX.Element {
               data-testid="audit-copy-json"
             >
               <ClipboardCopy className="size-4 mr-1" aria-hidden="true" />
-              Copy JSON
+              {t('audit.detailCopyJson')}
             </Button>
           </DialogFooter>
         </DialogContent>

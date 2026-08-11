@@ -14,6 +14,7 @@
 //     the matching { pngBase64 | jpegBase64 } field.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -77,6 +78,11 @@ function profileFromPatch(p: DoctorProfile | null): Pick<
 export default function ProfileEditor(): JSX.Element {
   const { navigate } = useRoute();
   const { profile, loading, refresh, setLocal } = useDoctorProfile();
+  // ponytail: visible strings flow through t() per Phase 7 i18n
+  // contract. The Language Card's radio labels stay hard-coded
+  // ("English" / "العربية") because those are the language NAMES —
+  // translating them would defeat the purpose of the picker.
+  const { t } = useTranslation();
 
   // ponytail: per-field auto-save state. We hold one useAutoSave per
   // field so the "Saving…" indicator tracks the just-blurred field.
@@ -163,13 +169,17 @@ export default function ProfileEditor(): JSX.Element {
           }),
         ]);
         void refresh();
-        toast.success(newLang === 'ar' ? 'Language: العربية' : 'Language: English');
+        toast.success(
+          newLang === 'ar'
+            ? t('language.updatedTo', { name: 'العربية' })
+            : t('language.updatedTo', { name: 'English' }),
+        );
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Language change failed';
+        const msg = err instanceof Error ? err.message : t('language.updated');
         toast.error(msg);
       }
     },
-    [profile, refresh],
+    [profile, refresh, t],
   );
 
   // The signature + logo hidden file inputs.
@@ -210,11 +220,11 @@ export default function ProfileEditor(): JSX.Element {
   // trigger, so the per-field state machine is sufficient.
 
   const indicatorText = useMemo((): string => {
-    if (status === 'saving') return 'Saving…';
-    if (status === 'error') return 'Save failed — retry';
-    if (status === 'saved' && savedAt !== null) return `Saved at ${formatHHMMSS(savedAt)}`;
+    if (status === 'saving') return t('common.saving');
+    if (status === 'error') return t('common.saveFailedRetry');
+    if (status === 'saved' && savedAt !== null) return t('common.savedAt', { time: formatHHMMSS(savedAt) });
     return '';
-  }, [status, savedAt]);
+  }, [status, savedAt, t]);
 
   const handleFieldChange = useCallback(
     (field: keyof ReturnType<typeof profileFromPatch>) =>
@@ -253,7 +263,7 @@ export default function ProfileEditor(): JSX.Element {
       const bytes = decodeDataUrl(dataUrl);
       const fmt = detectImageFormat(bytes);
       if (fmt === null) {
-        toast.error('Only PNG or JPEG images are accepted');
+        toast.error(t('profile.uploadFormatError'));
         return;
       }
       // ponytail: send ONLY the raw base64 payload over IPC, NOT the
@@ -276,13 +286,13 @@ export default function ProfileEditor(): JSX.Element {
         }
         void refresh();
         void refreshPreviews();
-        toast.success(`${kind === 'signature' ? 'Signature' : 'Logo'} uploaded`);
+        toast.success(t('profile.uploadSuccess', { kind: kind === 'signature' ? t('profile.signatureLabel') : t('profile.logoLabel') }));
       } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Upload failed';
+        const msg = err instanceof Error ? err.message : t('profile.uploadFailed');
         toast.error(msg);
       }
     },
-    [refresh],
+    [refresh, t],
   );
 
   // When the profile first loads, no auto-save fires (per the hook's
@@ -296,7 +306,7 @@ export default function ProfileEditor(): JSX.Element {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-3xl">
-          <p className="text-sm text-slate-500">Loading profile…</p>
+          <p className="text-sm text-slate-500">{t('profile.loadingProfile')}</p>
         </div>
       </main>
     );
@@ -310,9 +320,9 @@ export default function ProfileEditor(): JSX.Element {
         <header className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Settings
+              {t('profile.pageKicker')}
             </p>
-            <h1 className="text-2xl font-semibold">Doctor profile</h1>
+            <h1 className="text-2xl font-semibold">{t('profile.pageTitle')}</h1>
           </div>
           <Button
             variant="outline"
@@ -320,23 +330,19 @@ export default function ProfileEditor(): JSX.Element {
             data-testid="profile-editor-back"
           >
             <ArrowLeft aria-hidden="true" />
-            Back
+            {t('common.back')}
           </Button>
         </header>
 
         <Card>
           <CardHeader>
-            <CardTitle>Clinic + doctor details</CardTitle>
-            <CardDescription>
-              English is required. Arabic is optional today (the clinic
-              header on the report PDF uses English; Arabic will follow
-              in a later release).
-            </CardDescription>
+            <CardTitle>{t('profile.cardClinicTitle')}</CardTitle>
+            <CardDescription>{t('profile.cardClinicDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
-                <Label htmlFor="fullNameEn">Full name (EN)</Label>
+                <Label htmlFor="fullNameEn">{t('profile.fullNameEn')}</Label>
                 <Input
                   id="fullNameEn"
                   autoComplete="name"
@@ -346,7 +352,7 @@ export default function ProfileEditor(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="fullNameAr">Full name (AR)</Label>
+                <Label htmlFor="fullNameAr">{t('profile.fullNameAr')}</Label>
                 <Input
                   id="fullNameAr"
                   dir="rtl"
@@ -356,7 +362,7 @@ export default function ProfileEditor(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="clinicNameEn">Clinic name (EN)</Label>
+                <Label htmlFor="clinicNameEn">{t('profile.clinicNameEn')}</Label>
                 <Input
                   id="clinicNameEn"
                   autoComplete="organization"
@@ -366,7 +372,7 @@ export default function ProfileEditor(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="clinicNameAr">Clinic name (AR)</Label>
+                <Label htmlFor="clinicNameAr">{t('profile.clinicNameAr')}</Label>
                 <Input
                   id="clinicNameAr"
                   dir="rtl"
@@ -376,7 +382,7 @@ export default function ProfileEditor(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="address">Address</Label>
+                <Label htmlFor="address">{t('profile.address')}</Label>
                 <Input
                   id="address"
                   autoComplete="street-address"
@@ -386,7 +392,7 @@ export default function ProfileEditor(): JSX.Element {
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <Label htmlFor="phone">Phone</Label>
+                <Label htmlFor="phone">{t('profile.phone')}</Label>
                 <Input
                   id="phone"
                   autoComplete="tel"
@@ -410,12 +416,8 @@ export default function ProfileEditor(): JSX.Element {
 
         <Card>
           <CardHeader>
-            <CardTitle>Assets</CardTitle>
-            <CardDescription>
-              Signature + clinic logo are printed on every report PDF.
-              PNG or JPEG, max 6 MB per file (enforced at the IPC
-              boundary).
-            </CardDescription>
+            <CardTitle>{t('profile.cardAssetsTitle')}</CardTitle>
+            <CardDescription>{t('profile.cardAssetsDescription')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <input
@@ -428,11 +430,11 @@ export default function ProfileEditor(): JSX.Element {
             />
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">Signature</p>
+                <p className="text-sm font-medium">{t('profile.signatureLabel')}</p>
                 <p className="text-xs text-muted-foreground" data-testid="profile-editor-signature-status">
                   {signatureAt === null
-                    ? 'Not uploaded'
-                    : `Uploaded at ${formatHHMMSS(signatureAt)}`}
+                    ? t('profile.signatureNotUploaded')
+                    : t('profile.signatureUploadedAt', { time: formatHHMMSS(signatureAt) })}
                 </p>
                 {/* Phase 6 UAT G-06-3 — render the actual uploaded image so the
                     doctor can confirm the right file landed. Hidden when
@@ -455,7 +457,7 @@ export default function ProfileEditor(): JSX.Element {
                 data-testid="profile-editor-signature-button"
               >
                 <ImagePlus className="size-4 mr-1" aria-hidden="true" />
-                Upload signature image
+                {t('profile.uploadSignature')}
               </Button>
             </div>
 
@@ -469,11 +471,11 @@ export default function ProfileEditor(): JSX.Element {
             />
             <div className="flex items-center justify-between">
               <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">Clinic logo</p>
+                <p className="text-sm font-medium">{t('profile.logoLabel')}</p>
                 <p className="text-xs text-muted-foreground" data-testid="profile-editor-logo-status">
                   {logoAt === null
-                    ? 'Not uploaded'
-                    : `Uploaded at ${formatHHMMSS(logoAt)}`}
+                    ? t('profile.logoNotUploaded')
+                    : t('profile.logoUploadedAt', { time: formatHHMMSS(logoAt) })}
                 </p>
                 {logoPreview !== null ? (
                   <img
@@ -491,7 +493,7 @@ export default function ProfileEditor(): JSX.Element {
                 data-testid="profile-editor-logo-button"
               >
                 <ImagePlus className="size-4 mr-1" aria-hidden="true" />
-                Upload clinic logo
+                {t('profile.uploadLogo')}
               </Button>
             </div>
           </CardContent>
@@ -504,11 +506,8 @@ export default function ProfileEditor(): JSX.Element {
             remain green. */}
         <Card data-testid="profile-editor-language-card">
           <CardHeader>
-            <CardTitle>Language</CardTitle>
-            <CardDescription>
-              Choose the language for the clinic chrome. Report PDFs use
-              the language chosen per-procedure.
-            </CardDescription>
+            <CardTitle>{t('language.label')}</CardTitle>
+            <CardDescription>{t('language.description')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             <div className="flex items-center gap-4">
@@ -522,6 +521,9 @@ export default function ProfileEditor(): JSX.Element {
                   onChange={() => void handleLanguageChange('en')}
                   data-testid="profile-editor-language-en"
                 />
+                {/* ponytail: the radio labels are the language NAMES
+                    (English / العربية) — translating them would defeat
+                    the purpose of the picker. Stays hard-coded. */}
                 <Label htmlFor="profile-editor-language-en">English</Label>
               </div>
               <div className="flex items-center gap-2">

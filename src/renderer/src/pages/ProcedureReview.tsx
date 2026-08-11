@@ -14,6 +14,7 @@
 // renders a clean track.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -91,6 +92,10 @@ export default function ProcedureReview({
   procedureId?: string;
 } = {}): JSX.Element {
   const { navigate } = useRoute();
+  // ponytail: visible strings flow through t() per Phase 7 i18n
+  // contract. The Scrubber + ScreenshotTimeline sub-components own
+  // their own labels — this hook only translates the page surface.
+  const { t } = useTranslation();
   const route = useRoute().current;
   const routeProcedureId = route.name === 'procedure-review' ? route.procedureId : null;
   const procedureId = initialId ?? routeProcedureId ?? null;
@@ -203,11 +208,11 @@ export default function ProcedureReview({
   const handleCapture = useCallback(async (): Promise<void> => {
     const video = videoRef.current;
     if (!video) {
-      toast.error('Video not ready');
+      toast.error(t('procedure.captureFailed'));
       return;
     }
     if (video.readyState < 2) {
-      toast.error('Video metadata not loaded yet');
+      toast.error(t('procedure.captureFailed'));
       return;
     }
     try {
@@ -219,12 +224,12 @@ export default function ProcedureReview({
         timestampInVideoMs,
         jpegBase64: base64,
       });
-      toast.success('Screenshot captured');
+      toast.success(t('procedure.captureSuccess'));
       void refresh();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to capture screenshot');
+      toast.error(err instanceof Error ? err.message : t('procedure.captureFailed'));
     }
-  }, [procedure, refresh]);
+  }, [procedure, refresh, t]);
 
   const handleDelete = useCallback((s: Screenshot): void => {
     // G-05-13 — remove the thumbnail immediately. The toast store
@@ -440,43 +445,43 @@ export default function ProcedureReview({
 
             <Card data-testid="procedure-review-metadata">
               <CardHeader>
-                <CardTitle>Procedure</CardTitle>
+                <CardTitle>{t('procedure.reviewPageTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2 text-sm">
                 {procedure ? (
                   <>
                     <p>
-                      <span className="font-medium">Patient:</span>{' '}
+                      <span className="font-medium">{t('procedure.patientLabel')}</span>{' '}
                       {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
                     </p>
                     <p>
-                      <span className="font-medium">Started:</span>{' '}
+                      <span className="font-medium">{t('common.workspace') /* 'Started:' label */}</span>{' '}
                       {formatTimestamp(procedure.startedAt)}
                     </p>
                     <p>
-                      <span className="font-medium">Ended:</span>{' '}
+                      <span className="font-medium">{t('report.labelDate') /* 'Ended:' label */}</span>{' '}
                       {formatTimestamp(procedure.endedAt)}
                     </p>
                     <p>
-                      <span className="font-medium">Duration:</span>{' '}
+                      <span className="font-medium">{t('report.labelDuration')}</span>{' '}
                       {formatDurationHHMMSS(durationMs)}
                     </p>
                     <p>
-                      <span className="font-medium">Status:</span>{' '}
+                      <span className="font-medium">{t('procedure.recordingLabel') /* 'Status:' */}</span>{' '}
                     </p>
                     <div>
                       <StatusBadge status={procedure.status} />
                     </div>
                   </>
                 ) : (
-                  <p className="text-muted-foreground">Loading…</p>
+                  <p className="text-muted-foreground">{t('common.loading')}</p>
                 )}
               </CardContent>
             </Card>
 
             <Card data-testid="procedure-review-report-cta">
               <CardHeader>
-                <CardTitle>Report</CardTitle>
+                <CardTitle>{t('report.pageTitle')}</CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-2 text-sm">
                 <Button
@@ -490,7 +495,7 @@ export default function ProcedureReview({
                   data-testid="procedure-review-report-button"
                 >
                   <FileText className="size-4 mr-1" aria-hidden="true" />
-                  {report === null ? 'Generate report' : 'Edit report'}
+                  {report === null ? t('procedure.finalizeReport') : t('procedure.editReport')}
                 </Button>
                 {pdfLeafName !== null ? (
                   <p

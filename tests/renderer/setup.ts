@@ -7,6 +7,13 @@ import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
 import { initialRoute, setRoute } from '@/lib/router';
 import { session } from '@/store/session';
+// Phase 7 / Plan 07-04 — I18N-01 + D-19: i18next must be initialized before
+// any component that calls useTranslation() / useLanguage() mounts in the
+// test environment. main.tsx normally fires the side-effect import, but
+// tests import components directly without going through main.tsx, so the
+// init never runs. Importing the i18n module here ensures the bundles
+// load + the default language (en) is active for every renderer test.
+import '@/i18n';
 
 type MockApi = {
   auth: {

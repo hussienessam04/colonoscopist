@@ -35,6 +35,7 @@ import {
   useState,
   type ChangeEvent,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, FileText, FolderOpen, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
@@ -119,6 +120,10 @@ export default function ReportEditor({
 }): JSX.Element {
   const { navigate } = useRoute();
   const route = useRoute().current;
+  // ponytail: visible strings flow through t() per Phase 7 i18n
+  // contract. Sub-components (Badge / ScreenshotTimeline) own their
+  // own translations; this hook only handles the page-level surface.
+  const { t } = useTranslation();
   // ponytail: prefer explicit props (page-composable) over the route
   // union fields. The ReportEditor accepts both: prop-driven for tests,
   // route-driven for navigation (Phase 5 ProcedureReview CTA lands the
@@ -184,44 +189,44 @@ export default function ReportEditor({
       // being populated.
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
-      toast.success('Report finalized + PDF generated');
+      toast.success(t('report.reportFinalized'));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Finalize failed';
+      const msg = err instanceof Error ? err.message : t('procedure.finalizeFailed');
       toast.error(msg);
     }
-  }, [report, refresh]);
+  }, [report, refresh, t]);
 
   const handleRegenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
-      toast.success('PDF regenerated');
+      toast.success(t('report.regenPdfSuccess'));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'PDF render failed';
+      const msg = err instanceof Error ? err.message : t('report.regenPdfFailed');
       toast.error(msg);
     }
-  }, [report, refresh]);
+  }, [report, refresh, t]);
 
   const handleOpenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
       await window.api.reports.openPdf({ id: report.id, reveal: false });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Open failed';
+      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
       toast.error(msg);
     }
-  }, [report]);
+  }, [report, t]);
 
   const handleRevealPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
       await window.api.reports.openPdf({ id: report.id, reveal: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Reveal failed';
+      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
       toast.error(msg);
     }
-  }, [report]);
+  }, [report, t]);
 
   // Phase 6 UAT G-06-11 — print the actual PDF. We open the PDF in the
   // OS's default PDF viewer (Adobe Reader, Edge, Chrome's built-in,
@@ -238,10 +243,10 @@ export default function ReportEditor({
       await window.api.reports.openPdf({ id: report.id, reveal: false });
       toast.success('PDF opened — use the viewer toolbar to print');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Print failed';
+      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
       toast.error(msg);
     }
-  }, [report]);
+  }, [report, t]);
 
   const handleToggleAttach = useCallback(
     (screenshotId: number): void => {
@@ -256,15 +261,15 @@ export default function ReportEditor({
   );
 
   const indicatorText = useMemo((): string => {
-    if (status === 'saving') return 'Saving…';
-    if (status === 'error') return 'Save failed — retry';
+    if (status === 'saving') return t('common.saving');
+    if (status === 'error') return t('common.saveFailedRetry');
     if (status === 'saved' && savedAt !== null) {
       const d = new Date(savedAt);
       const pad = (n: number): string => n.toString().padStart(2, '0');
-      return `Saved at ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+      return t('common.savedAt', { time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}` });
     }
     return '';
-  }, [status, savedAt]);
+  }, [status, savedAt, t]);
 
   // Resolve the patient for the screenshot URL composition + the
   // patient block in the rendered PDF preview.
