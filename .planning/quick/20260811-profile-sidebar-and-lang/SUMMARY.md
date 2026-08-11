@@ -5,7 +5,7 @@ created: 2026-08-11
 completed: 2026-08-11
 commits:
   - 2fa2087 (fix/quick)
-  - <summary commit TBD>
+  - 3ce47df (docs/quick)
 ---
 
 # Quick Task Summary — ProfileEditor Sidebar + Language Change
