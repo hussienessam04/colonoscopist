@@ -11,14 +11,29 @@
 // Quick task 20260811 — PatientList filter sidebar + per-row accordion
 // expansion were reverted; procedures surface moved to a dedicated page
 // reached from the patient row dropdown.
+//
+// Quick task 20260811-patients-list-polish — refined visual density:
+//   - Header: "PATIENTS" kicker + ghost icon-only Settings + prominent
+//     `size="lg"` New Patient
+//   - Search surface collapsed into a single horizontal flex row
+//     (no outer Card wrapper) — matches Phase 7 RESEARCH.md Pattern 1
+//   - Active filter chips (search / MRN) render below the row when set;
+//     click × clears that filter
+//   - Results: sticky thead inside max-h-[60vh] + hover:bg-slate-50 rows
+//     + 3 grey animate-pulse skeleton rows for loading (no shadcn Skeleton
+//     dep — same pattern as Audit + PatientProcedures)
+//   - Empty state differentiates "no patients yet" (with CTA → patient-new)
+//     vs "no patients match filters"
+//   - Pagination footer uses "Showing {start}-{end} of {total}" format
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Plus, Search, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, Search, Settings as SettingsIcon, UserPlus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import PageSizeSelector from '@/components/PageSizeSelector';
 import PatientRow from '@/components/PatientRow';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -112,91 +127,104 @@ export default function PatientsList(): JSX.Element {
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const canRestore = currentUser?.isFirstAdmin ?? false;
+  // ponytail: pagination range math collapses to "Showing 1 of 1" when
+  // there's a single row — keeps the footer one-liner readable.
+  const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const rangeEnd = Math.min(page * pageSize, total);
+  const filtersActive = search !== '' || mrn !== '';
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto max-w-6xl flex flex-col gap-4">
         <header className="flex items-center justify-between">
-          <div>
+          <div className="flex flex-col gap-1">
+            <p
+              className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+              data-testid="patient-page-kicker"
+            >
+              {t('patient.pageKicker')}
+            </p>
             <h1 className="text-2xl font-semibold">{t('patient.pageTitle')}</h1>
             <p className="text-sm text-muted-foreground">
-              {t('patient.total', { count: total })}
+              {filtersActive
+                ? `${t('patient.total', { count: total })} · filtered`
+                : t('patient.total', { count: total })}
             </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
-              variant="outline"
+              variant="ghost"
+              size="icon"
               title={t('common.settings')}
+              aria-label={t('common.settings')}
               data-testid="settings-trigger"
               onClick={() => navigate({ name: 'settings-hub' })}
             >
-              <SettingsIcon className="size-4 mr-1" aria-hidden="true" />
-              {t('common.settings')}
+              <SettingsIcon className="size-4" aria-hidden="true" />
             </Button>
-            <Button onClick={() => navigate({ name: 'patient-new' })}>
-              <Plus className="size-4 mr-1" /> {t('patient.newPatient')}
+            <Button
+              size="lg"
+              onClick={() => navigate({ name: 'patient-new' })}
+              data-testid="patient-new-button"
+            >
+              <Plus className="size-4 mr-2" aria-hidden="true" /> {t('patient.newPatient')}
             </Button>
           </div>
         </header>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('patient.searchByName')}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="patient-search">{t('patient.searchByName')}</Label>
-                <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-                  <Input
-                    id="patient-search"
-                    className="pl-8"
-                    placeholder={t('patient.searchPlaceholder')}
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setPage(1);
-                    }}
-                    data-testid="filter-search"
-                  />
-                </div>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="patient-mrn">{t('patient.mrnExact')}</Label>
-                <Input
-                  id="patient-mrn"
-                  value={mrn}
-                  onChange={(e) => {
-                    setMrn(e.target.value);
-                    setPage(1);
-                  }}
-                  data-testid="filter-mrn"
-                />
-              </div>
-              <div className="flex items-center gap-2 sm:pb-1">
-                <input
-                  id="patient-include-deleted"
-                  type="checkbox"
-                  checked={includeDeleted}
-                  onChange={(e) => {
-                    setIncludeDeleted(e.target.checked);
-                    setPage(1);
-                  }}
-                  data-testid="filter-include-deleted"
-                  className="size-4"
-                />
-                <Label htmlFor="patient-include-deleted" className="text-sm">
-                  {t('patient.showDeleted')}
-                </Label>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2 space-y-0">
-            <CardTitle className="text-base">{t('patient.filtersResults')}</CardTitle>
+        <div className="flex items-center gap-3" data-testid="patient-filter-row">
+          <div className="relative flex-1 min-w-0">
+            <Label htmlFor="patient-search" className="sr-only">
+              {t('patient.searchByName')}
+            </Label>
+            <Search
+              className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+              aria-hidden="true"
+            />
+            <Input
+              id="patient-search"
+              className="pl-8"
+              placeholder={t('patient.searchPlaceholder')}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              data-testid="filter-search"
+            />
+          </div>
+          <div className="w-44">
+            <Label htmlFor="patient-mrn" className="sr-only">
+              {t('patient.mrnExact')}
+            </Label>
+            <Input
+              id="patient-mrn"
+              placeholder={t('patient.mrnPlaceholder')}
+              value={mrn}
+              onChange={(e) => {
+                setMrn(e.target.value);
+                setPage(1);
+              }}
+              data-testid="filter-mrn"
+            />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              id="patient-include-deleted"
+              type="checkbox"
+              checked={includeDeleted}
+              onChange={(e) => {
+                setIncludeDeleted(e.target.checked);
+                setPage(1);
+              }}
+              data-testid="filter-include-deleted"
+              className="size-4"
+            />
+            <Label htmlFor="patient-include-deleted" className="text-sm whitespace-nowrap">
+              {t('patient.showDeleted')}
+            </Label>
+          </div>
+          <div className="ml-auto shrink-0">
             <PageSizeSelector
               value={pageSize}
               onChange={(n) => {
@@ -204,31 +232,108 @@ export default function PatientsList(): JSX.Element {
                 setPage(1);
               }}
             />
-          </CardHeader>
+          </div>
+        </div>
+
+        {filtersActive ? (
+          <div className="flex items-center gap-2 flex-wrap" data-testid="patient-filter-chips">
+            {search !== '' ? (
+              <Badge variant="secondary" data-testid="filter-chip-search" className="gap-1 pr-1">
+                <span className="text-xs">
+                  Search: <span className="font-mono">{search}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label={t('patient.filterChipRemove')}
+                  onClick={() => {
+                    setSearch('');
+                    setPage(1);
+                  }}
+                  className="ml-1 rounded-sm hover:bg-slate-200/60 size-4 inline-flex items-center justify-center"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </Badge>
+            ) : null}
+            {mrn !== '' ? (
+              <Badge variant="secondary" data-testid="filter-chip-mrn" className="gap-1 pr-1">
+                <span className="text-xs">
+                  MRN: <span className="font-mono">{mrn}</span>
+                </span>
+                <button
+                  type="button"
+                  aria-label={t('patient.filterChipRemove')}
+                  onClick={() => {
+                    setMrn('');
+                    setPage(1);
+                  }}
+                  className="ml-1 rounded-sm hover:bg-slate-200/60 size-4 inline-flex items-center justify-center"
+                >
+                  <X className="size-3" aria-hidden="true" />
+                </button>
+              </Badge>
+            ) : null}
+          </div>
+        ) : null}
+
+        <Card>
           <CardContent className="p-0">
-            <div className="rounded-md">
+            <div className="max-h-[60vh] overflow-y-auto rounded-md" data-testid="patient-table-scroll">
               <table className="w-full">
-                <thead>
+                <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
                   <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2">Name</th>
-                    <th className="px-3 py-2">DOB</th>
-                    <th className="px-3 py-2">Gender</th>
-                    <th className="px-3 py-2">MRN</th>
-                    <th className="px-3 py-2">Phone</th>
-                    <th className="px-3 py-2 text-right">Actions</th>
+                    <th className="px-3 py-2 bg-card">Name</th>
+                    <th className="px-3 py-2 bg-card">DOB</th>
+                    <th className="px-3 py-2 bg-card">Gender</th>
+                    <th className="px-3 py-2 bg-card">MRN</th>
+                    <th className="px-3 py-2 bg-card">Phone</th>
+                    <th className="px-3 py-2 bg-card text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {loading ? (
-                    <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        {t('common.loading')}
-                      </td>
-                    </tr>
+                    // ponytail: 3 grey animate-pulse skeleton rows instead of
+                    // plain text + spinner — matches the Audit + PatientProcedures
+                    // polish (no shadcn Skeleton dep needed).
+                    <>
+                      {[0, 1, 2].map((i) => (
+                        <tr key={`skeleton-${i}`} data-testid="patient-skeleton-row">
+                          <td colSpan={6} className="px-3 py-2">
+                            <div className="h-5 w-full animate-pulse rounded bg-slate-200" />
+                          </td>
+                        </tr>
+                      ))}
+                    </>
                   ) : rows.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                        {t('patient.resultsEmpty')}
+                      <td
+                        colSpan={6}
+                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                        data-testid={
+                          filtersActive ? 'patient-empty-filtered' : 'patient-empty-first'
+                        }
+                      >
+                        {filtersActive ? (
+                          <div className="flex flex-col gap-2 items-center">
+                            <span className="font-medium">{t('patient.resultsEmpty')}</span>
+                            <span className="text-xs">{t('patient.emptyFilteredHint')}</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col gap-3 items-center">
+                            <UserPlus className="size-8 text-muted-foreground" aria-hidden="true" />
+                            <span className="font-medium">{t('patient.emptyFirst')}</span>
+                            <span className="text-xs">{t('patient.emptyFirstHint')}</span>
+                            <Button
+                              size="lg"
+                              onClick={() => navigate({ name: 'patient-new' })}
+                              data-testid="patient-empty-cta"
+                              className="mt-1"
+                            >
+                              <Plus className="size-4 mr-2" aria-hidden="true" />
+                              {t('patient.emptyFirstCta')}
+                            </Button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (
@@ -250,8 +355,17 @@ export default function PatientsList(): JSX.Element {
         </Card>
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">
-            {t('common.page')} {page} {t('common.of')} {totalPages}
+          <span
+            className="text-muted-foreground"
+            data-testid="pagination-range"
+          >
+            {total === 1
+              ? t('patient.paginationRangeOne')
+              : t('patient.paginationRange', {
+                  start: rangeStart,
+                  end: rangeEnd,
+                  total,
+                })}
           </span>
           <div className="flex gap-2">
             <Button

@@ -208,3 +208,91 @@ describe('PatientsList — Settings hub entry', () => {
     await waitFor(() => expect(getRoute().name).toBe('settings-hub'));
   });
 });
+
+// Quick task 20260811-patients-list-polish — header kicker, active
+// filter chips, refined empty states, and the "Showing X-Y of Z"
+// pagination footer format. Cases mirror PLAN.md §Acceptance so a
+// regression in any of these surfaces fails the suite.
+describe('PatientsList — UI polish (20260811-patients-list-polish)', () => {
+  it('header "PATIENTS" kicker renders above the page title', async () => {
+    render(<PatientsList />);
+    await screen.findByText('Alice Carter');
+    const kicker = await screen.findByTestId('patient-page-kicker');
+    // ponytail: i18next resolves the kicker to the bundled "Patients"
+    // string in the en bundle; the test contract is the testid + the
+    // string content, not any specific casing (CSS uppercases it).
+    expect(kicker).toHaveTextContent(/Patient/i);
+  });
+
+  it('active filter chip for search renders; clicking × clears search', async () => {
+    const api = getApi();
+    render(<PatientsList />);
+    const search = await screen.findByLabelText(/search by name/i);
+    const user = userEvent.setup();
+    await user.type(search, 'John');
+    // Chip mounts once the search input has any content.
+    const chip = await screen.findByTestId('filter-chip-search');
+    expect(chip).toHaveTextContent('John');
+    // Click the chip × — the inner button (badge's remove affordance).
+    const removeBtn = chip.querySelector('button');
+    expect(removeBtn).not.toBeNull();
+    await user.click(removeBtn as HTMLButtonElement);
+    // Chip disappears + the next debounced patients.list call has no
+    // search param.
+    await waitFor(() => {
+      expect(screen.queryByTestId('filter-chip-search')).toBeNull();
+    });
+    await waitFor(() => {
+      const lastCall =
+        api.patients.list.mock.calls[api.patients.list.mock.calls.length - 1]?.[0];
+      expect(lastCall).toMatchObject({ search: undefined });
+    });
+  });
+
+  it('active filter chip for MRN renders when MRN is non-empty', async () => {
+    render(<PatientsList />);
+    const mrn = await screen.findByLabelText(/mrn \(exact\)/i);
+    const user = userEvent.setup();
+    await user.type(mrn, '12345');
+    const chip = await screen.findByTestId('filter-chip-mrn');
+    expect(chip).toHaveTextContent('12345');
+  });
+
+  it('empty state with no rows + no filters renders "Add your first patient" CTA → navigates to patient-new', async () => {
+    const api = getApi();
+    api.patients.list.mockResolvedValue({ rows: [], total: 0 });
+    render(<PatientsList />);
+    const cta = await screen.findByTestId('patient-empty-cta');
+    expect(cta).toBeInTheDocument();
+    // The surrounding empty-state cell uses the first-patient testid.
+    expect(await screen.findByTestId('patient-empty-first')).toBeInTheDocument();
+    const user = userEvent.setup();
+    await user.click(cta);
+    await waitFor(() => expect(getRoute().name).toBe('patient-new'));
+  });
+
+  it('empty state with rows=0 + search filter renders the filtered empty message', async () => {
+    const api = getApi();
+    api.patients.list.mockResolvedValue({ rows: [], total: 0 });
+    render(<PatientsList />);
+    const search = await screen.findByLabelText(/search by name/i);
+    const user = userEvent.setup();
+    await user.type(search, 'John');
+    // Filtered empty cell renders instead of the first-patient CTA.
+    const filtered = await screen.findByTestId('patient-empty-filtered');
+    expect(filtered).toBeInTheDocument();
+    expect(screen.queryByTestId('patient-empty-first')).toBeNull();
+    expect(filtered).toHaveTextContent(/no procedures match these filters/i);
+    expect(filtered).toHaveTextContent(/try clearing your filters/i);
+  });
+
+  it('pagination footer uses the "Showing X-Y of Z" range format', async () => {
+    const api = getApi();
+    // 2 rows + total=50 + page=1 + pageSize=25 → "Showing 1-25 of 50".
+    api.patients.list.mockResolvedValue({ rows: patients, total: 50 });
+    render(<PatientsList />);
+    await screen.findByText('Alice Carter');
+    const range = await screen.findByTestId('pagination-range');
+    expect(range).toHaveTextContent('Showing 1-25 of 50');
+  });
+});
