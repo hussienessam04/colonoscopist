@@ -131,7 +131,15 @@
     "columnStatus": "Status",
     "columnDuration": "Duration",
     "columnReport": "Report",
-    "columnActions": "Actions"
+    "columnActions": "Actions",
+    "newProcedure": "+ New Procedure",
+    "newProcedureTooltip": "Start a new procedure for this patient",
+    "searchPlaceholder": "Search procedures...",
+    "clearFilters": "Clear",
+    "applyFilters": "Apply",
+    "noMatchFilters": "No procedures match these filters.",
+    "clearFiltersHint": "Try clearing filters or adjusting the date range.",
+    "statusAll": "All statuses"
   },
   "audit": {
     "pageTitle": "Audit log",

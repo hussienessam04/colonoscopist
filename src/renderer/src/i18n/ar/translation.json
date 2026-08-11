@@ -131,7 +131,15 @@
     "columnStatus": "الحالة",
     "columnDuration": "المدة",
     "columnReport": "التقرير",
-    "columnActions": "الإجراءات"
+    "columnActions": "الإجراءات",
+    "newProcedure": "+ إجراء جديد",
+    "newProcedureTooltip": "بدء إجراء جديد لهذا المريض",
+    "searchPlaceholder": "بحث في الإجراءات...",
+    "clearFilters": "مسح",
+    "applyFilters": "تطبيق",
+    "noMatchFilters": "لا توجد إجراءات تطابق هذه التصفية.",
+    "clearFiltersHint": "حاول مسح التصفية أو تعديل النطاق الزمني.",
+    "statusAll": "جميع الحالات"
   },
   "audit": {
     "pageTitle": "سجل التدقيق",
