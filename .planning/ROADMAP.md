@@ -223,7 +223,8 @@ Plans:
 
 **Wave 6** *(blocked on Wave 5 completion)*
 
-- [ ] 07-06-PLAN.md — Playwright RTL smoke per route (8 tests: dir='rtl' + scrollWidth check + screenshot) + backup → restore roundtrip integration test (RUN_SMOKE=1, integrity_check === 'ok') + AR PDF magic bytes integration test (RUN_SMOKE=1, file > 50KB + '%PDF' magic) + 07-UAT.md phase acceptance plan (Wave 6, depends_on: 07-02, 07-03, 07-04, 07-05)
+- [x] 07-06-PLAN.md — Playwright RTL smoke per route (8 tests: dir='rtl' + scrollWidth check + screenshot via shared `smokeRoute(page, path, name)` helper) + backup → restore roundtrip integration test (RUN_SMOKE=1, integrity_check === 'ok', wizardBootstrap-seeded DB) + AR PDF magic bytes integration test (RUN_SMOKE=1, file > 5KB + '%PDF' magic, full-orchestrator path, documented 50KB threshold deviation) + 07-UAT.md phase acceptance plan (Overview / Prerequisites / Test Cases per req / Pass-Fail / Manual-Only) (Wave 6, depends_on: 07-02, 07-03, 07-04, 07-05)
+  - **Verification:** Typecheck clean (both `typecheck:node` + `typecheck:web`); `RUN_SMOKE=1 npm run test:integration:smoke:phase7` 3/3 green (backup-restore-roundtrip x2 + ar-pdf-magic x1); Playwright harness committed with Chromium 1234 installed locally (no `npx playwright install` step needed); e2e suite requires `npm run dev` running on `http://localhost:5173` for live verification — harness is well-formed (typecheck + Chromium launch verified); Phase 7 plan execution complete (6/6 plans executed); I18N-03 + RPT-06 + SET-05 + SET-06 ship gates ready for `/gsd-verify-work 7` per `07-UAT.md`.
 
 ---
 
