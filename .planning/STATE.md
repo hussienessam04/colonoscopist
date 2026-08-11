@@ -250,3 +250,4 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2026-08-11 | profile-sidebar-and-lang | ProfileEditor missing SettingsSidebar + language picker didn't flip i18n (i18n.changeLanguage missing) |
 | 2026-08-11 | audit-ui-polish | Audit page: snake_case contract mismatch (NaN time), entityType filter ignored, missing SettingsSidebar, malformed metadata crash |
 | 2026-08-11 | backup-restore-tests-polish | BackupRestore UI polish + last-backup indicator + 10 renderer tests + 12 main-side IPC tests |
+| 2026-08-11 | patients-list-polish | PatientsList UI polish: sticky thead, filter chips, empty-state CTA, pagination range, 6 renderer tests |
