@@ -246,3 +246,4 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Date | Slug | Description |
 |------|------|-------------|
 | 2026-08-11 | revert-patient-list-filter | Revert patient list filter sidebar + new PatientProcedures page accessed via dropdown menu |
+| 2026-08-11 | polish-patient-procedures | Polish PatientProcedures UI + filter system + new procedure button |
