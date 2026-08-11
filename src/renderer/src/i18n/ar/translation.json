@@ -93,6 +93,7 @@
     "openPatient": "فتح المريض",
     "openProcedure": "فتح الإجراء",
     "openReportPdf": "فتح تقرير PDF",
+    "viewProcedures": "عرض الإجراءات",
     "filtersTitle": "البحث والتصفية",
     "filtersResults": "النتائج",
     "filtersDateRange": "النطاق الزمني",
@@ -113,6 +114,24 @@
     "reportStatusDraft": "مسودة",
     "reportStatusFinalized": "نهائي",
     "retry": "حاول مرة أخرى"
+  },
+  "patientProcedures": {
+    "pageTitle": "الإجراءات",
+    "pageKicker": "المريض",
+    "loadingPatient": "جاري تحميل المريض…",
+    "patientNotFound": "لم يتم العثور على المريض",
+    "loadingProcedures": "جاري تحميل الإجراءات…",
+    "proceduresEmpty": "لا توجد إجراءات مسجلة لهذا المريض بعد.",
+    "openProcedure": "فتح الإجراء",
+    "openPdf": "فتح PDF",
+    "noReport": "لا يوجد تقرير",
+    "minutesShort": "{{count}} دقيقة",
+    "backToList": "العودة إلى المرضى",
+    "columnStarted": "وقت البدء",
+    "columnStatus": "الحالة",
+    "columnDuration": "المدة",
+    "columnReport": "التقرير",
+    "columnActions": "الإجراءات"
   },
   "audit": {
     "pageTitle": "سجل التدقيق",

@@ -101,7 +101,7 @@ type MockApi = {
     get: ReturnType<typeof vi.fn>;
     // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup by
     // procedureId (returns null when no report exists). Used by the
-    // Patient List accordion expansion.
+    // PatientProcedures page (quick task 20260811).
     getByProcedure: ReturnType<typeof vi.fn>;
     updateDraft: ReturnType<typeof vi.fn>;
     updateFinalized: ReturnType<typeof vi.fn>;

@@ -27,6 +27,10 @@ import Audit from './pages/Audit';
 // landed in Plan 07-02; the page body lands here. Two side-by-side
 // Cards per UI-SPEC §Implementation Bindings Backup & Restore layout.
 import BackupRestore from './pages/BackupRestore';
+// Quick task 20260811 — Patient procedures page reached from the
+// PatientRow dropdown's "View procedures" item. The route variant
+// landed in the same quick task.
+import PatientProcedures from './pages/PatientProcedures';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -103,6 +107,8 @@ export default function App(): JSX.Element {
       return <Audit />;
     case 'backup-restore':
       return <BackupRestore />;
+    case 'patient-procedures':
+      return <PatientProcedures patientId={route.patientId} />;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit

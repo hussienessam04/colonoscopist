@@ -93,6 +93,7 @@
     "openPatient": "Open patient",
     "openProcedure": "Open procedure",
     "openReportPdf": "Open report PDF",
+    "viewProcedures": "View procedures",
     "filtersTitle": "Search & filter",
     "filtersResults": "Results",
     "filtersDateRange": "Date range",
@@ -113,6 +114,24 @@
     "reportStatusDraft": "Draft",
     "reportStatusFinalized": "Finalized",
     "retry": "Try again"
+  },
+  "patientProcedures": {
+    "pageTitle": "Procedures",
+    "pageKicker": "Patient",
+    "loadingPatient": "Loading patient…",
+    "patientNotFound": "Patient not found",
+    "loadingProcedures": "Loading procedures…",
+    "proceduresEmpty": "No procedures recorded for this patient yet.",
+    "openProcedure": "Open procedure",
+    "openPdf": "Open PDF",
+    "noReport": "No report",
+    "minutesShort": "{{count}} min",
+    "backToList": "Back to patients",
+    "columnStarted": "Started",
+    "columnStatus": "Status",
+    "columnDuration": "Duration",
+    "columnReport": "Report",
+    "columnActions": "Actions"
   },
   "audit": {
     "pageTitle": "Audit log",

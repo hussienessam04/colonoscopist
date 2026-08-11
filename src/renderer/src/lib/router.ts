@@ -26,7 +26,11 @@ export type Route =
   // calls compile; the page bodies land in the later plans. No admin gate
   // per UI-SPEC §Implementation Bindings — every doctor sees them.
   | { name: 'audit' }
-  | { name: 'backup-restore' };
+  | { name: 'backup-restore' }
+  // Quick task 20260811 — Patient procedures surface moved out of the
+  // Patient List accordion (reverted) into its own page, reached via
+  // "View procedures" on the patient actions dropdown.
+  | { name: 'patient-procedures'; patientId: string };
 
 export const initialRoute: Route = { name: 'login' };
 
