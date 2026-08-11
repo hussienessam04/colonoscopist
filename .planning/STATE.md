@@ -2,24 +2,24 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 07-04
+current_plan: 07-05
 status: in_progress
-stopped_at: Phase 07 Plan 3 complete
+stopped_at: Phase 07 Plan 4 complete
 paused_at: —
-last_updated: "2026-08-11T03:05:00.000Z"
+last_updated: "2026-08-11T04:05:00.000Z"
 last_activity: 2026-08-11
-last_activity_desc: Phase 7 Plan 3 complete — Audit UI + ProfileEditor language picker
+last_activity_desc: Phase 7 Plan 4 complete — bilingual EN+AR UI + RTL + AR PDF
 progress:
   total_phases: 7
   completed_phases: 6
   total_plans: 40
-  completed_plans: 37
+  completed_plans: 38
 ---
 
-**Current Plan:** 07-04
+**Current Plan:** 07-05
 **Total Plans in Phase:** 6
 **Last Activity:** 2026-08-11
-**Last Activity Description:** Phase 7 Plan 3 complete — Audit UI + ProfileEditor language picker
+**Last Activity Description:** Phase 7 Plan 4 complete — bilingual EN+AR UI + RTL + AR PDF
 **Status:** Phase 7 in progress
 **Paused At:** —
 
@@ -163,15 +163,16 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 05-10 | Gap closure (G-05-13): pure local-state `remove(id)` on useScreenshotIntake + useProcedures; event-driven re-sync via `screenshotToastStore.subscribeCommitted` → useProcedures `refresh()` on match; ProcedureRoom + ProcedureReview handlers call remove BEFORE enqueueDelete (Undo triggers refresh); `screenshotToastStore.commitDelete` now fires `toast.error` via dynamic `import('sonner')` on IPC failure instead of silent `console.error`; 4 new contract-guard tests in useScreenshotIntake.test.ts (3) + procedure-room-timer.test.tsx (1) + ProcedureReview.test.tsx (3 new in dedicated `ProcedureReview gallery delete (G-05-13)` describe block — actually total 7 in 3 files) | complete (511/511 tests pass across 64 files; 7 new contract-guard assertions; no regressions) |
 | 05-11 | Gap closure (G-05-14): extend `MEDIA_ROUTE_RE` with optional `(?:([a-zA-Z0-9-]+)\/)?` capture group 3 + add `ALLOWED_SUBDIRS: ReadonlySet<string> = new Set(['screenshots'])` allow-list defense-in-depth (404 BEFORE filesystem access); handler reads `subdir = match[3] ?? ''` and joins it into the resolved path (`''` is a no-op for `path.join` so flat URLs continue to work); ScreenshotLightbox URL composition updated to include the literal `screenshots/` segment: `${mediaBaseUrl}/media/${patientId}/${procedureId}/screenshots/${fileName}`; 4 new contract-guard tests (2 in preview-server + 2 in range-request) + 1 updated ScreenshotLightbox URL composition assertion | complete (515/515 tests pass across 64 files; 4 new contract-guard assertions; no regressions) |
 | 05-12 | Gap closure (G-05-15): extract shared `screenshotUrl({ mediaBaseUrl, patientId, procedureId, filePath })` helper at `src/renderer/src/lib/screenshot-url.ts` — single source of truth for the screenshot `<img>` src (leaf-filename regex + literal `screenshots/` subdir + `/media/` route shape) — returns `null` when `mediaBaseUrl` is `null` for graceful degrade; ScreenshotTimeline adds `mediaBaseUrl: string \| null` + `patientId: string` props and composes each thumbnail's `thumbnailSrc` via the helper (the `<img>` element mounts at ~120×110px — no more 'FRAME' placeholder); ScreenshotLightbox canonicalized onto the same helper (no third copy of the leaf-filename regex); ScreenshotThumbnail gains `data-testid="screenshot-thumbnail-img"` for the new contract-guard test seam; ProcedureRoom gains a `useMediaUrl()` hook call so the mid-procedure gallery is visually populated; 1 new contract-guard test (timeline `<img>` src composition) + 4 new helper tests (null-safety + happy-path + Windows backslash + forward-slash leaf extraction) | complete (520/520 tests pass across 65 files; 5 new contract-guard assertions; no regressions) |
+| 07-04 | i18next bundles (en/ar) + useLanguage hook flips `<html dir>` on change + Wizard step 4 (language radio submits users.language) + 5-page useTranslation wiring (PatientsList + Audit + ProfileEditor + ProcedureReview + ReportEditor) + AR PDF via Font.register(NotoSansArabic) + bidi `<Text direction='rtl'>` wrappers + numeric fragment `<Text direction='ltr'>` isolation per Pitfall 8 + D-24 parity check Vitest + RUN_SMOKE=1 integration smoke (file > 50KB + PDF magic bytes) | complete (649/652 tests pass across 88 files; 14 new tests + 5 pre-existing PDF smoke failures unrelated to Phase 7; 4 auto-fixed bugs: unused useState, dead STATUS_OPTIONS, ReportEditableFields missing fields, ProcedureReview race condition) |
 
 ---
 *State last updated: 2026-08-08 after 05-12-PLAN.md completed (G-05-15 closed: timeline thumbnails broken — `ScreenshotTimeline.tsx` was silently dropping `thumbnailSrc` since Plan 05-07 (placeholder fall-through was masking the missing wiring); Plan 12 extracted the URL composition into a shared `screenshotUrl` helper, wired `mediaBaseUrl` + `patientId` props through ScreenshotTimeline + ProcedureReview + ProcedureRoom, canonicalized ScreenshotLightbox onto the same helper (no third copy), added `data-testid="screenshot-thumbnail-img"` for the new contract-guard test, and gave ProcedureRoom its first `useMediaUrl()` call so the mid-procedure gallery is visually populated; 1 new ScreenshotTimeline contract-guard test + 4 new `screenshotUrl` helper tests; 520/520 tests across 65 files)*
 
 ## Session
 
-**Last session:** 2026-08-10T18:40:23.425Z
-**Stopped at:** Phase 07 UI-SPEC approved
-**Resume file:** .planning/phases/07-search-history-audit-ui-backup-restore-arabic-rtl/07-UI-SPEC.md
+**Last session:** 2026-08-11T04:05:00.000Z
+**Stopped at:** Phase 07 Plan 4 complete
+**Resume file:** .planning/phases/07-search-history-audit-ui-backup-restore-arabic-rtl/07-04-SUMMARY.md
 
 ## Performance Metrics
 
@@ -185,6 +186,7 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | Phase 05 P10 | 8 min | 2 tasks | 8 files |
 | Phase 05 P11 | 6 min | 2 tasks | 5 files (preview-server.ts + ScreenshotLightbox.tsx + 3 test files) |
 | Phase 05 P12 | 6 min | 3 tasks | 8 files (screenshot-url.ts [new] + ScreenshotTimeline.tsx + ScreenshotThumbnail.tsx + ScreenshotLightbox.tsx + ProcedureReview.tsx + ProcedureRoom.tsx + 2 test files; 1 new test file) |
+| Phase 07 P04 | ~45 min | 2 tasks + 1 fix commit | 8 created + 12 modified + 1 TTF binary (i18n bundles + useLanguage + Wizard step 4 + AR PDF + 5-page useTranslation wiring) |
 
 ## Decisions
 
@@ -217,3 +219,11 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase 5 P12]: G-05-15: Coerce helper `null` → `undefined` at the timeline call site via `?? undefined` — preserves the existing `thumbnailSrc?: string` prop type without weakening the conditional render gate (`thumbnailSrc && !errored` correctly handles both null and undefined via the falsy check). No prop-signature change needed
 - [Phase 5 P12]: G-05-15: `data-testid="screenshot-thumbnail-img"` on the `<img>` element (not the placeholder div) — stable test seam for the contract-guard test, copy-independent (vs. the placeholder's `aria-label="Thumbnail pending"`), no-op for production users (React strips testids from production DOM via the standard JSX transform)
 - [Phase 5 P12]: G-05-15: ProcedureRoom gains ONE `useMediaUrl()` call (was missing entirely) — the hook stays bound across page transitions (existing design from Plan 05-03) so the IPC round-trip fires only once per app session. No new IPC, no new state
+- [Phase 7 P04]: useLanguage mounted ONCE at boot via `<LanguageApplier />` inside main.tsx — D-19 verbatim. Single source of truth for document direction; no per-page i18n.changeLanguage calls would fragment the direction state across renders
+- [Phase 7 P04]: AR PDF bidi isolation via nested `<Text direction>` wrappers — outer Text with direction='rtl' for the Arabic body, inner Text with direction='ltr' for numeric fragments (MRN, DOB, duration). The pattern is the only @react-pdf/renderer-supported way to render bidi text correctly; CSS logical direction is not supported by the renderer
+- [Phase 7 P04]: Font.register with module-scope once-per-process guard (`_notoArabicRegistered: boolean`) — re-registration on every PDF render is wasteful + can throw under load. The guard is a simple boolean flag in render-report-pdf.ts
+- [Phase 7 P04]: AR translation values are hand-written per D-20 verbatim — no machine translation. Every EN key has a matching AR value; the D-24 parity test in CI prevents the half-translated drift class
+- [Phase 7 P04]: NotoSansArabic TTF bundled at src/main/pdf/fonts/NotoSansArabic-Regular.ttf (234 KB subset) — per D-27 verbatim. The full font is ~700KB but the subset covers the Arabic glyph range used by the AR PDF UI. The smaller file size keeps the binary install under the 5MB shipping target (the offline-only mandate forbids a build-time fetch)
+- [Phase 7 P04]: src/shared/ipc-contract.ts NOT modified — REPORTS_REGEN_PDF signature is unchanged. Main reads language internally from doctor_profile.language → users.language → 'en' fallback chain (D-26). The renderer stays language-agnostic; the IPC contract stays stable
+- [Phase 7 P04]: tailwind.config.ts NOT modified — Tailwind 3.4 native rtl: variants are implicit (no plugin needed). The 'tailwindcss-rtl' plugin is explicitly forbidden per D-23
+- [Phase 7 P04]: ReportEditor.tsx ReportEditableFields patch widened to all four fields (recommendations + procedureDetails) — Phase 6 UAT G-06-10 trimmed the editor UI to two fields but the type contract still required all four. The runtime IPC was already accepting the overlay; the typecheck error was the surfacing issue

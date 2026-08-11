@@ -213,7 +213,8 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 07-04-PLAN.md — i18next bundles (en/ar) + useLanguage hook flips <html dir> on change + Wizard step 4 (language radio submits users.language) + AR PDF via Font.register(NotoSansArabic) + bidi <Text direction='rtl'> wrappers + numeric fragment <Text direction='ltr'> isolation per Pitfall 8 + D-24 parity check Vitest + integration smoke (file > 50KB + PDF magic bytes) (Wave 4, depends_on: 07-01)
+- [x] 07-04-PLAN.md — i18next bundles (en/ar) + useLanguage hook flips <html dir> on change + Wizard step 4 (language radio submits users.language) + AR PDF via Font.register(NotoSansArabic) + bidi <Text direction='rtl'> wrappers + numeric fragment <Text direction='ltr'> isolation per Pitfall 8 + D-24 parity check Vitest + integration smoke (file > 50KB + PDF magic bytes) (Wave 4, depends_on: 07-01)
+  - **Verification:** 649/652 tests pass across 88 files; 14 new tests (5 i18n parity + 4 useLanguage + 5 wizard + 1 AR PDF integration smoke); 3 pre-existing PDF smoke failures unrelated to Phase 7 (carry-over from Plan 06-03 — Playwright catch in 07-06); 4 auto-fixed bugs (unused useState, dead STATUS_OPTIONS, ReportEditableFields missing fields, ProcedureReview test race condition); I18N-01/02/03 + RPT-06 completed.
 
 **Wave 5** *(blocked on Wave 4 completion)*
 
