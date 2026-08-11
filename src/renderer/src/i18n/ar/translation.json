@@ -175,6 +175,7 @@
     "detailCopyJson": "نسخ JSON",
     "copySuccess": "تم النسخ",
     "tooManyHint": "عرض أول {{shown}} من {{total}} — تضييق النطاق بالتاريخ أو المستخدم.",
+    "errorTitle": "فشل تحميل سجل التدقيق",
     "entityTypes": {
       "user": "مستخدم",
       "patient": "مريض",

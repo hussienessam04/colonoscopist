@@ -19,6 +19,12 @@
 // this. The 1s debounce matches the page being a "view" rather than a
 // "load" — gives the operator time to navigate away (e.g. accidental
 // click) before the audit row lands.
+//
+// Phase 7 / quick 20260811-audit-ui-polish: SettingsSidebar mounts in
+// the left rail (mirrors ProfileEditor pattern) + sticky thead +
+// hover:bg-slate-50 rows + status color tokens (bg-{color}-100/800) +
+// 3 grey animate-pulse skeleton rows for loading + differentiated
+// empty states.
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,7 +35,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { SettingsSidebar } from '@/components/SettingsSidebar';
 import {
   Select,
   SelectContent,
@@ -51,6 +57,23 @@ import { useSession } from '@/store/session';
 import type { AuditEntry, UserPublic } from '@shared/ipc-contract';
 
 const DEFAULT_PAGE_SIZE = 100;
+
+// ponytail: status color tokens reused from PatientProcedures — emerald /
+// amber / blue / red / slate. Adding new tokens for the Audit page
+// would re-spawn the same palette across pages.
+function outcomeBadgeClass(outcome: AuditEntry['outcome']): string {
+  if (outcome === 'failed') return 'bg-red-100 text-red-800';
+  if (outcome === 'rate_limited') return 'bg-amber-100 text-amber-800';
+  return 'bg-emerald-100 text-emerald-800';
+}
+
+function entityTypeBadgeClass(entityType: string | null): string {
+  if (entityType === null) return 'bg-slate-100 text-slate-700';
+  if (entityType === 'backup' || entityType === 'restore') return 'bg-blue-100 text-blue-800';
+  if (entityType === 'patient') return 'bg-emerald-100 text-emerald-800';
+  if (entityType === 'procedure') return 'bg-amber-100 text-amber-800';
+  return 'bg-slate-100 text-slate-700';
+}
 
 // UI-SPEC §Implementation Bindings — fixed entity-type options. Anything
 // outside this list is logged by main but the Audit page doesn't expose
@@ -213,153 +236,156 @@ export default function Audit(): JSX.Element {
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl flex flex-col gap-4">
-        <header className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {t('audit.pageKicker')}
-            </p>
-            <h1 className="text-2xl font-semibold">{t('audit.pageTitle')}</h1>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ name: 'settings-hub' })}
-            data-testid="audit-back"
-          >
-            <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
-            {t('common.back')}
-          </Button>
-        </header>
-
-        <Card data-testid="audit-filter-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{t('audit.filtersTitle')}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-date-from">{t('audit.filterDateFrom')}</Label>
-                <Input
-                  id="audit-date-from"
-                  type="date"
-                  value={dateFrom}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    setDateFrom(e.target.value);
-                    setPage(1);
-                  }}
-                  data-testid="audit-date-from"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-date-to">{t('audit.filterDateTo')}</Label>
-                <Input
-                  id="audit-date-to"
-                  type="date"
-                  value={dateTo}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    setDateTo(e.target.value);
-                    setPage(1);
-                  }}
-                  data-testid="audit-date-to"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-user">{t('audit.filterUser')}</Label>
-                <Select
-                  value={userId === '' ? ANY_USER : userId}
-                  onValueChange={(v) => {
-                    setUserId(v === ANY_USER ? '' : v);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger id="audit-user" data-testid="audit-user">
-                    <SelectValue placeholder={t('audit.filterUserPlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY_USER}>{t('audit.filterUserPlaceholder')}</SelectItem>
-                    {users.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>
-                        {u.fullName}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-action">{t('audit.filterAction')}</Label>
-                <Input
-                  id="audit-action"
-                  value={action}
-                  onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                    setAction(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder={t('audit.filterActionPlaceholder')}
-                  data-testid="audit-action"
-                />
-              </div>
-              <div className="flex flex-col gap-1">
-                <Label htmlFor="audit-entity-type">{t('audit.filterEntityType')}</Label>
-                <Select
-                  value={entityType === '' ? ANY_ENTITY : entityType}
-                  onValueChange={(v) => {
-                    setEntityType(v === ANY_ENTITY ? '' : v);
-                    setPage(1);
-                  }}
-                >
-                  <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type">
-                    <SelectValue placeholder={t('audit.filterEntityTypePlaceholder')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={ANY_ENTITY}>{t('audit.filterEntityTypePlaceholder')}</SelectItem>
-                    {ENTITY_TYPES.map((entityOpt) => (
-                      <SelectItem key={entityOpt.value} value={entityOpt.value}>
-                        {t(`audit.entityTypes.${entityOpt.value}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+      <div className="mx-auto grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <SettingsSidebar activeTab="audit" />
+        <div className="flex flex-col gap-4">
+          <header className="flex items-center justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+                {t('audit.pageKicker')}
+              </p>
+              <h1 className="text-2xl font-semibold">{t('audit.pageTitle')}</h1>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                onClick={handleClearAll}
-                data-testid="audit-clear"
-              >
-                {t('audit.clearAll')}
-              </Button>
-              <Button
-                onClick={() => void refresh()}
-                data-testid="audit-apply"
-              >
-                {t('common.apply')}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            <Button
+              variant="outline"
+              onClick={() => navigate({ name: 'settings-hub' })}
+              data-testid="audit-back"
+            >
+              <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
+              {t('common.back')}
+            </Button>
+          </header>
 
-        {error !== null ? (
-          <Alert variant="destructive" data-testid="audit-error">
-            <AlertTitle>{t('common.genericError')}</AlertTitle>
-            <AlertDescription>{error}</AlertDescription>
-          </Alert>
-        ) : null}
+          <Card data-testid="audit-filter-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">{t('audit.filtersTitle')}</CardTitle>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-3">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="audit-date-from">{t('audit.filterDateFrom')}</Label>
+                  <Input
+                    id="audit-date-from"
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      setDateFrom(e.target.value);
+                      setPage(1);
+                    }}
+                    data-testid="audit-date-from"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="audit-date-to">{t('audit.filterDateTo')}</Label>
+                  <Input
+                    id="audit-date-to"
+                    type="date"
+                    value={dateTo}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      setDateTo(e.target.value);
+                      setPage(1);
+                    }}
+                    data-testid="audit-date-to"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="audit-user">{t('audit.filterUser')}</Label>
+                  <Select
+                    value={userId === '' ? ANY_USER : userId}
+                    onValueChange={(v) => {
+                      setUserId(v === ANY_USER ? '' : v);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger id="audit-user" data-testid="audit-user">
+                      <SelectValue placeholder={t('audit.filterUserPlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_USER}>{t('audit.filterUserPlaceholder')}</SelectItem>
+                      {users.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.fullName}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="audit-action">{t('audit.filterAction')}</Label>
+                  <Input
+                    id="audit-action"
+                    value={action}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      setAction(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder={t('audit.filterActionPlaceholder')}
+                    data-testid="audit-action"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <Label htmlFor="audit-entity-type">{t('audit.filterEntityType')}</Label>
+                  <Select
+                    value={entityType === '' ? ANY_ENTITY : entityType}
+                    onValueChange={(v) => {
+                      setEntityType(v === ANY_ENTITY ? '' : v);
+                      setPage(1);
+                    }}
+                  >
+                    <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type">
+                      <SelectValue placeholder={t('audit.filterEntityTypePlaceholder')} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={ANY_ENTITY}>
+                        {t('audit.filterEntityTypePlaceholder')}
+                      </SelectItem>
+                      {ENTITY_TYPES.map((entityOpt) => (
+                        <SelectItem key={entityOpt.value} value={entityOpt.value}>
+                          {t(`audit.entityTypes.${entityOpt.value}`)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={handleClearAll}
+                  data-testid="audit-clear"
+                >
+                  {t('audit.clearAll')}
+                </Button>
+                <Button
+                  onClick={() => void refresh()}
+                  data-testid="audit-apply"
+                >
+                  {t('common.apply')}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">
-              {t('audit.sectionTitle')}{' '}
-              <span className="text-muted-foreground text-sm font-normal">
-                ({t('patient.total', { count: total })})
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[calc(100vh-22rem)]">
-              <div className="rounded-md">
+          {error !== null ? (
+            <Alert variant="destructive" data-testid="audit-error">
+              <AlertTitle>{t('audit.errorTitle')}</AlertTitle>
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          ) : null}
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {t('audit.sectionTitle')}{' '}
+                <span className="text-muted-foreground text-sm font-normal">
+                  ({t('patient.total', { count: total })})
+                </span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="max-h-[60vh] overflow-y-auto" data-testid="audit-table-scroll">
                 <table className="w-full">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-card">
                     <tr className="border-b text-left text-xs uppercase text-muted-foreground">
                       <th className="px-3 py-2 w-28">{t('audit.columnTime')}</th>
                       <th className="px-3 py-2 w-44">{t('audit.columnUser')}</th>
@@ -369,16 +395,18 @@ export default function Audit(): JSX.Element {
                   </thead>
                   <tbody>
                     {loading ? (
-                      <tr>
-                        <td
-                          colSpan={4}
-                          className="px-3 py-8 text-center text-sm text-muted-foreground"
-                          data-testid="audit-loading"
-                        >
-                          <span className="inline-block size-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600 mr-2 align-[-2px]" />
-                          {t('common.loading')}
-                        </td>
-                      </tr>
+                      // ponytail: 3 grey animate-pulse skeleton rows instead of
+                      // plain text + spinner — matches the PatientProcedures
+                      // polish (no shadcn Skeleton dep needed).
+                      <>
+                        {[0, 1, 2].map((i) => (
+                          <tr key={`skeleton-${i}`} data-testid="audit-skeleton-row">
+                            <td colSpan={4} className="px-3 py-2">
+                              <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+                            </td>
+                          </tr>
+                        ))}
+                      </>
                     ) : rows.length === 0 ? (
                       <tr>
                         <td
@@ -409,16 +437,32 @@ export default function Audit(): JSX.Element {
                             </span>
                           </td>
                           <td className="px-3 py-1 align-middle">
-                            <span className="truncate text-sm font-medium">
-                              {row.action}
+                            <span className="inline-flex items-center gap-2">
+                              <span className="truncate text-sm font-medium">{row.action}</span>
+                              <span
+                                className={`inline-block rounded px-1.5 py-0.5 text-xs ${outcomeBadgeClass(
+                                  row.outcome,
+                                )}`}
+                                data-testid="audit-outcome-badge"
+                              >
+                                {row.outcome}
+                              </span>
                             </span>
                           </td>
                           <td className="px-3 py-1 align-middle">
-                            <span className="truncate text-sm text-muted-foreground">
-                              {row.entityType === null
-                                ? '—'
-                                : `${row.entityType}${row.entityId ? ` ${row.entityId}` : ''}`}
-                            </span>
+                            {row.entityType === null ? (
+                              <span className="text-muted-foreground text-sm">—</span>
+                            ) : (
+                              <span
+                                className={`inline-block truncate rounded px-1.5 py-0.5 text-xs ${entityTypeBadgeClass(
+                                  row.entityType,
+                                )}`}
+                                data-testid="audit-entity-badge"
+                              >
+                                {row.entityType}
+                                {row.entityId ? ` ${row.entityId}` : ''}
+                              </span>
+                            )}
                           </td>
                         </tr>
                       ))
@@ -426,33 +470,33 @@ export default function Audit(): JSX.Element {
                   </tbody>
                 </table>
               </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground" data-testid="audit-pagination">
-            {t('audit.pageInfo', { page, totalPages })}
-          </span>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              data-testid="audit-prev"
-            >
-              {t('common.previous')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-              data-testid="audit-next"
-            >
-              {t('common.next')}
-            </Button>
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground" data-testid="audit-pagination">
+              {t('audit.pageInfo', { page, totalPages })}
+            </span>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                data-testid="audit-prev"
+              >
+                {t('common.previous')}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+                data-testid="audit-next"
+              >
+                {t('common.next')}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -463,7 +507,7 @@ export default function Audit(): JSX.Element {
           if (!v) setDetail(null);
         }}
       >
-        <DialogContent className="max-w-2xl" data-testid="audit-detail-dialog">
+        <DialogContent className="max-w-3xl" data-testid="audit-detail-dialog">
           <DialogHeader>
             <DialogTitle>{t('audit.detailDialogTitle')}</DialogTitle>
             <DialogDescription>
@@ -488,7 +532,15 @@ export default function Audit(): JSX.Element {
                   {detail.entityId ?? '—'}
                 </dd>
                 <dt className="text-muted-foreground">{t('audit.detailOutcome')}</dt>
-                <dd className="font-mono text-xs">{detail.outcome}</dd>
+                <dd className="font-mono text-xs">
+                  <span
+                    className={`inline-block rounded px-1.5 py-0.5 text-xs ${outcomeBadgeClass(
+                      detail.outcome,
+                    )}`}
+                  >
+                    {detail.outcome}
+                  </span>
+                </dd>
                 <dt className="text-muted-foreground">{t('audit.detailTime')}</dt>
                 <dd className="font-mono text-xs">
                   {new Date(detail.createdAt).toISOString()}

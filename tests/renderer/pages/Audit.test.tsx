@@ -225,4 +225,123 @@ describe('Audit page', () => {
     expect(dateFrom.value).toBe('');
     expect(actionInput.value).toBe('');
   });
+
+  // Phase 7 / quick 20260811-audit-ui-polish — IPC handler mapping
+  // regression coverage. The renderer mocks the IPC boundary, so the
+  // tests below feed the renderer the post-mapping shape the IPC
+  // handler now produces (camelCase + parsed metadata Record). The
+  // IPC handler's actual mapping is covered separately in
+  // tests/main/ipc/audit.test.ts via the handler map. Together, they
+  // prove (a) the handler maps snake_case DB rows → camelCase
+  // AuditEntry, and (b) the renderer handles the post-mapping shape
+  // correctly.
+  it('post-mapping shape: row renders HH:MM:SS + Dr. Karim + entity "user <uuid>" (no NaN, no fallback user)', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({
+      rows: [
+        {
+          ...ROW,
+          // metadata: parsed Record (what the IPC handler produces from
+          // the raw JSON-encoded string in audit_log.metadata).
+          metadata: { ip: '127.0.0.1', method: 'pin' },
+        },
+      ],
+      total: 1,
+    });
+    await renderAudit();
+    await waitFor(() => expect(screen.getAllByTestId('audit-row')).toHaveLength(1));
+    const renderedRow = screen.getByTestId('audit-row');
+    // Time formats HH:MM:SS — NOT "NaN:NaN:NaN" (pre-fix symptom when
+    // the renderer saw `row.createdAt` as `undefined`).
+    expect(renderedRow.textContent).toMatch(/\d{2}:\d{2}:\d{2}/);
+    expect(renderedRow.textContent).not.toContain('NaN');
+    // User column resolves to Dr. Karim — NOT the current user's name
+    // (pre-fix fallback when `row.userId` was undefined).
+    expect(renderedRow.textContent).toContain('Dr. Karim');
+    expect(renderedRow.textContent).not.toContain(ADMIN_USER.fullName);
+    // Entity column shows entity_type + entity_id (NOT "undefined undefined").
+    expect(renderedRow.textContent).toContain('user');
+    expect(renderedRow.textContent).toContain(OTHER_USER.id);
+  });
+
+  it('post-mapping shape: detail dialog renders pretty-printed JSON metadata', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({
+      rows: [
+        {
+          ...ROW,
+          metadata: { ip: '127.0.0.1', method: 'pin' },
+        },
+      ],
+      total: 1,
+    });
+    await renderAudit();
+    await waitFor(() => expect(screen.getAllByTestId('audit-row')).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('audit-row'));
+    const pre = await screen.findByTestId('audit-detail-metadata');
+    // Pretty-printed JSON — multi-line indented format. The pre-fix
+    // symptom was a single escaped string `'{"ip":"127.0.0.1"}'` with
+    // backslash-escaped quotes; JSON.stringify on a Record produces
+    // pretty-printed keys without the escape backslashes.
+    expect(pre.textContent).toContain('"ip"');
+    expect(pre.textContent).toContain('127.0.0.1');
+    expect(pre.textContent).toContain('"method"');
+    expect(pre.textContent).not.toMatch(/\\"/);
+  });
+
+  it('post-mapping shape: defensive _parseError fallback renders without crashing', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({
+      rows: [
+        {
+          ...ROW,
+          // metadata: the defensive fallback shape the IPC handler
+          // produces when JSON.parse fails on a corrupt row.
+          metadata: { _parseError: true, _raw: 'not-valid-json' },
+        },
+      ],
+      total: 1,
+    });
+    await renderAudit();
+    await waitFor(() => expect(screen.getAllByTestId('audit-row')).toHaveLength(1));
+    // Click the row — dialog must open without throwing.
+    fireEvent.click(screen.getByTestId('audit-row'));
+    const dialog = await screen.findByTestId('audit-detail-dialog');
+    expect(dialog).toBeInTheDocument();
+    // The defensive fallback surfaces the raw string + the parseError
+    // flag so the operator can see the row is corrupt.
+    const pre = screen.getByTestId('audit-detail-metadata');
+    expect(pre.textContent).toContain('not-valid-json');
+    expect(pre.textContent).toContain('_parseError');
+  });
+
+  it('post-mapping shape: unknown outcome values are coerced to "ok" by the IPC handler', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({
+      rows: [
+        {
+          ...ROW,
+          // outcome: the post-coercion shape the IPC handler produces
+          // (the raw "something-weird" never reaches the renderer).
+          outcome: 'ok',
+        },
+      ],
+      total: 1,
+    });
+    await renderAudit();
+    await waitFor(() => expect(screen.getAllByTestId('audit-row')).toHaveLength(1));
+    fireEvent.click(screen.getByTestId('audit-row'));
+    const dialog = await screen.findByTestId('audit-detail-dialog');
+    expect(dialog.textContent).toContain('ok');
+  });
+
+  it('mounts <SettingsSidebar /> with activeTab="audit" (data-active="true" on the Audit button)', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({ rows: [ROW], total: 1 });
+    await renderAudit();
+    await waitFor(() => expect(api.audit.list).toHaveBeenCalled());
+    const auditButton = screen.getByTestId('settings-hub-audit');
+    expect(auditButton).toBeInTheDocument();
+    expect(auditButton.getAttribute('data-active')).toBe('true');
+  });
 });

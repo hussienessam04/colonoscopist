@@ -9,7 +9,8 @@
 
 import { ipcMain } from 'electron';
 import { IPC } from '@shared/ipc-contract';
-import { auditRepo } from '../db/audit';
+import type { AuditEntry } from '@shared/ipc-contract';
+import { auditRepo, type AuditListRow } from '../db/audit';
 import { auditFilterInput, auditLogInput } from '@shared/validators';
 import { session } from '../auth/session';
 import { IpcErrorException, ipcError } from '@shared/errors';
@@ -43,10 +44,46 @@ function safeParse<T>(schema: z.ZodType<T>, raw: unknown, fallbackField?: string
   }
 }
 
+// ponytail: map snake_case DB rows → camelCase IPC contract.
+// The audit_log table stores metadata as a JSON-encoded TEXT column
+// (nullable). Parse defensively — a corrupt row should NOT crash the
+// handler; fall back to the raw string with an `_parseError` flag so
+// the UI can surface "this row has malformed metadata" instead of the
+// whole audit page failing to load.
+function toAuditEntry(row: AuditListRow): AuditEntry {
+  let metadata: Record<string, unknown> | null = null;
+  if (row.metadata !== null) {
+    try {
+      const parsed: unknown = JSON.parse(row.metadata);
+      metadata =
+        parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+    } catch {
+      metadata = { _parseError: true, _raw: row.metadata };
+    }
+  }
+  // ponytail: clamp outcome to the contract union — older rows may have
+  // unconstrained strings.
+  const outcome: AuditEntry['outcome'] =
+    row.outcome === 'failed' || row.outcome === 'rate_limited' ? row.outcome : 'ok';
+  return {
+    id: row.id,
+    userId: row.user_id,
+    action: row.action,
+    entityType: row.entity_type,
+    entityId: row.entity_id,
+    metadata,
+    outcome,
+    createdAt: row.created_at,
+  };
+}
+
 export function registerAuditIpc(): void {
   ipcMain.handle(IPC.AUDIT_LIST, (_e, raw) => {
     const filter = auditFilterInput.parse(raw ?? {});
-    return auditRepo.list(filter);
+    const { rows, total } = auditRepo.list(filter);
+    return { rows: rows.map(toAuditEntry), total };
   });
 
   // AUDIT-01 / D-08 — renderer-side "audit-on-every-read" channel.

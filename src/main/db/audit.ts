@@ -19,6 +19,7 @@ export type AuditListInput = {
   to?: number;
   action?: string;
   userId?: string;
+  entityType?: string;
   page?: number;
   pageSize?: number;
 };
@@ -55,6 +56,7 @@ function stmts() {
          AND (@to IS NULL OR created_at <= @to)
          AND (@action IS NULL OR action = @action)
          AND (@userId IS NULL OR user_id = @userId)
+         AND (@entityType IS NULL OR entity_type = @entityType)
        ORDER BY created_at DESC, id DESC
        LIMIT @limit OFFSET @offset`,
     ),
@@ -64,7 +66,8 @@ function stmts() {
        WHERE (@from IS NULL OR created_at >= @from)
          AND (@to IS NULL OR created_at <= @to)
          AND (@action IS NULL OR action = @action)
-         AND (@userId IS NULL OR user_id = @userId)`,
+         AND (@userId IS NULL OR user_id = @userId)
+         AND (@entityType IS NULL OR entity_type = @entityType)`,
     ),
   };
   return cached;
@@ -125,6 +128,7 @@ export const auditRepo = {
       to: filter.to ?? null,
       action: filter.action ?? null,
       userId: filter.userId ?? null,
+      entityType: filter.entityType ?? null,
       limit,
       offset,
     }) as AuditListRow[];
@@ -133,6 +137,7 @@ export const auditRepo = {
       to: filter.to ?? null,
       action: filter.action ?? null,
       userId: filter.userId ?? null,
+      entityType: filter.entityType ?? null,
     }) as { c: number }).c;
     return { rows, total };
   },

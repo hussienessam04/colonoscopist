@@ -208,3 +208,105 @@ describe('audit:log IPC', () => {
     expect(wrapped.ipcError?.field).toBe('action');
   });
 });
+
+// Phase 7 / quick 20260811-audit-ui-polish — AUDIT_LIST handler must
+// (a) map snake_case DB rows → camelCase AuditEntry, (b) parse the
+// metadata JSON string defensively, (c) coerce unknown outcome values
+// to the contract union, and (d) honour the entityType filter at the
+// SQL layer. Pre-fix, the handler returned raw AuditListRow[] — the
+// renderer saw `row.createdAt === undefined` and produced "NaN:NaN:NaN".
+describe('audit:list IPC handler mapping', () => {
+  it('maps snake_case DB rows → camelCase AuditEntry (Bug 1)', async () => {
+    await bootstrapAndLogin();
+    const { registerAuditIpc } = await import('../../../src/main/ipc/audit');
+    registerAuditIpc();
+    const handler = handlers.get('audit:list');
+    expect(handler).toBeDefined();
+
+    const result = (await handler!({}, {})) as {
+      rows: Array<Record<string, unknown>>;
+      total: number;
+    };
+    expect(result.total).toBeGreaterThan(0);
+    // Every row carries the camelCase contract keys.
+    for (const row of result.rows) {
+      expect(row).toHaveProperty('userId');
+      expect(row).toHaveProperty('entityType');
+      expect(row).toHaveProperty('entityId');
+      expect(row).toHaveProperty('createdAt');
+      // Snake_case keys must NOT leak past the IPC boundary.
+      expect(row).not.toHaveProperty('user_id');
+      expect(row).not.toHaveProperty('entity_type');
+      expect(row).not.toHaveProperty('entity_id');
+      expect(row).not.toHaveProperty('created_at');
+    }
+  });
+
+  it('parses metadata JSON string → Record (defensive fallback on malformed)', async () => {
+    await bootstrapAndLogin();
+    const { getDb } = await import('../../../src/main/db');
+    const { registerAuditIpc } = await import('../../../src/main/ipc/audit');
+    // Append a row with malformed metadata directly via raw SQL — the
+    // public auditRepo.append() would reject this, but we want to
+    // verify the IPC handler survives corrupt rows.
+    getDb()
+      .prepare(
+        `INSERT INTO audit_log (user_id, action, entity_type, entity_id, metadata, outcome, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(null, 'corrupt.row', 'audit', null, 'not-valid-json', 'ok', Date.now());
+    registerAuditIpc();
+    const handler = handlers.get('audit:list');
+    expect(handler).toBeDefined();
+
+    const result = (await handler!({}, {})) as {
+      rows: Array<{ action: string; metadata: unknown }>;
+      total: number;
+    };
+    const corrupt = result.rows.find((row) => row.action === 'corrupt.row');
+    expect(corrupt).toBeDefined();
+    // Defensive fallback — the row didn't crash the handler.
+    expect(corrupt?.metadata).toEqual({ _parseError: true, _raw: 'not-valid-json' });
+  });
+
+  it('coerces unknown outcome values to "ok"', async () => {
+    await bootstrapAndLogin();
+    const { getDb } = await import('../../../src/main/db');
+    const { registerAuditIpc } = await import('../../../src/main/ipc/audit');
+    getDb()
+      .prepare(
+        `INSERT INTO audit_log (user_id, action, entity_type, entity_id, metadata, outcome, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(null, 'legacy.row', 'audit', null, null, 'something-weird', Date.now());
+    registerAuditIpc();
+    const handler = handlers.get('audit:list');
+    expect(handler).toBeDefined();
+
+    const result = (await handler!({}, {})) as {
+      rows: Array<{ action: string; outcome: string }>;
+      total: number;
+    };
+    const legacy = result.rows.find((row) => row.action === 'legacy.row');
+    expect(legacy).toBeDefined();
+    expect(legacy?.outcome).toBe('ok');
+  });
+
+  it('honours the entityType filter (Bug 3)', async () => {
+    await bootstrapAndLogin();
+    const { registerAuditIpc } = await import('../../../src/main/ipc/audit');
+    registerAuditIpc();
+    const handler = handlers.get('audit:list');
+    expect(handler).toBeDefined();
+
+    // The wizard bootstrap writes auth.* rows with entityType=audit.
+    // Filter for only those rows — the handler must forward the filter
+    // into auditRepo.list, narrowing both rows and total.
+    const filtered = (await handler!({}, { entityType: 'audit' })) as {
+      rows: Array<{ entityType: string }>;
+      total: number;
+    };
+    expect(filtered.total).toBe(filtered.rows.length);
+    expect(filtered.rows.every((row) => row.entityType === 'audit')).toBe(true);
+  });
+});

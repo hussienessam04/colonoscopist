@@ -175,6 +175,7 @@
     "detailCopyJson": "Copy JSON",
     "copySuccess": "Copied to clipboard",
     "tooManyHint": "Showing first {{shown}} of {{total}} — refine by date or user to narrow.",
+    "errorTitle": "Failed to load audit log",
     "entityTypes": {
       "user": "user",
       "patient": "patient",

@@ -41,6 +41,7 @@ export const auditFilterInput = z.object({
   to: z.number().int().nonnegative().optional(),
   action: z.string().min(1).max(120).optional(),
   userId: z.string().uuid().optional(),
+  entityType: z.string().min(1).max(60).optional(),
   page: z.number().int().positive().optional(),
   pageSize: z.number().int().positive().max(200).optional(),
 });
