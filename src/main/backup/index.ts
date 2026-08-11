@@ -9,8 +9,14 @@
 // We use archiver (NOT in-memory zip libraries like adm-zip) — clinic-scale
 // media can exceed the main process heap; archiver streams the zip entry-by-
 // entry instead of buffering the whole archive in memory.
+//
+// ponytail: archiver v8 is pure ESM (`"type": "module"`, `exports: "./index.js"`).
+// electron-vite compiles main to CJS, so a top-level `import { ZipArchive }
+// from 'archiver'` would compile to `require('archiver')` and crash at runtime
+// with `ERR_REQUIRE_ESM`. The dynamic `await import('archiver')` below is the
+// supported interop shape — Node's CJS loader can dynamically load an ESM
+// module, just not statically.
 
-import { ZipArchive } from 'archiver';
 import { createWriteStream, existsSync, statSync, unlinkSync } from 'node:fs';
 import { unlink } from 'node:fs/promises';
 
@@ -37,11 +43,18 @@ export async function createBackup(opts: {
   // the source data folder) so the source folder is never modified.
   const tempDbPath = `${opts.destZipPath}.db.tmp`;
 
+  // ponytail: dynamic ESM import — archiver v8 is pure ESM, and the compiled
+  // CJS main module cannot statically `require()` it. This is the only
+  // interop shape that works in both Electron's runtime and the vitest test
+  // environment (vitest's `await import('../../../src/main/backup')` already
+  // uses dynamic import, so the nested `await import('archiver')` chains
+  // cleanly through).
+  const { ZipArchive } = await import('archiver');
+
   // Per D-10 step 3 — stream the zip.
   const output = createWriteStream(opts.destZipPath);
-  // ponytail: archiver v8 is pure ESM — `ZipArchive` is the named export.
-  // It extends `Archiver` and pre-binds the zip plugin + directory/symlink
-  // support. Construction wires up the internal module pipe.
+  // ZipArchive extends Archiver and pre-binds the zip plugin + directory/
+  // symlink support. Construction wires up the internal module pipe.
   const archive = new ZipArchive({ zlib: { level: 6 } });
 
   // ponytail: capture errors so we can reject + clean up the temp file.
