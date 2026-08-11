@@ -22,6 +22,8 @@
     "test:unit": "node scripts/run-vitest.cjs",
     "test:integration:smoke": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
     "test:integration:smoke:optin": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
+    "test:integration:smoke:phase7": "node scripts/run-vitest.cjs --run tests/integration/backup-restore-roundtrip.test.ts tests/integration/ar-pdf-magic.test.ts",
+    "test:e2e": "playwright test",
     "_integration_smoke_note": "The trim-smoke test is opt-in via RUN_SMOKE=1. Default runs skip; CI runs with RUN_SMOKE=1 npm run test:integration:smoke:optin (or set RUN_SMOKE in the CI env).",
     "postinstall": "node node_modules/electron/install.js && electron-rebuild && node scripts/fix-electron-path.cjs"
   },
@@ -60,6 +62,7 @@
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
+    "@playwright/test": "^1.50.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
