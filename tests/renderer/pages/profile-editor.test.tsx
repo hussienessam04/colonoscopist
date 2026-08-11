@@ -5,7 +5,7 @@
 // The upload widgets read via FileReader, sniff PNG/JPEG magic bytes
 // client-side, then call api.profile.uploadSignature/uploadLogo.
 
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { getApi } from '../setup';
 import { setRoute, initialRoute } from '@/lib/router';
@@ -311,5 +311,82 @@ describe('ProfileEditor', () => {
     // default).
     expect(en.checked).toBe(true);
     expect(ar.checked).toBe(false);
+  });
+
+  // Quick task 20260811-profile-sidebar-and-lang — Bug 1: ProfileEditor
+  // is the only Settings page without a left-rail <SettingsSidebar />.
+  // The fix mounts the sidebar with activeTab="profile"; the existing
+  // Audit/Backup sidebar mount tests use data-active="true" as the
+  // assertion seam. ProfileEditor follows the same pattern.
+  it('SettingsSidebar mounts with activeTab="profile" (profile button active, others inactive)', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue(PROFILE);
+    await renderProfileEditor();
+    // All five sidebar entries surface — capture, profile, audit,
+    // backup-restore, users. The profile button is the only one with
+    // data-active="true".
+    const capture = await screen.findByTestId('settings-hub-capture');
+    const profile = await screen.findByTestId('settings-hub-profile');
+    const audit = await screen.findByTestId('settings-hub-audit');
+    const backupRestore = await screen.findByTestId('settings-hub-backup-restore');
+    const users = await screen.findByTestId('settings-hub-users');
+    expect(capture).toBeInTheDocument();
+    expect(profile).toBeInTheDocument();
+    expect(audit).toBeInTheDocument();
+    expect(backupRestore).toBeInTheDocument();
+    expect(users).toBeInTheDocument();
+    expect(profile.getAttribute('data-active')).toBe('true');
+    expect(capture.getAttribute('data-active')).toBe('false');
+    expect(audit.getAttribute('data-active')).toBe('false');
+    expect(backupRestore.getAttribute('data-active')).toBe('false');
+    expect(users.getAttribute('data-active')).toBe('false');
+  });
+
+  // Quick task 20260811-profile-sidebar-and-lang — Bug 2: ProfileEditor's
+  // handleLanguageChange used to write the language to DB + emit an
+  // audit row but never called i18n.changeLanguage(), so the toast
+  // said "Language updated" while the UI stayed English and <html dir>
+  // stayed ltr. The fix mirrors Wizard.tsx's i18n.changeLanguage call;
+  // <LanguageApplier /> in main.tsx picks up the change and flips the
+  // document direction via useLanguage's useEffect on i18n.language.
+  //
+  // ponytail: tests bypass main.tsx so <LanguageApplier /> is NOT
+  // mounted — there is no useEffect consumer for document.dir to fire
+  // in the test. The internal-call shape (i18n.changeLanguage called
+  // with 'ar') is the right assertion seam: it's exactly what the
+  // missing call site looked like before the fix. In production the
+  // LanguageApplier is mounted at main.tsx and consumes the change.
+  it('clicking AR radio calls i18n.changeLanguage("ar") (the missing call that fixed Bug 2)', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue(PROFILE);
+    api.profile.update.mockImplementation(async (input) => ({
+      ...PROFILE,
+      ...input,
+    }));
+    // Spy on the global i18n instance so we can assert the renderer
+    // actually flipped it. We import lazily so the spy is installed
+    // after i18n.init from tests/renderer/setup.ts has run.
+    const { default: i18n } = await import('@/i18n');
+    const spy = vi.spyOn(i18n, 'changeLanguage');
+    try {
+      await renderProfileEditor();
+      const ar = await screen.findByTestId('profile-editor-language-ar');
+      fireEvent.click(ar);
+      await waitFor(
+        () => {
+          expect(spy).toHaveBeenCalledWith('ar');
+        },
+        { timeout: 1500 },
+      );
+      // DB write also fires (sanity — the i18n flip is independent of
+      // the audit row but the handler does both).
+      expect(api.profile.update).toHaveBeenCalled();
+      const updateCall = api.profile.update.mock.calls.at(-1)![0] as {
+        language?: 'en' | 'ar';
+      };
+      expect(updateCall.language).toBe('ar');
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

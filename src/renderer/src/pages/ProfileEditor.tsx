@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SettingsSidebar } from '@/components/SettingsSidebar';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
 import { useRoute } from '@/lib/router';
@@ -82,7 +83,7 @@ export default function ProfileEditor(): JSX.Element {
   // contract. The Language Card's radio labels stay hard-coded
   // ("English" / "العربية") because those are the language NAMES —
   // translating them would defeat the purpose of the picker.
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   // ponytail: per-field auto-save state. We hold one useAutoSave per
   // field so the "Saving…" indicator tracks the just-blurred field.
@@ -168,6 +169,14 @@ export default function ProfileEditor(): JSX.Element {
             metadata: { from, to: newLang, scope: 'profile' },
           }),
         ]);
+        // ponytail: flip the renderer's i18n instance so the
+        // <LanguageApplier /> at main.tsx (useLanguage's useEffect on
+        // i18n.language) mutates <html dir> + <html lang> and every
+        // useTranslation() consumer re-renders with the AR bundle. The
+        // DB write fires first; if it throws, the catch block fires
+        // toast.error and we skip the flip — UI stays consistent with
+        // the persisted state.
+        await i18n.changeLanguage(newLang);
         void refresh();
         toast.success(
           newLang === 'ar'
@@ -179,7 +188,7 @@ export default function ProfileEditor(): JSX.Element {
         toast.error(msg);
       }
     },
-    [profile, refresh, t],
+    [profile, refresh, t, i18n],
   );
 
   // The signature + logo hidden file inputs.
@@ -316,8 +325,10 @@ export default function ProfileEditor(): JSX.Element {
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto flex max-w-3xl flex-col gap-4">
-        <header className="flex items-center justify-between">
+      <div className="mx-auto grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+        <SettingsSidebar activeTab="profile" />
+        <div className="flex flex-col gap-4">
+          <header className="flex items-center justify-between">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
               {t('profile.pageKicker')}
@@ -542,6 +553,7 @@ export default function ProfileEditor(): JSX.Element {
             </div>
           </CardContent>
         </Card>
+        </div>
       </div>
     </main>
   );
