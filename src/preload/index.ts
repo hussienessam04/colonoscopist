@@ -140,13 +140,21 @@ const api: IpcContract = {
   // filesystem writes; the renderer is sandboxed (Phase 1 security
   // baseline) so it cannot pass arbitrary native paths beyond what the
   // user picks via Electron's dialog.showSaveDialog in Plan 07-05.
+  //
+  // Phase 7 / Plan 07-05 — D-11 / D-13 verbatim: pickDestination +
+  // pickZip + revealStaging are the only legitimate way for the
+  // renderer to obtain absolute paths that reach the create/preview/
+  // unpack handlers. The renderer never composes paths itself.
   backup: {
     create: (input) => ipcRenderer.invoke(IPC.BACKUP_CREATE, input),
     reveal: (input) => ipcRenderer.invoke(IPC.BACKUP_REVEAL, input),
+    pickDestination: () => ipcRenderer.invoke(IPC.BACKUP_PICK_DESTINATION),
   },
   restore: {
     preview: (input) => ipcRenderer.invoke(IPC.RESTORE_PREVIEW, input),
     unpack: (input) => ipcRenderer.invoke(IPC.RESTORE_UNPACK, input),
+    pickZip: () => ipcRenderer.invoke(IPC.RESTORE_PICK_ZIP),
+    revealStaging: (input) => ipcRenderer.invoke(IPC.RESTORE_REVEAL_STAGING, input),
   },
 };
 

@@ -12,10 +12,16 @@
 // BACKUP_REVEAL: invokes `revealBackup(path)` which delegates to
 // `shell.showItemInFolder`. No audit row (read-only highlight).
 //
+// BACKUP_PICK_DESTINATION: Phase 7 / Plan 07-05 — D-11 verbatim. Wraps
+// Electron's `dialog.showSaveDialog` with a pre-filled filename of
+// `colonoscopist-backup-<timestamp>.zip`. The renderer never builds
+// absolute paths; this channel is the only legitimate source of a
+// `destPath` value that flows into BACKUP_CREATE.
+//
 // Per Phase 2 BLOCKER 4, no payload includes a `userId` field — main
 // derives it from `requireSession()` for the audit row.
 
-import { ipcMain } from 'electron';
+import { dialog, ipcMain } from 'electron';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -23,6 +29,7 @@ import { IPC } from '@shared/ipc-contract';
 import {
   backupCreateInput,
   backupRevealInput,
+  pickDestinationInput,
 } from '@shared/validators';
 import { IpcErrorException, ipcError } from '@shared/errors';
 
@@ -114,5 +121,26 @@ export function registerBackupIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
+  });
+
+  // Phase 7 / Plan 07-05 — D-11 verbatim dialog.showSaveDialog wrapper.
+  // Pre-fills the suggested filename with a UTC timestamp suffix so
+  // doctors don't have to edit the dialog manually. The picker returns
+  // null when the user cancels — the renderer short-circuits without
+  // invoking BACKUP_CREATE. No audit row for the picker itself (it's
+  // a UI-only action; the CREATE call writes the audit trail).
+  ipcMain.handle(IPC.BACKUP_PICK_DESTINATION, async (_e, raw) => {
+    requireSession();
+    safeParse(pickDestinationInput, raw);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const result = await dialog.showSaveDialog({
+      title: 'Create backup',
+      defaultPath: `colonoscopist-backup-${timestamp}.zip`,
+      filters: [{ name: 'Zip', extensions: ['zip'] }],
+    });
+    if (result.canceled || !result.filePath) {
+      return null;
+    }
+    return result.filePath;
   });
 }

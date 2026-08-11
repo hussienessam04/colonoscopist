@@ -22,6 +22,11 @@ import ReportEditor from './pages/ReportEditor';
 // was added in Plan 07-02 so the SettingsSidebar's navigate() call
 // compiles.
 import Audit from './pages/Audit';
+// Phase 7 / Plan 07-05 — SET-05 + SET-06: Backup & Restore page
+// (Route.backup-restore). Same Story as Audit — the route variant
+// landed in Plan 07-02; the page body lands here. Two side-by-side
+// Cards per UI-SPEC §Implementation Bindings Backup & Restore layout.
+import BackupRestore from './pages/BackupRestore';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -96,6 +101,8 @@ export default function App(): JSX.Element {
       return <ReportEditor procedureId={route.procedureId} reportId={route.reportId} />;
     case 'audit':
       return <Audit />;
+    case 'backup-restore':
+      return <BackupRestore />;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit

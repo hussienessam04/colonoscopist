@@ -113,6 +113,22 @@ export const IPC = {
   BACKUP_REVEAL: 'backup:reveal',
   RESTORE_PREVIEW: 'restore:preview',
   RESTORE_UNPACK: 'restore:unpack',
+  // Phase 7 / Plan 07-05 — D-11 verbatim: Backup button invokes
+  // `dialog.showSaveDialog` (per RESEARCH.md Pattern 3) → calls
+  // BACKUP_CREATE. Plan 07-05 adds BACKUP_PICK_DESTINATION so the
+  // renderer never constructs absolute paths directly; the only
+  // legitimate path comes from Electron's file picker. Returns null
+  // when the user cancels the dialog.
+  BACKUP_PICK_DESTINATION: 'backup:pick-destination',
+  // Phase 7 / Plan 07-05 — D-13 verbatim: Restore flow = (1) pick zip
+  // → (2) preview → (3) explicit Restore. The picker wraps
+  // `dialog.showOpenDialog({properties:['openFile'], filters:[zip]})`.
+  RESTORE_PICK_ZIP: 'restore:pick-zip',
+  // Phase 7 / Plan 07-05 — Reveal the staging directory in the OS
+  // file manager (NOT a specific file). Wraps `shell.openPath(staging)`
+  // so the doctor can inspect a freshly-staged backup without
+  // picking any other path.
+  RESTORE_REVEAL_STAGING: 'restore:reveal-staging',
   AUDIT_LOG: 'audit:log',
 } as const;
 
@@ -574,6 +590,11 @@ export interface IpcContract {
   // byte-identical before and after the operation (D-13..D-16). Per
   // Phase 2 BLOCKER 4, the renderer never supplies a doctorId — main
   // derives it from `requireSession()` for the audit row.
+  //
+  // Phase 7 / Plan 07-05 — D-11 / D-13: the renderer never builds
+  // absolute paths; the picker channel wraps Electron's
+  // dialog.showSaveDialog/showOpenDialog so the path the user picks
+  // is the only path that ever reaches create/preview/unpack.
   backup: {
     create: (input: { destPath: string }) => Promise<{
       path: string;
@@ -581,6 +602,7 @@ export interface IpcContract {
       procedureCount: number;
     }>;
     reveal: (input: { path: string }) => Promise<{ ok: true }>;
+    pickDestination: () => Promise<string | null>;
   };
   restore: {
     preview: (input: { zipPath: string; stagingDir: string }) => Promise<RestorePreview>;
@@ -588,6 +610,8 @@ export interface IpcContract {
       fileCount: number;
       stagingDir: string;
     }>;
+    pickZip: () => Promise<string | null>;
+    revealStaging: (input: { stagingDir: string }) => Promise<{ ok: true }>;
   };
   // Phase 7 / Plan 07-01 — Audit log write channel (AUDIT-01). The
   // renderer can write audit rows for "audit-on-every-read" patterns

@@ -113,6 +113,22 @@ type MockApi = {
     reorderScreenshots: ReturnType<typeof vi.fn>;
     listScreenshots: ReturnType<typeof vi.fn>;
   };
+  // Phase 7 / Plan 07-05 — backup + restore namespaces. The default
+  // mocks resolve to safe empty values so any test that mounts the
+  // BackupRestore page without per-test seeding doesn't crash. Tests
+  // that exercise specific branches seed `mockResolvedValue`
+  // per-test.
+  backup: {
+    create: ReturnType<typeof vi.fn>;
+    reveal: ReturnType<typeof vi.fn>;
+    pickDestination: ReturnType<typeof vi.fn>;
+  };
+  restore: {
+    preview: ReturnType<typeof vi.fn>;
+    unpack: ReturnType<typeof vi.fn>;
+    pickZip: ReturnType<typeof vi.fn>;
+    revealStaging: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -213,6 +229,22 @@ export function mockApi(): MockApi {
       detachScreenshot: vi.fn().mockResolvedValue({ ok: true }),
       reorderScreenshots: vi.fn().mockResolvedValue({ ok: true }),
       listScreenshots: vi.fn().mockResolvedValue([]),
+    },
+    // Phase 7 / Plan 07-05 — BackupRestore page tests mock
+    // pickDestination / pickZip to drive the file-picker branches;
+    // create / preview / unpack reject when called without seeding so
+    // accidental flows surface. reveal / revealStaging resolve to
+    // { ok: true } (no-op reveal) so the success toast path is reachable.
+    backup: {
+      create: vi.fn(),
+      reveal: vi.fn().mockResolvedValue({ ok: true }),
+      pickDestination: vi.fn().mockResolvedValue(null),
+    },
+    restore: {
+      preview: vi.fn(),
+      unpack: vi.fn(),
+      pickZip: vi.fn().mockResolvedValue(null),
+      revealStaging: vi.fn().mockResolvedValue({ ok: true }),
     },
   };
   (window as unknown as { api: MockApi }).api = api;

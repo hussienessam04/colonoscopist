@@ -371,11 +371,35 @@ export const restoreUnpackInput = z
   })
   .strict();
 
+// Phase 7 / Plan 07-05 — D-11 verbatim: backup.pickDestination and
+// restore.pickZip take NO payload (they wrap Electron's dialog
+// pickers). The handlers return either an absolute path or null when
+// the user cancels. Empty-object .strict() so any future renderer drift
+// (e.g. adding a typed field) fails the IPC_VALIDATION gate up-front
+// instead of crashing the handler.
+export const pickDestinationInput = z.object({}).strict();
+export const pickZipInput = z.object({}).strict();
+
+// Phase 7 / Plan 07-05 — restore.revealStaging: the renderer sends the
+// staging directory (which the renderer itself composed as
+// `data-restore-<timestamp>`). main resolves it to the userData-rooted
+// absolute path via `restoreStagingDir(timestamp)`; the renderer's
+// literal `data-restore-<timestamp>` string is forwarded for the
+// shell.openPath call only (no zip-write paths feed from this).
+export const restoreRevealStagingInput = z
+  .object({
+    stagingDir: z.string().min(1).max(2000),
+  })
+  .strict();
+
 export type AuditLogInput = z.infer<typeof auditLogInput>;
 export type BackupCreateInput = z.infer<typeof backupCreateInput>;
 export type BackupRevealInput = z.infer<typeof backupRevealInput>;
 export type RestorePreviewInput = z.infer<typeof restorePreviewInput>;
 export type RestoreUnpackInput = z.infer<typeof restoreUnpackInput>;
+export type PickDestinationInput = z.infer<typeof pickDestinationInput>;
+export type PickZipInput = z.infer<typeof pickZipInput>;
+export type RestoreRevealStagingInput = z.infer<typeof restoreRevealStagingInput>;
 
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);
