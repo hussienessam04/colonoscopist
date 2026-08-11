@@ -201,15 +201,15 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 07-01-PLAN.md — Tracer: Migration 0007 (users.language + doctor_profile.language) + src/main/backup/{snapshot,index,restore}.ts (archiver zip + yauzl unpack + PRAGMA integrity_check) + 3 shadcn primitives install (popover, tooltip, slider) + IPC contract extensions (backup.* + restore.* + audit.log) + profile.update(extends language) + wizard bootstrap(extends language) + users.create(extends language); full real archiver round-trip + yauzl entry-path filter tests (Wave 1)
+- [x] 07-01-PLAN.md — Tracer: Migration 0007 (users.language + doctor_profile.language) + src/main/backup/{snapshot,index,restore}.ts (archiver zip + yauzl unpack + PRAGMA integrity_check) + 3 shadcn primitives install (popover, tooltip, slider) + IPC contract extensions (backup.* + restore.* + audit.log) + profile.update(extends language) + wizard bootstrap(extends language) + users.create(extends language); full real archiver round-trip + yauzl entry-path filter tests (Wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-02-PLAN.md — Patient List filter sidebar (name + MRN + date range + doctor + procedure status, AND-combined) + PatientRow accordion expansion (procedure row → procedure-review, report row → reports.openPdf) + SettingsSidebar visual entries for Audit + Backup & Restore (Wave 2, depends_on: 07-01)
+- [x] 07-02-PLAN.md — Patient List filter sidebar (name + MRN + date range + doctor + procedure status, AND-combined) + PatientRow accordion expansion (procedure row → procedure-review, report row → reports.openPdf) + SettingsSidebar visual entries for Audit + Backup & Restore (Wave 2, depends_on: 07-01)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-03-PLAN.md — Audit page (compact one-line rows, 100/page, filter bar, detail Dialog) + audit_view self-audit emit on mount (debounced 1s) + useAudit SWR-style hook + ProfileEditor language picker Card (EN/AR radio → doctor_profile.language, emits language.changed audit row) (Wave 3, depends_on: 07-01)
+- [x] 07-03-PLAN.md — Audit page (compact one-line rows, 100/page, filter bar, detail Dialog) + audit_view self-audit emit on mount (debounced 1s) + useAudit SWR-style hook + ProfileEditor language picker Card (EN/AR radio → doctor_profile.language, emits language.changed audit row) (Wave 3, depends_on: 07-01)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
