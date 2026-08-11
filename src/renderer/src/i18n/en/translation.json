@@ -355,7 +355,10 @@
     "warningActiveProcedure": "For best results, close any active procedure before backing up. You can override and continue.",
     "warningIntegrityFailed": "This backup failed integrity check. Do not activate. Try a different backup.",
     "backupConfirmTitle": "Create backup?",
-    "backupConfirmBody": "Backup will be saved to: {{path}}"
+    "backupConfirmBody": "Backup will be saved to: {{path}}",
+    "lastBackup": "Last backup: {{time}}",
+    "lastBackupNever": "No backups yet",
+    "noBackupSelectedYet": "No backup selected yet"
   },
   "settings": {
     "hubTitle": "Settings",

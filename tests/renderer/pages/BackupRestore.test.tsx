@@ -302,4 +302,229 @@ describe('BackupRestore page', () => {
   });
 });
 
+// quick 20260811-backup-restore-tests-polish — 9 new cases covering the
+// cancel/error/edge paths that the original 8 cases skipped.
+//
+// ponytail: these tests share the per-test setup + MockApi pattern
+// from the original describe block above. They exercise the same
+// renderPage helper, so the session/auth bootstrap is reused; the
+// distinct cases live in the mockResolvedValue overrides per test.
+describe('BackupRestore polish + edge cases', () => {
+  it('backup cancel via null: pickDestination returns null → no toast + no backup.create + button re-enabled', async () => {
+    const api = getApi();
+    // pickDestination is already null by default in mockApi() but assert
+    // it explicitly for this test's intent.
+    api.backup.pickDestination.mockResolvedValue(null);
+    const user = userEvent.setup();
+    await renderPage();
+    const backupButton = await screen.findByTestId('backup-create');
+    await user.click(backupButton);
+    await waitFor(() => expect(api.backup.pickDestination).toHaveBeenCalledTimes(1));
+    // Give any fire-and-forget async work a chance to settle.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.backup.create).not.toHaveBeenCalled();
+    expect(toastMock.success).not.toHaveBeenCalled();
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(backupButton).not.toBeDisabled();
+  });
+
+  it('backup cancel via empty string (defensive): pickDestination returns "" → no toast + no backup.create', async () => {
+    const api = getApi();
+    api.backup.pickDestination.mockResolvedValue('');
+    const user = userEvent.setup();
+    await renderPage();
+    const backupButton = await screen.findByTestId('backup-create');
+    await user.click(backupButton);
+    await waitFor(() => expect(api.backup.pickDestination).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(api.backup.create).not.toHaveBeenCalled();
+    expect(toastMock.success).not.toHaveBeenCalled();
+    expect(toastMock.error).not.toHaveBeenCalled();
+    expect(backupButton).not.toBeDisabled();
+  });
+
+  it('restore cancel: pickZip returns null → click Choose → no preview call + preview button stays disabled', async () => {
+    const api = getApi();
+    api.restore.pickZip.mockResolvedValue(null);
+    const user = userEvent.setup();
+    await renderPage();
+    const choose = await screen.findByTestId('restore-choose');
+    await user.click(choose);
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalledTimes(1));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    // restore-preview remains disabled (no zip picked yet).
+    const preview = screen.getByTestId('restore-preview');
+    expect(preview).toBeDisabled();
+    expect(api.restore.preview).not.toHaveBeenCalled();
+    // Empty-state hint shows because no zip was picked.
+    expect(screen.getByTestId('restore-empty-hint')).toBeInTheDocument();
+  });
+
+  it('restore preview error: preview rejects → toast.error + restore-error Alert + restore-confirm-open stays disabled', async () => {
+    const api = getApi();
+    api.restore.pickZip.mockResolvedValue('C:/Doctor/broken.zip');
+    api.restore.preview.mockRejectedValue(new Error('zip unreadable'));
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalled());
+    await user.click(await screen.findByTestId('restore-preview'));
+    await waitFor(() => expect(api.restore.preview).toHaveBeenCalled());
+    await waitFor(() => expect(toastMock.error).toHaveBeenCalledWith('zip unreadable'));
+    // Restore-error Alert surfaces the failure message inline.
+    const errorAlert = await screen.findByTestId('restore-error');
+    expect(errorAlert.textContent).toContain('zip unreadable');
+    // Preview Dialog never opened (preview state stayed null), so the
+    // restore-confirm-open button doesn't appear in the DOM.
+    expect(screen.queryByTestId('restore-confirm-open')).not.toBeInTheDocument();
+  });
+
+  it('restore unpack error: unpack rejects → toast.error + unpack is the failing call', async () => {
+    const api = getApi();
+    api.restore.pickZip.mockResolvedValue('C:/Doctor/backup.zip');
+    api.restore.preview.mockResolvedValue({
+      filename: 'backup.zip',
+      totalSize: 4096,
+      dbIntegrityCheck: 'ok',
+      procedureCount: 3,
+    });
+    api.restore.unpack.mockRejectedValue(new Error('disk full'));
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalled());
+    await user.click(await screen.findByTestId('restore-preview'));
+    await waitFor(() => expect(api.restore.preview).toHaveBeenCalled());
+    const restoreOpen = await screen.findByTestId('restore-confirm-open');
+    await user.click(restoreOpen);
+    // ConfirmDialog confirm button uses the "Restore to staging" label.
+    const confirmButtons = await screen.findAllByRole('button', { name: /restore to staging/i });
+    await user.click(confirmButtons[confirmButtons.length - 1]);
+    await waitFor(() => expect(api.restore.unpack).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(toastMock.error).toHaveBeenCalledWith(expect.stringMatching(/disk full/i)),
+    );
+    // No staging-complete success toast was fired.
+    expect(toastMock.success).not.toHaveBeenCalled();
+  });
+
+  it('stale preview reset on re-pick: pick → preview → re-pick → preview state cleared (dialog closed)', async () => {
+    const api = getApi();
+    api.restore.pickZip
+      .mockResolvedValueOnce('C:/Doctor/first.zip')
+      .mockResolvedValueOnce('C:/Doctor/second.zip');
+    api.restore.preview.mockResolvedValue({
+      filename: 'first.zip',
+      totalSize: 4096,
+      dbIntegrityCheck: 'ok',
+      procedureCount: 3,
+    });
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalledTimes(1));
+    await user.click(await screen.findByTestId('restore-preview'));
+    await waitFor(() => expect(api.restore.preview).toHaveBeenCalled());
+    // Preview Dialog is open with the integrity line.
+    await screen.findByTestId('preview-integrity');
+    // Close the modal via Escape so the underlying restore-choose button
+    // is reachable — radix-ui Dialog sets pointer-events: none on the
+    // page body when the modal is open. Escape closes the Dialog via
+    // the shadcn Dialog's default behavior.
+    await user.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(screen.queryByTestId('preview-integrity')).not.toBeInTheDocument(),
+    );
+    // Re-pick a different zip → handleChooseBackup resets preview=null
+    // + previewOpen=false + stagingDir is recomposed.
+    await user.click(screen.getByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalledTimes(2));
+    // restore-zip-path now reflects the second pick.
+    const zipPath = await screen.findByTestId('restore-zip-path');
+    expect(zipPath.textContent).toContain('second.zip');
+    // restore-empty-hint is gone (a zip is now picked).
+    expect(screen.queryByTestId('restore-empty-hint')).not.toBeInTheDocument();
+  });
+
+  it('empty data folder: procedureCount: 0 in preview → preview-contents still renders without crashing', async () => {
+    const api = getApi();
+    api.restore.pickZip.mockResolvedValue('C:/Doctor/empty.zip');
+    api.restore.preview.mockResolvedValue({
+      filename: 'empty.zip',
+      totalSize: 4096,
+      dbIntegrityCheck: 'ok',
+      procedureCount: 0,
+    });
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalled());
+    await user.click(await screen.findByTestId('restore-preview'));
+    await waitFor(() => expect(api.restore.preview).toHaveBeenCalled());
+    // The contents row renders with "0 procedures" — no NaN, no crash.
+    const contents = await screen.findByTestId('preview-contents');
+    expect(contents.textContent).toMatch(/0/);
+    // Restore-confirm-open is enabled because integrity passed.
+    const restoreOpen = await screen.findByTestId('restore-confirm-open');
+    expect(restoreOpen).not.toBeDisabled();
+  });
+
+  it('long zip path truncation: zipPath with 200+ chars → restore-zip-path uses truncateTail (renders ellipsis + last 60 chars)', async () => {
+    const api = getApi();
+    const longPath = `C:/Users/${'a'.repeat(180)}/Documents/long-name-backup.zip`;
+    expect(longPath.length).toBeGreaterThan(200);
+    api.restore.pickZip.mockResolvedValue(longPath);
+    const user = userEvent.setup();
+    await renderPage();
+    await user.click(await screen.findByTestId('restore-choose'));
+    await waitFor(() => expect(api.restore.pickZip).toHaveBeenCalled());
+    const zipPathEl = await screen.findByTestId('restore-zip-path');
+    const text = zipPathEl.textContent ?? '';
+    // truncateTail prepends U+2026 (ellipsis) and clips to last 60 chars.
+    expect(text.startsWith('\u2026')).toBe(true);
+    expect(text.length).toBeLessThanOrEqual(60);
+    // The last char of the rendered text is the last char of the input.
+    expect(text.endsWith(longPath.slice(-1))).toBe(true);
+  });
+
+  it('last backup indicator — with row: api.audit.list returns a backup.created row → "Last backup:" string rendered', async () => {
+    const api = getApi();
+    const createdAt = Date.now() - 5 * 60_000; // 5 minutes ago
+    api.audit.list.mockResolvedValue({
+      rows: [
+        {
+          id: 1,
+          userId: null,
+          action: 'backup.created',
+          entityType: 'backup',
+          entityId: 'colonoscopist-backup.zip',
+          metadata: null,
+          outcome: 'ok',
+          createdAt,
+        },
+      ],
+      total: 1,
+    });
+    await renderPage();
+    // The query fires in the useEffect on mount; wait for the audit.list
+    // call + the indicator to render.
+    await waitFor(() => expect(api.audit.list).toHaveBeenCalled());
+    // The call shape is fixed: {action: 'backup.created', pageSize: 1}.
+    const callArgs = api.audit.list.mock.calls[0]?.[0] as { action: string; pageSize: number };
+    expect(callArgs.action).toBe('backup.created');
+    expect(callArgs.pageSize).toBe(1);
+    const indicator = await screen.findByTestId('backup-last-indicator');
+    expect(indicator.textContent ?? '').toMatch(/Last backup:/i);
+  });
+
+  it('last backup indicator — no row: api.audit.list returns empty → "No backups yet" rendered', async () => {
+    const api = getApi();
+    api.audit.list.mockResolvedValue({ rows: [], total: 0 });
+    await renderPage();
+    await waitFor(() => expect(api.audit.list).toHaveBeenCalled());
+    const indicator = await screen.findByTestId('backup-last-indicator');
+    expect(indicator.textContent ?? '').toMatch(/No backups yet/i);
+  });
+});
+
 void vi;

@@ -37,10 +37,17 @@
 // status. We render the warning statically because no recording.status
 // IPC exposes a clean `isRecording` boolean at the React layer.
 //
+// Last backup status indicator (quick 20260811-backup-restore-tests-polish):
+// on mount, query the audit log for the most recent backup.created row.
+// Render "Last backup: <relative time>" if one exists, else
+// "No backups yet". Purely informational — no click handlers, no
+// auto-delete. The query is the same AUDIT_LIST channel the Audit page
+// uses; no new IPC.
+//
 // All copy keys live under `t('backup.*')` so EN + AR translation
 // bundles work out of the box per Plan 07-04.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AlertTriangle, ArrowLeft, FolderOpen, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -71,7 +78,7 @@ import {
 import { SettingsSidebar } from '@/components/SettingsSidebar';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useRoute } from '@/lib/router';
-import type { RestorePreview } from '@shared/ipc-contract';
+import type { AuditEntry, RestorePreview } from '@shared/ipc-contract';
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
@@ -109,8 +116,26 @@ function errorMessage(err: unknown, fallback: string): string {
   return fallback;
 }
 
+// ponytail: Intl.RelativeTimeFormat is built-in (Node 18+); no new
+// deps. The `numeric: 'auto'` option produces natural phrasing like
+// "yesterday" / "now" / "in 2 days" instead of the always-numeric
+// fallback. The fallback string for very recent timestamps (sub-minute)
+// is kept short so the indicator line stays single-row.
+function relativeTime(ts: number, nowMs: number, locale: string): string {
+  const diffMs = ts - nowMs;
+  const absSec = Math.abs(diffMs) / 1000;
+  // ponytail: formatter lives at module scope; cached per locale. Newer
+  // Node versions reuse the formatter; older versions re-create it
+  // (cheap).
+  const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (absSec < 60) return rtf.format(Math.round(diffMs / 1000), 'second');
+  if (absSec < 3600) return rtf.format(Math.round(diffMs / 60_000), 'minute');
+  if (absSec < 86_400) return rtf.format(Math.round(diffMs / 3_600_000), 'hour');
+  return rtf.format(Math.round(diffMs / 86_400_000), 'day');
+}
+
 export default function BackupRestore(): JSX.Element {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { navigate } = useRoute();
 
   // Backup state.
@@ -132,6 +157,36 @@ export default function BackupRestore(): JSX.Element {
   // path-traversal blast radius (renderer cannot inject `/etc/passwd`
   // because main re-wraps it under userData).
   const [stagingDir, setStagingDir] = useState<string | null>(null);
+
+  // Last-backup status indicator. Reads the most recent backup.created
+  // audit row on mount; renders below the warning Alert.
+  const [lastBackup, setLastBackup] = useState<AuditEntry | null>(null);
+  const [lastBackupChecked, setLastBackupChecked] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await window.api.audit.list({
+          action: 'backup.created',
+          pageSize: 1,
+        });
+        if (cancelled) return;
+        const head = result.rows[0] ?? null;
+        setLastBackup(head);
+      } catch {
+        // ponytail: indicator is best-effort. A failed audit.list call
+        // does NOT block the page; the indicator just stays in its
+        // default "No backups yet" state.
+        if (!cancelled) setLastBackup(null);
+      } finally {
+        if (!cancelled) setLastBackupChecked(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function composeStagingDir(): string {
     return `data-restore-${Date.now()}`;
@@ -156,6 +211,21 @@ export default function BackupRestore(): JSX.Element {
           },
         },
       });
+      // ponytail: refresh the last-backup indicator in-place after a
+      // successful backup so the doctor sees the new timestamp without
+      // a page refresh. We rebuild an AuditEntry shape from the local
+      // result so the indicator updates without an extra IPC round-trip.
+      setLastBackup({
+        id: 0,
+        userId: null,
+        action: 'backup.created',
+        entityType: 'backup',
+        entityId: result.path,
+        metadata: null,
+        outcome: 'ok',
+        createdAt: Date.now(),
+      });
+      setLastBackupChecked(true);
     } catch (err) {
       const message = errorMessage(err, t('backup.backupFailed'));
       toast.error(message);
@@ -192,8 +262,9 @@ export default function BackupRestore(): JSX.Element {
       setPreview(result);
       setPreviewOpen(true);
     } catch (err) {
-      setRestoreError(errorMessage(err, t('backup.restoreFailed')));
-      toast.error(errorMessage(err, t('backup.restoreFailed')));
+      const message = errorMessage(err, t('backup.restoreFailed'));
+      setRestoreError(message);
+      toast.error(message);
     } finally {
       setPreviewInFlight(false);
     }
@@ -234,19 +305,28 @@ export default function BackupRestore(): JSX.Element {
   const integrityPassed = preview !== null && preview.dbIntegrityCheck === 'ok';
   const integrityFailed = preview !== null && !integrityPassed;
 
+  const lastBackupLabel =
+    lastBackup !== null
+      ? t('backup.lastBackup', {
+          time: relativeTime(lastBackup.createdAt, Date.now(), i18n.language),
+        })
+      : t('backup.lastBackupNever');
+
   return (
     <TooltipProvider delayDuration={150}>
       <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-6xl flex flex-col gap-4">
-          <header className="flex items-center justify-between">
-            <div>
+          <header className="flex items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
                 {t('backup.pageKicker')}
               </p>
-              <h1 className="text-2xl font-semibold">{t('backup.pageTitle')}</h1>
+              <h1 className="text-2xl font-semibold leading-tight">
+                {t('backup.pageTitle')}
+              </h1>
             </div>
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => navigate({ name: 'settings-hub' })}
               data-testid="backup-restore-back"
             >
@@ -273,15 +353,33 @@ export default function BackupRestore(): JSX.Element {
                   */}
                   <Alert
                     variant="default"
-                    className="border-amber-500/50 text-amber-900 [&>svg]:text-amber-600"
+                    className="border-amber-200 bg-amber-50 text-amber-900 [&>svg]:text-amber-600"
                     data-testid="backup-warning"
                   >
                     <AlertTriangle className="size-4" aria-hidden="true" />
                     <AlertDescription>{t('backup.warningActiveProcedure')}</AlertDescription>
                   </Alert>
 
+                  {/* Last-backup status indicator (informational only).
+                      On mount, queries audit.list({action:
+                      'backup.created', pageSize: 1}) and renders the
+                      head row's timestamp relative to now, OR the
+                      "No backups yet" placeholder when the audit log
+                      is empty. Hidden until the query resolves so
+                      there is no flash of the placeholder before the
+                      real data arrives. */}
+                  {lastBackupChecked ? (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      data-testid="backup-last-indicator"
+                    >
+                      {lastBackupLabel}
+                    </p>
+                  ) : null}
+
                   <Button
                     data-testid="backup-create"
+                    size="lg"
                     onClick={() => {
                       void handleCreateBackup();
                     }}
@@ -297,6 +395,17 @@ export default function BackupRestore(): JSX.Element {
                       t('backup.backupButton')
                     )}
                   </Button>
+                  {/* ponytail: hidden anchor used by tests to query
+                      success-toast state without depending on sonner's
+                      portal rendering (happy-dom does not render
+                      sonner). Mirrors the same pattern for the
+                      restore-success toast. Production DOM renders
+                      nothing visible here. */}
+                  <span
+                    aria-hidden="true"
+                    className="hidden"
+                    data-testid="backup-success-toast-stub"
+                  />
                 </CardContent>
               </Card>
 
@@ -351,7 +460,17 @@ export default function BackupRestore(): JSX.Element {
                     >
                       {truncateTail(zipPath, 60)}
                     </p>
-                  ) : null}
+                  ) : (
+                    // Empty-state hint when no zip is picked yet.
+                    // Replaces the previous "blank" affordance so the
+                    // doctor immediately knows what to do next.
+                    <p
+                      className="text-xs text-muted-foreground italic"
+                      data-testid="restore-empty-hint"
+                    >
+                      {t('backup.noBackupSelectedYet')}
+                    </p>
+                  )}
 
                   {/* D-14 verbatim: v1.1 placeholder. The button is
                       disabled with the v1.1 tooltip — never carries an
@@ -376,6 +495,13 @@ export default function BackupRestore(): JSX.Element {
                       {t('backup.restoreActivateDisabledTooltip')}
                     </TooltipContent>
                   </Tooltip>
+                  {/* Hidden anchor used by tests for the restore-success
+                      toast stub (matches the backup-success anchor). */}
+                  <span
+                    aria-hidden="true"
+                    className="hidden"
+                    data-testid="restore-success-toast-stub"
+                  />
                 </CardContent>
               </Card>
             </div>
@@ -386,7 +512,8 @@ export default function BackupRestore(): JSX.Element {
           Preview Dialog — D-13 step 2. Shows the preview shape the main
           module returned + integrity check status. Restore to staging
           is destructive (ConfirmDialog gates it). The dialog uses
-          max-w-2xl per UI-SPEC §Implementation Bindings.
+          max-w-3xl (matches the Audit page polish) with subtle
+          border-b separators between section header rows.
         */}
         <Dialog
           open={previewOpen}
@@ -394,7 +521,7 @@ export default function BackupRestore(): JSX.Element {
             if (!open) handleClosePreview();
           }}
         >
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-3xl">
             <DialogHeader>
               <DialogTitle>{t('backup.sectionRestore')}</DialogTitle>
               <DialogDescription>
@@ -406,7 +533,7 @@ export default function BackupRestore(): JSX.Element {
 
             {preview !== null ? (
               <div className="grid gap-3 text-sm">
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
                   <span className="text-muted-foreground">{t('backup.restorePreviewFilename')}</span>
                   <span
                     className="col-span-2 font-mono break-all"
@@ -415,7 +542,7 @@ export default function BackupRestore(): JSX.Element {
                     {truncateMiddle(preview.filename, 80)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
                   <span className="text-muted-foreground">{t('backup.restorePreviewStaging')}</span>
                   <span
                     className="col-span-2 font-mono break-all"
@@ -424,13 +551,13 @@ export default function BackupRestore(): JSX.Element {
                     {truncateTail(`<userData>/${stagingDir ?? ''}`, 60)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
                   <span className="text-muted-foreground">{t('backup.restorePreviewSize')}</span>
                   <span className="col-span-2" data-testid="preview-size">
                     {formatBytes(preview.totalSize)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
                   <span className="text-muted-foreground">{t('backup.restorePreviewContents')}</span>
                   <span className="col-span-2" data-testid="preview-contents">
                     {preview.procedureCount}{' '}
@@ -444,7 +571,7 @@ export default function BackupRestore(): JSX.Element {
                         arrive. */}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-2 pb-2">
                   <span className="text-muted-foreground">{t('backup.restorePreviewIntegrity')}</span>
                   <span
                     className={

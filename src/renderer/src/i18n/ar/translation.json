@@ -355,7 +355,10 @@
     "warningActiveProcedure": "للحصول على أفضل النتائج، أغلق أي إجراء نشط قبل إنشاء نسخة احتياطية. يمكنك التجاوز والمتابعة.",
     "warningIntegrityFailed": "فشلت هذه النسخة الاحتياطية في فحص السلامة. لا تقم بتفعيلها. جرّب نسخة احتياطية أخرى.",
     "backupConfirmTitle": "إنشاء نسخة احتياطية؟",
-    "backupConfirmBody": "سيتم حفظ النسخة الاحتياطية في: {{path}}"
+    "backupConfirmBody": "سيتم حفظ النسخة الاحتياطية في: {{path}}",
+    "lastBackup": "آخر نسخة احتياطية: {{time}}",
+    "lastBackupNever": "لا توجد نسخ احتياطية بعد",
+    "noBackupSelectedYet": "لم يتم اختيار نسخة احتياطية بعد"
   },
   "settings": {
     "hubTitle": "الإعدادات",
