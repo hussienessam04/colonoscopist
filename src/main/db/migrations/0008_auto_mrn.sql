@@ -2,7 +2,7 @@
 -- Per D-lock. Atomic increment via a one-row counter table; better-sqlite3 is sync +
 -- single-threaded inside the same db.transaction() as the patient insert, so no race.
 
--- Step A: backfill any NULL mrn rows so the NOT NULL constraint below has zero violations.
+-- Step A: backfill any NULL mrn rows so the column has zero NULLs in practice.
 -- ponytail: ROW_NUMBER() OVER (ORDER BY created_at, id) keeps backfill stable across
 -- restarts — same input ordering each run, and `id` is the deterministic tiebreaker
 -- when two rows share a millisecond timestamp.
@@ -45,34 +45,40 @@ FROM patients
 WHERE mrn GLOB 'MRN-[0-9]*';
 
 -- Step D: drop the partial unique index, then recreate as a full unique index
--- (every MRN is now non-null, so the WHERE clause is dead weight).
+-- (every MRN is now non-null in practice, so the WHERE clause is dead weight).
 DROP INDEX IF EXISTS idx_patients_mrn;
 CREATE UNIQUE INDEX idx_patients_mrn ON patients(mrn);
 
--- Step E: enforce NOT NULL via the 12-step recipe.
--- SQLite <3.35 lacks ALTER COLUMN … SET NOT NULL. We rebuild the table.
-CREATE TABLE new_patients (
-  id           TEXT PRIMARY KEY,
-  full_name    TEXT NOT NULL,
-  dob          TEXT NOT NULL,
-  gender       TEXT,
-  mrn          TEXT NOT NULL,
-  phone        TEXT,
-  notes        TEXT,
-  created_at   INTEGER NOT NULL,
-  updated_at   INTEGER NOT NULL,
-  deleted_at   INTEGER
-);
-
-INSERT INTO new_patients
-  (id, full_name, dob, gender, mrn, phone, notes, created_at, updated_at, deleted_at)
-SELECT id, full_name, dob, gender, mrn, phone, notes, created_at, updated_at, deleted_at
-FROM patients;
-
-DROP TABLE patients;
-ALTER TABLE new_patients RENAME TO patients;
-
--- Re-attach indexes that lived on `patients` and were dropped with the table.
-CREATE UNIQUE INDEX idx_patients_mrn ON patients(mrn);
-CREATE INDEX idx_patients_name ON patients(full_name COLLATE NOCASE);
-CREATE INDEX idx_patients_deleted ON patients(deleted_at);
+-- Step E: schema-level NOT NULL on patients.mrn is INTENTIONALLY NOT enforced.
+--
+-- Originally the plan was the SQLite 12-step table-rebuild recipe
+-- (CREATE TABLE new_patients → INSERT … SELECT → DROP TABLE patients →
+-- ALTER TABLE new_patients RENAME TO patients), because SQLite <3.35
+-- lacks ALTER COLUMN … SET NOT NULL.
+--
+-- That recipe is unsafe for v1: any row in `procedures` referencing a
+-- patient via `procedures.patient_id REFERENCES patients(id) ON DELETE
+-- RESTRICT` (migration 0002) triggers `FOREIGN KEY constraint failed`
+-- at DROP TABLE time when foreign_keys=ON. SQLite 3.35+ allows
+-- `PRAGMA defer_foreign_keys = ON` inside a transaction, but DROP TABLE
+-- FK checks are not deferrable — the constraint fires immediately.
+--
+-- The migration runner wraps each migration in db.transaction(); toggling
+-- PRAGMA foreign_keys = OFF inside a transaction is a no-op (SQLite docs:
+-- "may only be changed when there is no pending transaction"). And we
+-- don't want to disable FK enforcement globally for all migrations —
+-- that would mask real schema bugs.
+--
+-- ponytail: the NOT NULL invariant is already enforced at the repo layer
+-- by `nextMrn()` (called inside the createPatient transaction, after
+-- the migration has backfilled any pre-existing NULLs). `patientPatchInput`
+-- is `.strict()`, so a stray `mrn` in a patch becomes a 422. The DB column
+-- stays TEXT (nullable in the schema); the invariant lives in code where
+-- the auto-MRN contract is owned. For v1 (single-clinic, offline, no
+-- concurrent writers, single repo entry point), this is sufficient.
+--
+-- If a future migration needs schema-level NOT NULL on patients.mrn,
+-- the workaround is to either (a) bump to SQLite ≥3.35 and use
+-- `ALTER TABLE patients DROP COLUMN mrn_old;` after renaming, or (b)
+-- add a special migration runner path that disables FK enforcement
+-- just for the affected migration. Both are deferred — not v1 work.
