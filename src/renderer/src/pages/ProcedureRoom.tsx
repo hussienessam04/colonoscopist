@@ -404,7 +404,7 @@ export default function ProcedureRoom(): JSX.Element {
                   onClick={() => setNotesCollapsed(true)}
                   aria-label="Collapse notes panel"
                 >
-                  Hide
+                  Hide notes
                 </Button>
               </div>
               <ProcedureNotesPanel procedureId={procedureId} />
@@ -412,37 +412,6 @@ export default function ProcedureRoom(): JSX.Element {
                 lastLost={lastLost}
                 onDismiss={() => recordingStore.clearLastLost()}
               />
-              {isRecording || screenshotIntake.screenshots.length > 0 ? (
-                // G-05-8 / Plan 07 — mid-procedure gallery fed by the
-                // existing useScreenshotIntake.screenshots state. The same
-                // <ScreenshotTimeline> surface as ProcedureReview; onSeek
-                // is a no-op (no <video> to seek during recording) and
-                // onAnnotate is intentionally not passed (annotations are
-                // review-only). The +Capture button reuses the room's
-                // handleScreenshotCapture so the S hotkey and the
-                // timeline button are interchangeable.
-                <div
-                  className="flex flex-col gap-2"
-                  data-testid="procedure-room-gallery-section"
-                >
-                  <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Captured screenshots
-                  </h3>
-                  <ScreenshotTimeline
-                    procedureId={procedureId ?? ''}
-                    patientId={patientIdFromRoute}
-                    mediaBaseUrl={mediaUrl.url}
-                    status={isRecording ? 'recording' : 'completed'}
-                    screenshots={screenshotIntake.screenshots}
-                    onSeek={() => undefined}
-                    onCapture={() => {
-                      void handleScreenshotCapture();
-                    }}
-                    onDelete={handleScreenshotDelete}
-                    testId="procedure-room-gallery"
-                  />
-                </div>
-              ) : null}
             </aside>
           ) : (
             <div className="flex items-start justify-end">
@@ -457,6 +426,46 @@ export default function ProcedureRoom(): JSX.Element {
             </div>
           )}
         </section>
+
+        {isRecording || screenshotIntake.screenshots.length > 0 ? (
+          // Quick task 20260812 — mid-procedure gallery lives at the bottom
+          // of the page (full width) instead of the right sidebar. Same
+          // useScreenshotIntake.screenshots source; onSeek is a no-op (no
+          // <video> to seek during recording) and onAnnotate is intentionally
+          // not passed (annotations are review-only). The +Capture button
+          // reuses the room's handleScreenshotCapture so the S hotkey and
+          // the timeline button are interchangeable.
+          <section
+            className="rounded-xl border bg-card p-5 shadow-sm"
+            data-testid="procedure-room-gallery-section"
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Captured screenshots
+              </h2>
+              <span
+                className="text-xs text-muted-foreground"
+                data-testid="procedure-room-gallery-count"
+              >
+                {screenshotIntake.screenshots.length} capture
+                {screenshotIntake.screenshots.length === 1 ? '' : 's'}
+              </span>
+            </div>
+            <ScreenshotTimeline
+              procedureId={procedureId ?? ''}
+              patientId={patientIdFromRoute}
+              mediaBaseUrl={mediaUrl.url}
+              status={isRecording ? 'recording' : 'completed'}
+              screenshots={screenshotIntake.screenshots}
+              onSeek={() => undefined}
+              onCapture={() => {
+                void handleScreenshotCapture();
+              }}
+              onDelete={handleScreenshotDelete}
+              testId="procedure-room-gallery"
+            />
+          </section>
+        ) : null}
       </div>
     </main>
   );
