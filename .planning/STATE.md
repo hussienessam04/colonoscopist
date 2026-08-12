@@ -6,9 +6,9 @@ current_plan: 07-06
 status: complete
 stopped_at: Phase 07 Plan 6 complete
 paused_at: —
-last_updated: "2026-08-12T13:25:00.000Z"
+last_updated: "2026-08-12T13:40:00.000Z"
 last_activity: 2026-08-12
-last_activity_desc: Quick task 260812-mpf — ProcedureRoom UI polish: gallery moved from sidebar to bottom strip
+last_activity_desc: Quick task 260812-n0h — settings shell unified across 6 pages via SettingsLayout
 progress:
   total_phases: 7
   completed_phases: 6
@@ -254,3 +254,4 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2026-08-12 | change-mrn-auto-serial | Auto-generate MRN as serial number (migration 0008 + nextMrn counter + drop mrn from create/patch input + render Edit MRN read-only + 3 contract-guard + 1 migration test) |
 | 2026-08-12 | procedure-room-ui-polish | Move ProcedureRoom mid-procedure screenshot gallery from right sidebar to full-width bottom strip; rename Hide → Hide notes; testid seams preserved |
 | 2026-08-12 | unify-settings-layout-and-navbar | Extract SettingsLayout + refactor 6 settings pages onto unified shell (kicker + h1 + subtitle + right-side action + Back); testid contracts preserved |
+| 2026-08-12 | profile-assets-premedication-devices | Profile: add header + footer image uploads (PDF top/bottom bands), used-devices CRUD card, premedication input; migration 0009 + 2x2 Assets grid + new Procedure defaults card |
