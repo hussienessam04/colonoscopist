@@ -95,6 +95,17 @@ type MockApi = {
     update: ReturnType<typeof vi.fn>;
     uploadSignature: ReturnType<typeof vi.fn>;
     uploadLogo: ReturnType<typeof vi.fn>;
+    // Quick task 260812-ns0 — header / footer image uploads + extended
+    // asset-data-url kind enum.
+    uploadHeader: ReturnType<typeof vi.fn>;
+    uploadFooter: ReturnType<typeof vi.fn>;
+    getAssetDataUrl: ReturnType<typeof vi.fn>;
+  };
+  // Quick task 260812-ns0 — used-devices CRUD.
+  usedDevices: {
+    list: ReturnType<typeof vi.fn>;
+    add: ReturnType<typeof vi.fn>;
+    remove: ReturnType<typeof vi.fn>;
   };
   reports: {
     getOrCreate: ReturnType<typeof vi.fn>;
@@ -215,6 +226,24 @@ export function mockApi(): MockApi {
       update: vi.fn(),
       uploadSignature: vi.fn().mockResolvedValue({ signaturePath: 'sig.png' }),
       uploadLogo: vi.fn().mockResolvedValue({ logoPath: 'logo.png' }),
+      // Quick task 260812-ns0 — header / footer image uploads.
+      uploadHeader: vi.fn().mockResolvedValue({ headerImagePath: 'header.png' }),
+      uploadFooter: vi.fn().mockResolvedValue({ footerImagePath: 'footer.png' }),
+      getAssetDataUrl: vi.fn().mockResolvedValue({ dataUrl: null }),
+    },
+    // Quick task 260812-ns0 — used-devices CRUD (1:N with doctor_profile).
+    usedDevices: {
+      list: vi.fn().mockResolvedValue([]),
+      add: vi.fn().mockImplementation(async (input: { name: string; notes?: string | null }) => ({
+        id: '00000000-0000-4000-8000-000000000999',
+        profileId: '00000000-0000-4000-8000-000000000888',
+        name: input.name,
+        notes: input.notes ?? null,
+        sortOrder: 0,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      })),
+      remove: vi.fn().mockResolvedValue({ ok: true as const }),
     },
     reports: {
       getOrCreate: vi.fn().mockResolvedValue(null),

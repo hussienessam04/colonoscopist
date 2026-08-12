@@ -1,6 +1,7 @@
 // ProfileEditor — Settings → Profile (PROF-01).
 // Bilingual fields (fullNameEn/Ar + clinicNameEn/Ar) + address + phone
-// + signature + logo upload. Auto-save-on-blur per CONTEXT.md §Doctor
+// + 4 image assets (header / footer / signature / logo) + premedication
+// input + used-devices CRUD. Auto-save-on-blur per CONTEXT.md §Doctor
 // profile storage. The inline save indicator cycles Saving → Saved at
 // HH:MM:SS / Save failed — retry via the useAutoSave state machine.
 //
@@ -10,12 +11,17 @@
 //     magic numbers client-side. Reject (toast.error + NO IPC) on
 //     mismatch — defense in depth on top of the main-side sniff from
 //     Plan 06-01 Task 11.
-//   - On accept, calls api.profile.uploadSignature / uploadLogo with
-//     the matching { pngBase64 | jpegBase64 } field.
+//   - On accept, calls api.profile.upload{Signature,Logo,Header,Footer}
+//     with the matching { pngBase64 | jpegBase64 } field.
+//
+// Quick task 260812-ns0 — header/footer/premedication/used-devices +
+// UI polish. The Assets card now renders as a 2×2 grid (header / footer /
+// signature / logo), a new "Procedure defaults" card sits between
+// Assets and Language (premedication input + used-devices CRUD).
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ImagePlus } from 'lucide-react';
+import { ImagePlus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +30,7 @@ import { Label } from '@/components/ui/label';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
-import type { DoctorProfile } from '@shared/ipc-contract';
+import type { DoctorProfile, UsedDevice } from '@shared/ipc-contract';
 
 // PNG signature: 89 50 4E 47 0D 0A 1A 0A (8 bytes).
 const PNG_SIG = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -63,7 +69,7 @@ function formatHHMMSS(ms: number): string {
 
 function profileFromPatch(p: DoctorProfile | null): Pick<
   DoctorProfile,
-  'fullNameEn' | 'fullNameAr' | 'clinicNameEn' | 'clinicNameAr' | 'address' | 'phone'
+  'fullNameEn' | 'fullNameAr' | 'clinicNameEn' | 'clinicNameAr' | 'address' | 'phone' | 'premedication'
 > {
   return {
     fullNameEn: p?.fullNameEn ?? '',
@@ -72,22 +78,82 @@ function profileFromPatch(p: DoctorProfile | null): Pick<
     clinicNameAr: p?.clinicNameAr ?? null,
     address: p?.address ?? null,
     phone: p?.phone ?? null,
+    premedication: p?.premedication ?? null,
   };
+}
+
+// ponytail: small inline component for the 2x2 asset grid quadrants.
+// Each quadrant renders the same pattern (label + status + preview + upload
+// button) so we hoist the markup here instead of repeating it 4 times in
+// the JSX below.
+type AssetKind = 'header' | 'footer' | 'signature' | 'logo';
+
+function AssetUploader({
+  kind,
+  preview,
+  uploadedAt,
+  onPick,
+  t,
+}: {
+  kind: AssetKind;
+  preview: string | null;
+  uploadedAt: number | null;
+  onPick: () => void;
+  t: (key: string, opts?: Record<string, unknown>) => string;
+}): ReactNode {
+  const label = {
+    header: t('profile.headerLabel'),
+    footer: t('profile.footerLabel'),
+    signature: t('profile.signatureLabel'),
+    logo: t('profile.logoLabel'),
+  }[kind];
+  const uploadButtonLabel = {
+    header: t('profile.uploadHeader'),
+    footer: t('profile.uploadFooter'),
+    signature: t('profile.uploadSignature'),
+    logo: t('profile.uploadLogo'),
+  }[kind];
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <p className="text-sm font-medium">{label}</p>
+      <p
+        className="text-xs text-muted-foreground"
+        data-testid={`profile-editor-${kind}-status`}
+      >
+        {uploadedAt === null
+          ? t(`profile.${kind}NotUploaded`)
+          : t(`profile.${kind}UploadedAt`, { time: formatHHMMSS(uploadedAt) })}
+      </p>
+      {preview !== null ? (
+        <img
+          src={preview}
+          alt={`${label} preview`}
+          className="max-h-[80px] max-w-full rounded border border-slate-200 bg-white object-contain p-1"
+          data-testid={`profile-editor-${kind}-preview`}
+        />
+      ) : (
+        <div className="flex h-[80px] items-center justify-center rounded border border-dashed border-slate-300 bg-white text-xs text-muted-foreground">
+          {t('profile.noPreview')}
+        </div>
+      )}
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onPick}
+        data-testid={`profile-editor-${kind}-button`}
+        className="self-start"
+      >
+        <ImagePlus className="size-4 mr-1" aria-hidden="true" />
+        {uploadButtonLabel}
+      </Button>
+    </div>
+  );
 }
 
 export default function ProfileEditor(): JSX.Element {
   const { profile, loading, refresh, setLocal } = useDoctorProfile();
-  // ponytail: visible strings flow through t() per Phase 7 i18n
-  // contract. The Language Card's radio labels stay hard-coded
-  // ("English" / "العربية") because those are the language NAMES —
-  // translating them would defeat the purpose of the picker.
   const { t, i18n } = useTranslation();
 
-  // ponytail: per-field auto-save state. We hold one useAutoSave per
-  // field so the "Saving…" indicator tracks the just-blurred field.
-  // All seven share the same { patch, persist } shape; using a single
-  // hook keyed on the latest patch would have collapsed the indicators
-  // into a confusing single line.
   const persist = useCallback(
     async (patch: Partial<DoctorProfile>): Promise<void> => {
       const updated = await window.api.profile.update({
@@ -97,9 +163,11 @@ export default function ProfileEditor(): JSX.Element {
         clinicNameAr: patch.clinicNameAr ?? profile?.clinicNameAr ?? null,
         address: patch.address ?? profile?.address ?? null,
         phone: patch.phone ?? profile?.phone ?? null,
+        // Quick task 260812-ns0 — premedication flows through the same
+        // auto-save IPC; null clears, undefined preserves the existing
+        // value (the repo's upsert keeps it as-is in that case).
+        premedication: patch.premedication !== undefined ? patch.premedication : profile?.premedication ?? null,
       });
-      // Refresh from the source of truth (D-07 — RPC-after-patch reads
-      // the server-stamped updated_at).
       void refresh();
       void updated;
     },
@@ -115,28 +183,13 @@ export default function ProfileEditor(): JSX.Element {
     },
   });
 
-  // Phase 7 / Plan 07-03 — I18N-01: per-doctor language preference is
-  // its own state machine (not auto-save-on-blur) because the picker is
-  // a binary radio, not a free-text field. The handler fires
-  // `profile.update` + `audit.log('language.changed')` in parallel on
-  // each selection change. Default to 'en' when the per-doctor
-  // override is null (the resolver falls back to users.language).
+  // Phase 7 / Plan 07-03 — I18N-01: per-doctor language preference.
   const [selectedLang, setSelectedLang] = useState<'en' | 'ar'>(
     profile?.language ?? 'en',
   );
-  // ponytail: stale-ref so the click handler always captures the
-  // committed value (the closure approach would race the React state
-  // update on rapid selects).
   const selectedLangRef = useRef<'en' | 'ar'>(selectedLang);
   selectedLangRef.current = selectedLang;
 
-  // Sync the radio when the profile loads (initial render has
-  // profile === null, so the radio defaults to 'en' per the spec; once
-  // the IPC resolves we hydrate the user's actual preference).
-  // Skip the sync if the user has already made a manual selection
-  // (the local state is the source of truth for the UI surface).
-  // null language = "follow users.language" — leave the radio on its
-  // current value (defaults to 'en' until the picker is touched).
   useEffect(() => {
     const lang = profile?.language;
     if (lang === null || lang === undefined) return;
@@ -167,13 +220,6 @@ export default function ProfileEditor(): JSX.Element {
             metadata: { from, to: newLang, scope: 'profile' },
           }),
         ]);
-        // ponytail: flip the renderer's i18n instance so the
-        // <LanguageApplier /> at main.tsx (useLanguage's useEffect on
-        // i18n.language) mutates <html dir> + <html lang> and every
-        // useTranslation() consumer re-renders with the AR bundle. The
-        // DB write fires first; if it throws, the catch block fires
-        // toast.error and we skip the flip — UI stays consistent with
-        // the persisted state.
         await i18n.changeLanguage(newLang);
         void refresh();
         toast.success(
@@ -186,30 +232,36 @@ export default function ProfileEditor(): JSX.Element {
         toast.error(msg);
       }
     },
-    [profile, refresh, t, i18n],
+    [profile, refresh, t],
   );
 
-  // The signature + logo hidden file inputs.
+  // Quick task 260812-ns0 — 4 hidden file inputs (one per asset kind).
+  const headerInputRef = useRef<HTMLInputElement | null>(null);
+  const footerInputRef = useRef<HTMLInputElement | null>(null);
   const signatureInputRef = useRef<HTMLInputElement | null>(null);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const [headerAt, setHeaderAt] = useState<number | null>(null);
+  const [footerAt, setFooterAt] = useState<number | null>(null);
   const [signatureAt, setSignatureAt] = useState<number | null>(null);
   const [logoAt, setLogoAt] = useState<number | null>(null);
   // Phase 6 UAT G-06-3 — image previews. Loaded as base64 data URLs from
-  // the new `api.profile.getAssetDataUrl` IPC so the doctor can see
-  // what their signature/logo actually look like (and confirm the right
-  // file uploaded). Refreshed after every successful upload.
+  // the existing `api.profile.getAssetDataUrl` IPC. Quick task 260812-ns0
+  // extends this to header + footer (4 kinds total).
+  const [headerPreview, setHeaderPreview] = useState<string | null>(null);
+  const [footerPreview, setFooterPreview] = useState<string | null>(null);
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
-  // ponytail: centralizes the data-URL fetch + state set so the
-  // upload handler can call it on success. Profile change (e.g. on
-  // wizard-bootstrap backfill) also calls this.
   const refreshPreviews = useCallback(async (): Promise<void> => {
     try {
-      const [sig, logo] = await Promise.all([
+      const [hdr, ftr, sig, logo] = await Promise.all([
+        window.api.profile.getAssetDataUrl({ kind: 'header' }),
+        window.api.profile.getAssetDataUrl({ kind: 'footer' }),
         window.api.profile.getAssetDataUrl({ kind: 'signature' }),
         window.api.profile.getAssetDataUrl({ kind: 'logo' }),
       ]);
+      setHeaderPreview(hdr.dataUrl);
+      setFooterPreview(ftr.dataUrl);
       setSignaturePreview(sig.dataUrl);
       setLogoPreview(logo.dataUrl);
     } catch {
@@ -221,10 +273,66 @@ export default function ProfileEditor(): JSX.Element {
     void refreshPreviews();
   }, [refreshPreviews]);
 
-  // Inline save indicator text already covers the auto-save lifecycle
-  // (Saving… / Saved at HH:MM:SS / Save failed — retry). No additional
-  // explicit-save button per CONTEXT.md — field blurs are the only
-  // trigger, so the per-field state machine is sufficient.
+  // Quick task 260812-ns0 — used devices list. Loaded on mount; refresh
+  // after every add / remove.
+  const [usedDevices, setUsedDevices] = useState<UsedDevice[]>([]);
+  const [devicesLoading, setDevicesLoading] = useState(true);
+  const refreshDevices = useCallback(async (): Promise<void> => {
+    setDevicesLoading(true);
+    try {
+      const list = await window.api.usedDevices.list();
+      setUsedDevices(list);
+    } catch {
+      // best-effort; the section shows the empty state
+    } finally {
+      setDevicesLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    void refreshDevices();
+  }, [refreshDevices]);
+
+  // Inline add-row state.
+  const [newDeviceName, setNewDeviceName] = useState('');
+  const [newDeviceNotes, setNewDeviceNotes] = useState('');
+  const [addingDevice, setAddingDevice] = useState(false);
+
+  const handleAddDevice = useCallback(async (): Promise<void> => {
+    const name = newDeviceName.trim();
+    if (name === '' || addingDevice) return;
+    setAddingDevice(true);
+    try {
+      const created = await window.api.usedDevices.add({
+        name,
+        notes: newDeviceNotes.trim() === '' ? null : newDeviceNotes.trim(),
+      });
+      // ponytail: optimistic insert — append to the local list, clear
+      // the form, then refresh in the background so the list is the
+      // server's view (in case the server re-ordered by sort_order).
+      setUsedDevices((prev) => [...prev, created].sort((a, b) => a.sortOrder - b.sortOrder));
+      setNewDeviceName('');
+      setNewDeviceNotes('');
+      void refreshDevices();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Add failed';
+      toast.error(msg);
+    } finally {
+      setAddingDevice(false);
+    }
+  }, [newDeviceName, newDeviceNotes, addingDevice, refreshDevices]);
+
+  const handleRemoveDevice = useCallback(async (id: string): Promise<void> => {
+    // Optimistic remove.
+    setUsedDevices((prev) => prev.filter((d) => d.id !== id));
+    try {
+      await window.api.usedDevices.remove({ id });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Remove failed';
+      toast.error(msg);
+      // Rollback on failure.
+      void refreshDevices();
+    }
+  }, [refreshDevices]);
 
   const indicatorText = useMemo((): string => {
     if (status === 'saving') return t('common.saving');
@@ -241,10 +349,6 @@ export default function ProfileEditor(): JSX.Element {
           [field]: value === '' ? null : value,
         } as Partial<DoctorProfile>;
         setLocal(patched);
-        // ponytail: pass the patched value directly so the auto-save
-        // IPC doesn't race the React setState — by the time the
-        // 300ms debounce fires, setLocal has been queued but not yet
-        // flushed, so the hook's closure-captured `value` is stale.
         const next = profile === null ? null : { ...profile, ...patched };
         trigger(next ?? undefined);
       },
@@ -252,15 +356,10 @@ export default function ProfileEditor(): JSX.Element {
   );
 
   const handleUpload = useCallback(
-    async (kind: 'signature' | 'logo', e: ChangeEvent<HTMLInputElement>): Promise<void> => {
+    async (kind: AssetKind, e: ChangeEvent<HTMLInputElement>): Promise<void> => {
       const file = e.target.files?.[0] ?? null;
-      // Reset the input so re-selecting the same file fires onChange.
       e.target.value = '';
       if (!file) return;
-      // ponytail: FileReader.readAsDataURL is the standard browser API;
-      // happy-dom + Chromium both support it. The decoded payload is a
-      // base64 data URL; we sniff the first bytes for the PNG/JPEG
-      // magic numbers BEFORE crossing the IPC boundary.
       const dataUrl = await new Promise<string>((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (): void => resolve(reader.result as string);
@@ -273,38 +372,39 @@ export default function ProfileEditor(): JSX.Element {
         toast.error(t('profile.uploadFormatError'));
         return;
       }
-      // ponytail: send ONLY the raw base64 payload over IPC, NOT the
-      // full data URL. Buffer.from('data:image/png;base64,XXX',
-      // 'base64') does not strip the data URL prefix — Node drops the
-      // non-base64 chars but keeps the valid ones (e.g. '/'), so the
-      // decoded buffer's first 8 bytes are NOT the PNG signature. The
-      // main-side magic-byte sniff then rejects a perfectly valid PNG.
-      // Strip `data:<mime>;base64,` here so main receives pure base64.
       const rawBase64 = dataUrl.slice(dataUrl.indexOf(',') + 1);
-      const payload =
-        fmt === 'png' ? { pngBase64: rawBase64 } : { jpegBase64: rawBase64 };
+      const payload = fmt === 'png' ? { pngBase64: rawBase64 } : { jpegBase64: rawBase64 };
       try {
         if (kind === 'signature') {
           await window.api.profile.uploadSignature(payload);
           setSignatureAt(Date.now());
-        } else {
+        } else if (kind === 'logo') {
           await window.api.profile.uploadLogo(payload);
           setLogoAt(Date.now());
+        } else if (kind === 'header') {
+          await window.api.profile.uploadHeader(payload);
+          setHeaderAt(Date.now());
+        } else {
+          await window.api.profile.uploadFooter(payload);
+          setFooterAt(Date.now());
         }
         void refresh();
         void refreshPreviews();
-        toast.success(t('profile.uploadSuccess', { kind: kind === 'signature' ? t('profile.signatureLabel') : t('profile.logoLabel') }));
+        const kindLabel = t(
+          kind === 'signature' ? 'profile.signatureLabel'
+          : kind === 'logo' ? 'profile.logoLabel'
+          : kind === 'header' ? 'profile.headerLabel'
+          : 'profile.footerLabel',
+        );
+        toast.success(t('profile.uploadSuccess', { kind: kindLabel }));
       } catch (err) {
         const msg = err instanceof Error ? err.message : t('profile.uploadFailed');
         toast.error(msg);
       }
     },
-    [refresh, t],
+    [refresh, refreshPreviews, t],
   );
 
-  // When the profile first loads, no auto-save fires (per the hook's
-  // explicit-trigger contract). Effect is a no-op marker so future
-  // hooks (e.g. language picker) can hydrate without round-tripping.
   useEffect(() => {
     void loading;
   }, [loading]);
@@ -333,209 +433,290 @@ export default function ProfileEditor(): JSX.Element {
           <CardTitle>{t('profile.cardClinicTitle')}</CardTitle>
           <CardDescription>{t('profile.cardClinicDescription')}</CardDescription>
         </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fullNameEn">{t('profile.fullNameEn')}</Label>
-                <Input
-                  id="fullNameEn"
-                  autoComplete="name"
-                  value={f.fullNameEn}
-                  onChange={handleFieldChange('fullNameEn')}
-                  data-testid="profile-editor-fullNameEn"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="fullNameAr">{t('profile.fullNameAr')}</Label>
-                <Input
-                  id="fullNameAr"
-                  dir="rtl"
-                  value={f.fullNameAr ?? ''}
-                  onChange={handleFieldChange('fullNameAr')}
-                  data-testid="profile-editor-fullNameAr"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="clinicNameEn">{t('profile.clinicNameEn')}</Label>
-                <Input
-                  id="clinicNameEn"
-                  autoComplete="organization"
-                  value={f.clinicNameEn}
-                  onChange={handleFieldChange('clinicNameEn')}
-                  data-testid="profile-editor-clinicNameEn"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="clinicNameAr">{t('profile.clinicNameAr')}</Label>
-                <Input
-                  id="clinicNameAr"
-                  dir="rtl"
-                  value={f.clinicNameAr ?? ''}
-                  onChange={handleFieldChange('clinicNameAr')}
-                  data-testid="profile-editor-clinicNameAr"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="address">{t('profile.address')}</Label>
-                <Input
-                  id="address"
-                  autoComplete="street-address"
-                  value={f.address ?? ''}
-                  onChange={handleFieldChange('address')}
-                  data-testid="profile-editor-address"
-                />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Label htmlFor="phone">{t('profile.phone')}</Label>
-                <Input
-                  id="phone"
-                  autoComplete="tel"
-                  value={f.phone ?? ''}
-                  onChange={handleFieldChange('phone')}
-                  data-testid="profile-editor-phone"
-                />
-              </div>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="fullNameEn">{t('profile.fullNameEn')}</Label>
+              <Input
+                id="fullNameEn"
+                autoComplete="name"
+                value={f.fullNameEn}
+                onChange={handleFieldChange('fullNameEn')}
+                data-testid="profile-editor-fullNameEn"
+              />
             </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="fullNameAr">{t('profile.fullNameAr')}</Label>
+              <Input
+                id="fullNameAr"
+                dir="rtl"
+                value={f.fullNameAr ?? ''}
+                onChange={handleFieldChange('fullNameAr')}
+                data-testid="profile-editor-fullNameAr"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="clinicNameEn">{t('profile.clinicNameEn')}</Label>
+              <Input
+                id="clinicNameEn"
+                autoComplete="organization"
+                value={f.clinicNameEn}
+                onChange={handleFieldChange('clinicNameEn')}
+                data-testid="profile-editor-clinicNameEn"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="clinicNameAr">{t('profile.clinicNameAr')}</Label>
+              <Input
+                id="clinicNameAr"
+                dir="rtl"
+                value={f.clinicNameAr ?? ''}
+                onChange={handleFieldChange('clinicNameAr')}
+                data-testid="profile-editor-clinicNameAr"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="address">{t('profile.address')}</Label>
+              <Input
+                id="address"
+                autoComplete="street-address"
+                value={f.address ?? ''}
+                onChange={handleFieldChange('address')}
+                data-testid="profile-editor-address"
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="phone">{t('profile.phone')}</Label>
+              <Input
+                id="phone"
+                autoComplete="tel"
+                value={f.phone ?? ''}
+                onChange={handleFieldChange('phone')}
+                data-testid="profile-editor-phone"
+              />
+            </div>
+          </div>
 
-            <p
-              className="text-xs text-muted-foreground"
-              data-testid="profile-editor-save-indicator"
-              role="status"
-              aria-live="polite"
-            >
-              {indicatorText}
+          <p
+            className="text-xs text-muted-foreground"
+            data-testid="profile-editor-save-indicator"
+            role="status"
+            aria-live="polite"
+          >
+            {indicatorText}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Quick task 260812-ns0 — Assets card now renders as a 2x2 grid
+          (header / footer / signature / logo). The four quadrants share
+          the same shape via the inline <AssetUploader> helper above. */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('profile.cardAssetsTitle')}</CardTitle>
+          <CardDescription>{t('profile.cardAssetsDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <input
+            ref={headerInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => void handleUpload('header', e)}
+            data-testid="profile-editor-header-input"
+          />
+          <input
+            ref={footerInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => void handleUpload('footer', e)}
+            data-testid="profile-editor-footer-input"
+          />
+          <input
+            ref={signatureInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => void handleUpload('signature', e)}
+            data-testid="profile-editor-signature-input"
+          />
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/png,image/jpeg"
+            className="hidden"
+            onChange={(e) => void handleUpload('logo', e)}
+            data-testid="profile-editor-logo-input"
+          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <AssetUploader
+              kind="header"
+              preview={headerPreview}
+              uploadedAt={headerAt}
+              onPick={() => headerInputRef.current?.click()}
+              t={t}
+            />
+            <AssetUploader
+              kind="footer"
+              preview={footerPreview}
+              uploadedAt={footerAt}
+              onPick={() => footerInputRef.current?.click()}
+              t={t}
+            />
+            <AssetUploader
+              kind="signature"
+              preview={signaturePreview}
+              uploadedAt={signatureAt}
+              onPick={() => signatureInputRef.current?.click()}
+              t={t}
+            />
+            <AssetUploader
+              kind="logo"
+              preview={logoPreview}
+              uploadedAt={logoAt}
+              onPick={() => logoInputRef.current?.click()}
+              t={t}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick task 260812-ns0 — new "Procedure defaults" card holds the
+          premedication input + used-devices CRUD UI. Sits between Assets
+          and Language so the existing profile-editor tests for the upper
+          cards continue to find the same testids. */}
+      <Card data-testid="profile-editor-procedure-defaults-card">
+        <CardHeader>
+          <CardTitle>{t('profile.cardProcedureDefaultsTitle')}</CardTitle>
+          <CardDescription>{t('profile.cardProcedureDefaultsDescription')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="premedication">{t('profile.premedicationLabel')}</Label>
+            <Input
+              id="premedication"
+              value={f.premedication ?? ''}
+              onChange={handleFieldChange('premedication')}
+              placeholder={t('profile.premedicationPlaceholder')}
+              data-testid="profile-editor-premedication"
+            />
+            <p className="text-xs text-muted-foreground">
+              {t('profile.premedicationHelp')}
             </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.cardAssetsTitle')}</CardTitle>
-            <CardDescription>{t('profile.cardAssetsDescription')}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <input
-              ref={signatureInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              className="hidden"
-              onChange={(e) => void handleUpload('signature', e)}
-              data-testid="profile-editor-signature-input"
-            />
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{t('profile.signatureLabel')}</p>
-                <p className="text-xs text-muted-foreground" data-testid="profile-editor-signature-status">
-                  {signatureAt === null
-                    ? t('profile.signatureNotUploaded')
-                    : t('profile.signatureUploadedAt', { time: formatHHMMSS(signatureAt) })}
+          <div className="flex flex-col gap-2">
+            <Label>{t('profile.usedDevicesLabel')}</Label>
+            <div className="flex flex-col gap-2" data-testid="profile-editor-used-devices">
+              {devicesLoading && usedDevices.length === 0 ? (
+                <p className="text-xs text-muted-foreground">…</p>
+              ) : usedDevices.length === 0 ? (
+                <p
+                  className="text-xs text-muted-foreground italic"
+                  data-testid="profile-editor-used-devices-empty"
+                >
+                  {t('profile.usedDevicesEmpty')}
                 </p>
-                {/* Phase 6 UAT G-06-3 — render the actual uploaded image so the
-                    doctor can confirm the right file landed. Hidden when
-                    nothing is uploaded yet. ~60px tall preview — large
-                    enough to verify legibility, small enough to not
-                    dominate the page. */}
-                {signaturePreview !== null ? (
-                  <img
-                    src={signaturePreview}
-                    alt="Uploaded signature preview"
-                    className="mt-1 max-h-[60px] max-w-[200px] rounded border border-slate-200 bg-white object-contain p-1"
-                    data-testid="profile-editor-signature-preview"
-                  />
-                ) : null}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => signatureInputRef.current?.click()}
-                data-testid="profile-editor-signature-button"
-              >
-                <ImagePlus className="size-4 mr-1" aria-hidden="true" />
-                {t('profile.uploadSignature')}
-              </Button>
-            </div>
+              ) : (
+                <ul className="flex flex-col gap-2">
+                  {usedDevices.map((d) => (
+                    <li
+                      key={d.id}
+                      className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                      data-testid={`profile-editor-used-device-row-${d.id}`}
+                    >
+                      <div className="flex flex-col">
+                        <span className="font-medium">{d.name}</span>
+                        {d.notes !== null ? (
+                          <span className="text-xs text-muted-foreground">{d.notes}</span>
+                        ) : null}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => void handleRemoveDevice(d.id)}
+                        aria-label={`${t('profile.usedDevicesRemove')}: ${d.name}`}
+                        data-testid={`profile-editor-used-device-remove-${d.id}`}
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
+              )}
 
-            <input
-              ref={logoInputRef}
-              type="file"
-              accept="image/png,image/jpeg"
-              className="hidden"
-              onChange={(e) => void handleUpload('logo', e)}
-              data-testid="profile-editor-logo-input"
-            />
-            <div className="flex items-center justify-between">
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-medium">{t('profile.logoLabel')}</p>
-                <p className="text-xs text-muted-foreground" data-testid="profile-editor-logo-status">
-                  {logoAt === null
-                    ? t('profile.logoNotUploaded')
-                    : t('profile.logoUploadedAt', { time: formatHHMMSS(logoAt) })}
-                </p>
-                {logoPreview !== null ? (
-                  <img
-                    src={logoPreview}
-                    alt="Uploaded clinic logo preview"
-                    className="mt-1 max-h-[60px] max-w-[200px] rounded border border-slate-200 bg-white object-contain p-1"
-                    data-testid="profile-editor-logo-preview"
+              <div className="flex flex-wrap items-end gap-2 rounded-md border border-dashed border-slate-300 p-2">
+                <div className="flex min-w-[200px] flex-1 flex-col gap-1">
+                  <Input
+                    placeholder={t('profile.usedDevicesNamePlaceholder')}
+                    value={newDeviceName}
+                    onChange={(e) => setNewDeviceName(e.target.value)}
+                    data-testid="profile-editor-used-device-name-input"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleAddDevice();
+                    }}
                   />
-                ) : null}
+                </div>
+                <div className="flex min-w-[200px] flex-1 flex-col gap-1">
+                  <Input
+                    placeholder={t('profile.usedDevicesNotesPlaceholder')}
+                    value={newDeviceNotes}
+                    onChange={(e) => setNewDeviceNotes(e.target.value)}
+                    data-testid="profile-editor-used-device-notes-input"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleAddDevice();
+                    }}
+                  />
+                </div>
+                <Button
+                  onClick={() => void handleAddDevice()}
+                  disabled={newDeviceName.trim() === '' || addingDevice}
+                  data-testid="profile-editor-used-device-add"
+                >
+                  {t('profile.usedDevicesAdd')}
+                </Button>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => logoInputRef.current?.click()}
-                data-testid="profile-editor-logo-button"
-              >
-                <ImagePlus className="size-4 mr-1" aria-hidden="true" />
-                {t('profile.uploadLogo')}
-              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </CardContent>
+      </Card>
 
-        {/* Phase 7 / Plan 07-03 — I18N-01 per-doctor language preference
-            (D-17). EN/AR radio fires profile.update + audit.log
-            ('language.changed') in parallel. Sits BELOW the Assets Card
-            so the existing profile-editor tests for the upper Cards
-            remain green. */}
-        <Card data-testid="profile-editor-language-card">
-          <CardHeader>
-            <CardTitle>{t('language.label')}</CardTitle>
-            <CardDescription>{t('language.description')}</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-3">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <input
-                  id="profile-editor-language-en"
-                  type="radio"
-                  name="profile-editor-language"
-                  value="en"
-                  checked={selectedLang === 'en'}
-                  onChange={() => void handleLanguageChange('en')}
-                  data-testid="profile-editor-language-en"
-                />
-                {/* ponytail: the radio labels are the language NAMES
-                    (English / العربية) — translating them would defeat
-                    the purpose of the picker. Stays hard-coded. */}
-                <Label htmlFor="profile-editor-language-en">English</Label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input
-                  id="profile-editor-language-ar"
-                  type="radio"
-                  name="profile-editor-language"
-                  value="ar"
-                  dir="rtl"
-                  checked={selectedLang === 'ar'}
-                  onChange={() => void handleLanguageChange('ar')}
-                  data-testid="profile-editor-language-ar"
-                />
-                <Label htmlFor="profile-editor-language-ar">العربية</Label>
-              </div>
+      <Card data-testid="profile-editor-language-card">
+        <CardHeader>
+          <CardTitle>{t('language.label')}</CardTitle>
+          <CardDescription>{t('language.description')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                id="profile-editor-language-en"
+                type="radio"
+                name="profile-editor-language"
+                value="en"
+                checked={selectedLang === 'en'}
+                onChange={() => void handleLanguageChange('en')}
+                data-testid="profile-editor-language-en"
+              />
+              <Label htmlFor="profile-editor-language-en">English</Label>
             </div>
-          </CardContent>
-        </Card>
+            <div className="flex items-center gap-2">
+              <input
+                id="profile-editor-language-ar"
+                type="radio"
+                name="profile-editor-language"
+                value="ar"
+                dir="rtl"
+                checked={selectedLang === 'ar'}
+                onChange={() => void handleLanguageChange('ar')}
+                data-testid="profile-editor-language-ar"
+              />
+              <Label htmlFor="profile-editor-language-ar">العربية</Label>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </SettingsLayout>
   );
 }

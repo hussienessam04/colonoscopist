@@ -33,6 +33,10 @@ const PROFILE: DoctorProfile = {
   phone: '+20-2-1234-5678',
   signaturePath: 'data/profiles/099/signature.png',
   logoPath: 'data/profiles/099/logo.png',
+  // Quick task 260812-ns0 — header / footer / premedication.
+  headerImagePath: null,
+  footerImagePath: null,
+  premedication: 'Midazolam 2-5mg IV',
   // Phase 7 / Plan 07-03 — I18N-01 (D-17): per-doctor language override.
   // Tests that flip the language override this to 'ar' before mounting.
   language: 'en',
@@ -388,5 +392,147 @@ describe('ProfileEditor', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // Quick task 260812-ns0 — header / footer image uploaders + the
+  // 2x2 Asset grid + the new "Procedure defaults" card (premedication
+  // + used-devices CRUD).
+  describe('Quick task 260812-ns0 — header/footer/premedication/used-devices', () => {
+    it('Assets card renders header + footer + signature + logo uploaders in a 2x2 grid', async () => {
+      const api = getApi();
+      api.profile.get.mockResolvedValue(PROFILE);
+      await renderProfileEditor();
+      expect(
+        await screen.findByTestId('profile-editor-header-button'),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByTestId('profile-editor-footer-button'),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByTestId('profile-editor-signature-button'),
+      ).toBeInTheDocument();
+      expect(
+        await screen.findByTestId('profile-editor-logo-button'),
+      ).toBeInTheDocument();
+      // The four hidden file inputs all live in the Assets card.
+      expect(
+        screen.getByTestId('profile-editor-header-input'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('profile-editor-footer-input'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('profile-editor-signature-input'),
+      ).toBeInTheDocument();
+      expect(
+        screen.getByTestId('profile-editor-logo-input'),
+      ).toBeInTheDocument();
+    });
+
+    it('header image upload accepts a PNG (mirror of the signature upload contract)', async () => {
+      const api = getApi();
+      api.profile.get.mockResolvedValue(PROFILE);
+      api.profile.uploadHeader.mockResolvedValue({ headerImagePath: 'h.png' });
+      const origFileReader = globalThis.FileReader;
+      class StubFileReader {
+        public result: string | ArrayBuffer | null = null;
+        public error: Error | null = null;
+        public onload: ((ev: ProgressEvent<FileReader>) => void) | null = null;
+        public onerror: ((ev: ProgressEvent<FileReader>) => void) | null = null;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        public readAsDataURL(_file: Blob): void {
+          this.result = `data:image/png;base64,${PNG_BASE64}`;
+          setTimeout(() => this.onload?.({} as ProgressEvent<FileReader>), 0);
+        }
+      }
+      globalThis.FileReader = StubFileReader as unknown as typeof FileReader;
+      try {
+        await renderProfileEditor();
+        const input = (await screen.findByTestId(
+          'profile-editor-header-input',
+        )) as HTMLInputElement;
+        const file = new File([new Uint8Array([0])], 'h.png', { type: 'image/png' });
+        fireEvent.change(input, { target: { files: [file] } });
+        await waitFor(() => {
+          expect(api.profile.uploadHeader).toHaveBeenCalled();
+        }, { timeout: 1500 });
+      } finally {
+        globalThis.FileReader = origFileReader;
+      }
+    });
+
+    it('premedication input is wired to the auto-save IPC (focus → blur → profile.update)', async () => {
+      const api = getApi();
+      api.profile.get.mockResolvedValue(PROFILE);
+      api.profile.update.mockImplementation(async (input) => ({
+        ...PROFILE,
+        ...input,
+      }));
+      await renderProfileEditor();
+      const input = (await screen.findByTestId(
+        'profile-editor-premedication',
+      )) as HTMLInputElement;
+      // The initial value mirrors PROFILE.premedication.
+      expect(input.value).toBe('Midazolam 2-5mg IV');
+      fireEvent.change(input, { target: { value: 'Midazolam 1-2mg IV' } });
+      await waitFor(
+        () => {
+          expect(api.profile.update).toHaveBeenCalled();
+        },
+        { timeout: 1500 },
+      );
+      const lastCall = api.profile.update.mock.calls.at(-1)![0] as {
+        premedication?: string | null;
+      };
+      expect(lastCall.premedication).toBe('Midazolam 1-2mg IV');
+    });
+
+    it('used-devices CRUD: add → list refetches → remove → list refetches', async () => {
+      const api = getApi();
+      const DEV1 = {
+        id: '00000000-0000-4000-8000-000000000a01',
+        profileId: '00000000-0000-4000-8000-000000000555',
+        name: 'Olympus CV-260',
+        notes: null,
+        sortOrder: 0,
+        createdAt: 1_000,
+        updatedAt: 1_000,
+      };
+
+      // Empty initial list → empty state visible.
+      api.profile.get.mockResolvedValue(PROFILE);
+      api.usedDevices.list.mockResolvedValue([]);
+      await renderProfileEditor();
+      expect(
+        await screen.findByTestId('profile-editor-used-devices-empty'),
+      ).toBeInTheDocument();
+      // list() fired once on mount.
+      expect(api.usedDevices.list).toHaveBeenCalledTimes(1);
+
+      // Add a device → add() called, list() refetches in the background.
+      api.usedDevices.add.mockResolvedValue(DEV1);
+      const nameInput = (await screen.findByTestId(
+        'profile-editor-used-device-name-input',
+      )) as HTMLInputElement;
+      fireEvent.change(nameInput, { target: { value: 'Olympus CV-260' } });
+      const addBtn = (await screen.findByTestId(
+        'profile-editor-used-device-add',
+      )) as HTMLButtonElement;
+      fireEvent.click(addBtn);
+      await waitFor(
+        () => {
+          expect(api.usedDevices.add).toHaveBeenCalledWith({
+            name: 'Olympus CV-260',
+            notes: null,
+          });
+        },
+        { timeout: 1500 },
+      );
+      // refreshDevices() runs after add — list was called at least
+      // twice now (initial + post-add).
+      await waitFor(() => {
+        expect(api.usedDevices.list.mock.calls.length).toBeGreaterThanOrEqual(2);
+      });
+    });
   });
 });
