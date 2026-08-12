@@ -124,9 +124,9 @@ describe('procedures IPC', () => {
     // Seed a patient for FK.
     const patientId = '00000000-0000-4000-8000-000000000010';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Alice', '1990-01-01', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Alice', '1990-01-01', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
 
     const inserted = proceduresRepo.insert({
       patientId,
@@ -188,9 +188,9 @@ describe('procedures IPC', () => {
 
     const patientId = '00000000-0000-4000-8000-000000000020';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Bob', '1992-02-02', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Bob', '1992-02-02', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
 
     for (let i = 0; i < 3; i++) {
       proceduresRepo.insert({
@@ -240,9 +240,9 @@ describe('procedures IPC', () => {
 
     const patientId = '00000000-0000-4000-8000-000000000030';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Carol', '1993-03-03', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Carol', '1993-03-03', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     const inserted = proceduresRepo.insert({
       patientId,
       doctorId: adminId,
@@ -286,9 +286,9 @@ describe('procedures IPC', () => {
 
     const patientId = '00000000-0000-4000-8000-000000000040';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Dave', '1994-04-04', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Dave', '1994-04-04', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     const inserted = proceduresRepo.insert({
       patientId,
       doctorId: adminId,
@@ -332,9 +332,9 @@ describe('procedures IPC', () => {
 
     const patientId = '00000000-0000-4000-8000-000000000050';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Eve', '1995-05-05', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Eve', '1995-05-05', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     const inserted = proceduresRepo.insert({
       patientId,
       doctorId: adminId,
@@ -396,9 +396,9 @@ describe('procedures IPC', () => {
 
     const patientId = '00000000-0000-4000-8000-000000000060';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Frank', '1996-06-06', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Frank', '1996-06-06', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     const inserted = proceduresRepo.insert({
       patientId,
       doctorId: adminId,

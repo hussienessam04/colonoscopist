@@ -73,10 +73,13 @@ async function bootstrapAndLogin(): Promise<{
   // Seed a patient + procedure for FK satisfaction.
   const db = getDb();
   const patientId = '00000000-0000-4000-8000-000000000001';
+  // Quick task 20260812 — mrn is NOT NULL after migration 0008; raw SQL
+  // inserts must supply one. Derive deterministically from id tail so
+  // the unique idx never collides across tests (each gets a fresh DB).
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(patientId, 'Alice', '1990-01-01', Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(patientId, 'Alice', '1990-01-01', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
   const inserted = proceduresRepo.insert({
     patientId,
     doctorId: r.userId,

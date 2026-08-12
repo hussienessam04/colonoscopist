@@ -65,9 +65,9 @@ async function bootstrap(opts?: { status?: 'completed' | 'partial' }): Promise<{
   await login({ userId: r.userId, pin: '1234' });
   const patientId = '00000000-0000-4000-8000-000000000010';
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(patientId, 'Alice', '1990-01-01', Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(patientId, 'Alice', '1990-01-01', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
   const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
   const inserted = proceduresRepo.insert({
     patientId,
@@ -208,9 +208,9 @@ describe('applyTrim', () => {
     const r = await wizardBootstrap({ fullName: 'Dr. B', clinicName: 'Clinic B', pin: '1234' });
     const patientId = '00000000-0000-4000-8000-000000000020';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?)`,
-    ).run(patientId, 'Bob', '1992-02-02', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    ).run(patientId, 'Bob', '1992-02-02', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
     const inserted = proceduresRepo.insert({
       patientId,

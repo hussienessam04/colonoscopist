@@ -75,8 +75,9 @@ describe('db migrations', () => {
       name: string;
     }[];
     // Phase 7 / Plan 07-01 added migration 0007 (doctor_profile.language +
-    // users.language). Total now = 5.
-    expect(migrations).toHaveLength(5);
+    // users.language). Quick task 20260812 added migration 0008 (auto-MRN).
+    // Total now = 6.
+    expect(migrations).toHaveLength(6);
     expect(migrations[0].id).toBe(1);
 
     // Phase 7 / Plan 07-01 — verify migration 0007 added the language
@@ -112,13 +113,13 @@ describe('db migrations', () => {
 
     // First open
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(6);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(5);
+    expect(count).toBe(6);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(
@@ -131,9 +132,9 @@ describe('db migrations', () => {
     // a second time (which would otherwise throw `duplicate column`).
     closeDb();
 
-    // Third open — confirm migration count stays at 5 (idempotency).
+    // Third open — confirm migration count stays at 6 (idempotency).
     const db3 = getDb();
-    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(5);
+    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(6);
     closeDb();
   });
 });

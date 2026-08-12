@@ -6,6 +6,10 @@
 -- ponytail: ROW_NUMBER() OVER (ORDER BY created_at, id) keeps backfill stable across
 -- restarts — same input ordering each run, and `id` is the deterministic tiebreaker
 -- when two rows share a millisecond timestamp.
+--
+-- SQLite quirk: the SET clause of an UPDATE cannot reference CTE columns directly
+-- (e.g. `SET col = cte.col` errors with "no such column: cte.col"). The fix is a
+-- correlated subquery in SET that joins the CTE back to patients by id.
 WITH numbered AS (
   SELECT id,
          ROW_NUMBER() OVER (
@@ -19,7 +23,11 @@ WITH numbered AS (
   WHERE mrn IS NULL
 )
 UPDATE patients
-SET mrn = 'MRN-' || printf('%06d', numbered.seq)
+SET mrn = (
+  SELECT 'MRN-' || printf('%06d', numbered.seq)
+  FROM numbered
+  WHERE numbered.id = patients.id
+)
 WHERE id IN (SELECT id FROM numbered);
 
 -- Step B: create the one-row counter table.

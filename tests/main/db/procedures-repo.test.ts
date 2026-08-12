@@ -49,9 +49,9 @@ async function bootstrap(): Promise<{
   await login({ userId: r.userId, pin: '1234' });
   const patientId = '00000000-0000-4000-8000-000000000010';
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(patientId, 'Alice', '1990-01-01', Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(patientId, 'Alice', '1990-01-01', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
   const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
   const inserted = proceduresRepo.insert({
     patientId,
@@ -181,9 +181,9 @@ describe('proceduresRepo.list — Phase 7 date + doctor filters (D-04)', () => {
     ).run(doctor2, 'Dr. B', Date.now());
     const patientId = '00000000-0000-4000-8000-000000000010';
     db.prepare(
-      `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-       VALUES (?, ?, '1990-01-01', ?, ?)`,
-    ).run(patientId, 'Alice', Date.now(), Date.now());
+      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+       VALUES (?, ?, '1990-01-01', ?, ?, ?)`,
+    ).run(patientId, 'Alice', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
     return { doctor1: r.userId, doctor2, patientId };
   }
 

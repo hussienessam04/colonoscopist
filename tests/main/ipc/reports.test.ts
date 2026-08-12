@@ -69,10 +69,11 @@ async function bootstrap(): Promise<{ userId: string; procedureId: string }> {
   await login({ userId: r.userId, pin: '1234' });
   const db = getDb();
   const patientId = '00000000-0000-4000-8000-000000000010';
+  // Quick task 20260812 — mrn NOT NULL after migration 0008.
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(patientId, 'Alice', '1990-01-01', Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(patientId, 'Alice', '1990-01-01', `MRN-T-${patientId.slice(-8)}`, Date.now(), Date.now());
   const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
   const procedure = proceduresRepo.insert({
     patientId,

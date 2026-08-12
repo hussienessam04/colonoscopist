@@ -51,9 +51,9 @@ async function bootstrapAndSeed(): Promise<{
   // Seed FK parents (patient + doctor) so proceduresRepo.insert can satisfy
   // the FK constraints.
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?)`,
-  ).run(PATIENT_ID, 'Alice', '1990-01-01', Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+  ).run(PATIENT_ID, 'Alice', '1990-01-01', `MRN-T-${PATIENT_ID.slice(-8)}`, Date.now(), Date.now());
   db.prepare(
     `INSERT INTO users (id, full_name, is_first_admin, pin_hash, created_at)
      VALUES (?, ?, 1, 'h', ?)`,

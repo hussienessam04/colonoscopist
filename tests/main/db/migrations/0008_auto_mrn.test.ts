@@ -4,6 +4,7 @@
 // partial unique index into a full unique index.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import Database from 'better-sqlite3';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -52,38 +53,80 @@ afterEach(() => {
   }
 });
 
+// ponytail: helper that creates the DB file at the userData path and
+// applies only migration 0001 (so the patients table exists with a nullable
+// mrn column). After this returns, calling getDb() picks up the file and
+// applies migrations 0002-0008 on top — 0008's backfill runs against the
+// NULL row we seeded.
+//
+// dbPath() resolves to `<userData>/data/app.db` (see src/main/paths.ts:14),
+// so we mirror that path here. tmpDir IS userData in the vi.mock setup above.
+function seedPreMigrationFixtures(): void {
+  const fs = require('node:fs') as typeof import('node:fs');
+  fs.mkdirSync(path.join(tmpDir, 'data'), { recursive: true });
+  const dbPath = path.join(tmpDir, 'data', 'app.db');
+  const db = new Database(dbPath);
+  db.pragma('foreign_keys = ON');
+  // Run migration 0001 verbatim (creates _migrations + users + patients).
+  db.exec(
+    `CREATE TABLE _migrations (id INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at INTEGER NOT NULL);
+     INSERT INTO _migrations (id, name, applied_at) VALUES (1, 'init', 0);
+     CREATE TABLE users (
+       id TEXT PRIMARY KEY, full_name TEXT NOT NULL, is_first_admin INTEGER NOT NULL DEFAULT 0,
+       pin_hash TEXT NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0,
+       locked_until INTEGER, is_locked INTEGER NOT NULL DEFAULT 0,
+       last_login_at INTEGER, created_at INTEGER NOT NULL, deleted_at INTEGER,
+       CHECK (is_first_admin IN (0, 1))
+     );
+     CREATE UNIQUE INDEX idx_users_first_admin ON users(is_first_admin) WHERE is_first_admin = 1;
+     CREATE INDEX idx_users_full_name ON users(full_name COLLATE NOCASE);
+     CREATE TABLE patients (
+       id TEXT PRIMARY KEY, full_name TEXT NOT NULL, dob TEXT NOT NULL,
+       gender TEXT, mrn TEXT, phone TEXT, notes TEXT,
+       created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, deleted_at INTEGER
+     );
+     CREATE UNIQUE INDEX idx_patients_mrn ON patients(mrn) WHERE mrn IS NOT NULL AND deleted_at IS NULL;
+     CREATE INDEX idx_patients_name ON patients(full_name COLLATE NOCASE);
+     CREATE INDEX idx_patients_deleted ON patients(deleted_at);
+     CREATE TABLE audit_log (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, action TEXT NOT NULL,
+       entity_type TEXT, entity_id TEXT, metadata TEXT, outcome TEXT NOT NULL DEFAULT 'ok',
+       created_at INTEGER NOT NULL
+     );
+     CREATE INDEX idx_audit_user ON audit_log(user_id);
+     CREATE INDEX idx_audit_created ON audit_log(created_at);
+     CREATE INDEX idx_audit_action ON audit_log(action);
+     CREATE TRIGGER audit_log_no_update BEFORE UPDATE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
+     CREATE TRIGGER audit_log_no_delete BEFORE DELETE ON audit_log BEGIN SELECT RAISE(ABORT, 'audit_log is append-only'); END;
+     CREATE TABLE settings (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL);`,
+  );
+  // Seed three fixtures: one NULL, one MRN-001, one MRN-ABC.
+  const now = Date.now();
+  db.prepare(
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, 'Null Person', '1980-01-01', NULL, ?, ?)`,
+  ).run('00000000-0000-4000-8000-0000000000a1', now, now);
+  db.prepare(
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, 'Old One', '1980-01-01', 'MRN-001', ?, ?)`,
+  ).run('00000000-0000-4000-8000-0000000000a2', now, now);
+  db.prepare(
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, 'Old Two', '1980-01-01', 'MRN-ABC', ?, ?)`,
+  ).run('00000000-0000-4000-8000-0000000000a3', now, now);
+  db.close();
+}
+
 describe('0008_auto_mrn migration', () => {
   it('backfills NULL mrn rows and seeds the counter above the max existing suffix', async () => {
+    seedPreMigrationFixtures();
+    // Open via the standard path — getDb() applies migrations 2-8 on top
+    // of our pre-seeded state. Migration 0008's backfill runs against the
+    // NULL row we seeded.
     const { getDb, closeDb } = await import('../../../../src/main/db');
     const db = getDb();
-    // Migrations have already run via getDb(). Seed three rows directly:
-    // one with NULL mrn, one with MRN-001, one with MRN-ABC (non-numeric).
-    const now = Date.now();
-    db.prepare(
-      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
-       VALUES (?, 'Null Person', '1980-01-01', NULL, ?, ?)`,
-    ).run('00000000-0000-4000-8000-0000000000a1', now, now);
-    db.prepare(
-      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
-       VALUES (?, 'Old One', '1980-01-01', 'MRN-001', ?, ?)`,
-    ).run('00000000-0000-4000-8000-0000000000a2', now, now);
-    db.prepare(
-      `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
-       VALUES (?, 'Old Two', '1980-01-01', 'MRN-ABC', ?, ?)`,
-    ).run('00000000-0000-4000-8000-0000000000a3', now, now);
 
-    // Force re-apply: close DB, drop the 0008 marker row, reopen.
-    closeDb();
-    // Re-import to get a fresh module instance with no cached connection.
-    const { runMigrations } = await import('../../../../src/main/db/migrations');
-    const { getDb: getDb2 } = await import('../../../../src/main/db');
-    // The cached `db` module still has tmpDir in userData path; reopen it.
-    const db2 = getDb2();
-    // Wipe just the 0008 marker row so runMigrations re-applies it.
-    db2.prepare(`DELETE FROM _migrations WHERE id = 8`).run();
-    runMigrations(db2);
-
-    const rows = db2
+    const rows = db
       .prepare(
         `SELECT id, mrn FROM patients WHERE id IN (?, ?, ?)`,
       )
@@ -103,8 +146,7 @@ describe('0008_auto_mrn migration', () => {
     // Pre-existing 'MRN-ABC' is preserved verbatim (non-numeric suffix).
     const oldTwo = rows.find((r) => r.id === '00000000-0000-4000-8000-0000000000a3');
     expect(oldTwo?.mrn).toBe('MRN-ABC');
-    // The backfilled NULL row gets a non-null MRN (we don't pin the exact
-    // value — depends on the ROW_NUMBER ordering vs. pre-existing fixtures).
+    // The backfilled NULL row gets a non-null MRN matching the serial format.
     const nullRow = rows.find((r) => r.id === '00000000-0000-4000-8000-0000000000a1');
     expect(nullRow?.mrn).toBeTruthy();
     expect(nullRow?.mrn).toMatch(/^MRN-\d{6}$/);
@@ -112,7 +154,7 @@ describe('0008_auto_mrn migration', () => {
     // Counter table exists and is seeded above the max numeric suffix
     // present in the data (MRN-001 → next starts at 2; MRN-ABC is non-numeric
     // so MAX(CAST(SUBSTR(...))) stays at 1 → counter = 2).
-    const counter = db2
+    const counter = db
       .prepare(`SELECT next FROM patient_mrn_counter WHERE id = 1`)
       .get() as { next: number } | undefined;
     expect(counter).toBeDefined();
@@ -120,7 +162,7 @@ describe('0008_auto_mrn migration', () => {
 
     // The mrn column is NOT NULL at the schema layer.
     expect(() =>
-      db2
+      db
         .prepare(
           `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
            VALUES ('00000000-0000-4000-8000-0000000000ff', 'Should Fail', '1980-01-01', 0, 0)`,
@@ -130,7 +172,7 @@ describe('0008_auto_mrn migration', () => {
 
     // The unique index rejects a duplicate MRN (no longer partial).
     expect(() =>
-      db2
+      db
         .prepare(
           `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
            VALUES ('00000000-0000-4000-8000-0000000000fe', 'Dup', '1980-01-01', 'MRN-001', 0, 0)`,
