@@ -28,6 +28,9 @@ import { app } from 'electron';
 
 import { reportsRepo } from '../db/reports-repo';
 import { doctorProfileRepo } from '../db/doctor-profile-repo';
+// Quick task 260812-ns0 — used-devices repo (1:N with doctor_profile)
+// for the procedure defaults block on the report.
+import { usedDevicesRepo } from '../db/used-devices-repo';
 import { userRepo } from '../db/users';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
@@ -163,11 +166,22 @@ export async function renderReportPdf(
   // path is `profileAssetPath(userId, storedRel)` per Anti-Pattern 2:
   // the DB stores a userData-relative path; main resolves to absolute
   // at read time.
+  //
+  // Quick task 260812-ns0 — header + footer image boxes (top/bottom
+  // band on every PDF page). The same `readImageBox` helper handles
+  // header/footer — natural aspect ratio + buffer; the template
+  // computes the actual on-page size from the report page width.
   const logoBox = profile?.logoPath
     ? readImageBox(profileAssetPath(report.doctorId, profile.logoPath), LOGO_BOX)
     : null;
   const signatureBox = profile?.signaturePath
     ? readImageBox(profileAssetPath(report.doctorId, profile.signaturePath), SIGNATURE_BOX)
+    : null;
+  const headerBox = profile?.headerImagePath
+    ? readImageBox(profileAssetPath(report.doctorId, profile.headerImagePath), { widthPx: 0, heightPx: 0 })
+    : null;
+  const footerBox = profile?.footerImagePath
+    ? readImageBox(profileAssetPath(report.doctorId, profile.footerImagePath), { widthPx: 0, heightPx: 0 })
     : null;
 
   // Load attached screenshots one-per-page, ordered by sort_order
@@ -199,9 +213,29 @@ export async function renderReportPdf(
     });
   }
 
+  // Quick task 260812-ns0 — load used-devices for the report (sorted
+  // by sort_order ASC, then created_at ASC per the repo's listByProfile).
+  // Empty array when the doctor hasn't added any devices; the template
+  // hides the section in that case.
+  const usedDevicesRows = profile
+    ? usedDevicesRepo.listByProfile(profile.id).map((d) => ({
+        id: d.id,
+        name: d.name,
+        notes: d.notes,
+      }))
+    : [];
+
   const input: ReportPdfInput = {
     logoBox,
     signatureBox,
+    // Quick task 260812-ns0 — header / footer image bands + used
+    // devices + premedication. Each is null / empty when the source
+    // is unset; the template handles the null / empty case by hiding
+    // the section entirely (no placeholder text).
+    headerBox,
+    footerBox,
+    usedDevices: usedDevicesRows,
+    premedication: profile?.premedication ?? null,
     clinicName: profile?.clinicNameEn ?? 'Clinic',
     doctorName: `Dr. ${doctor.full_name}`,
     procedureDateLabel: new Date(procedure.startedAt).toISOString().slice(0, 10),

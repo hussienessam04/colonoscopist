@@ -50,6 +50,27 @@ import {
   type ImageBox,
 } from './embed-image';
 
+// Quick task 260812-ns0 — header (top) + footer (bottom) band styles.
+// Full-width images, ~80px tall, drawn just inside the page padding
+// (so the natural aspect ratio fits without overflowing the page
+// width). The aspect ratio of the actual uploaded image is preserved
+// via `objectFit: 'contain'` semantics on the @react-pdf/renderer
+// <Image> — the band's height grows to match when the source is
+// taller than 80px.
+const HEADER_BAND_STYLE = {
+  width: '100%',
+  maxHeight: 80,
+  objectFit: 'contain' as const,
+  marginBottom: 12,
+  // data-testid set on the <Image> itself, not the style.
+};
+const FOOTER_BAND_STYLE = {
+  width: '100%',
+  maxHeight: 80,
+  objectFit: 'contain' as const,
+  marginTop: 12,
+};
+
 export type AttachedScreenshot = {
   screenshotId: number;
   filePath: string;
@@ -65,6 +86,20 @@ export type ReportPdfInput = {
   // Header inputs (logo top-left, signature top-right).
   logoBox: ImageBox | null;
   signatureBox: ImageBox | null;
+  // Quick task 260812-ns0 — header (top band) + footer (bottom band)
+  // image boxes, rendered on every PDF page. Null when the doctor has
+  // not uploaded the asset; the template omits the band entirely in
+  // that case (no placeholder, unlike logo + signature which show
+  // "[No logo uploaded]" / "[No signature on file]").
+  headerBox: ImageBox | null;
+  footerBox: ImageBox | null;
+  // Quick task 260812-ns0 — used devices (1:N with doctor_profile).
+  // Rendered as a compact name + optional-notes list in the patient
+  // block header. Empty array = the section is hidden.
+  usedDevices: { id: string; name: string; notes: string | null }[];
+  // Quick task 260812-ns0 — clinic-default premedication (free-text).
+  // Surfaces in the patient block header above findings.
+  premedication: string | null;
   clinicName: string;
   doctorName: string;
   procedureDateLabel: string;
@@ -175,6 +210,27 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     patientField: {
       marginRight: 18,
     },
+    // Quick task 260812-ns0 — used-devices block (compact name list
+    // with optional notes) sits inside the patient block above the
+    // procedure block. Hidden when usedDevices.length === 0.
+    usedDevicesBlock: {
+      marginTop: 6,
+      width: '100%',
+    },
+    usedDevicesLabel: {
+      fontSize: 10,
+      fontWeight: 'bold',
+      color: '#0f172a',
+      marginBottom: 2,
+    },
+    usedDevicesRow: {
+      fontSize: 10,
+      color: '#1f2937',
+    },
+    usedDevicesNotes: {
+      fontSize: 10,
+      color: '#475569',
+    },
     // Phase 6 UAT G-06-4 — attached screenshots render as INLINE
     // thumbnails BELOW the body sections (not separate full-page
     // figures). Each thumbnail is ~120×100px to keep the visual
@@ -279,6 +335,13 @@ export function createReportPdfElement(
   const {
     logoBox,
     signatureBox,
+    // Quick task 260812-ns0 — header / footer image bands + used
+    // devices + premedication. Header/footer default to null (the
+    // bands are hidden when the doctor hasn't uploaded an asset).
+    headerBox = null,
+    footerBox = null,
+    usedDevices = [],
+    premedication = null,
     clinicName,
     doctorName,
     procedureDateLabel,
@@ -335,6 +398,20 @@ export function createReportPdfElement(
     React.createElement(
       P.Page,
       { size: 'LETTER', style: pageStyle },
+      // Quick task 260812-ns0 — top band: the uploaded header image
+      // (full-width, ~80px tall) renders above the existing fixed
+      // header. Null when the doctor hasn't uploaded one; the band is
+      // hidden entirely in that case (no placeholder).
+      headerBox !== null
+        ? React.createElement(
+            P.Image,
+            {
+              src: headerBox.buffer,
+              style: HEADER_BAND_STYLE,
+              'data-testid': 'report-pdf-header-image',
+            },
+          )
+        : null,
       // Header (logo + signature + names + date)
       React.createElement(
         P.View,
@@ -435,7 +512,56 @@ export function createReportPdfElement(
             'Gender: ',
             patientGender ?? '—',
           ),
+          // Quick task 260812-ns0 — premedication (clinic default) sits
+          // in the patient block above findings. Null / empty = the
+          // line is omitted entirely (don't render "[Not set]").
+          // Free-text only — render as-is; if the clinic types it in
+          // Arabic, the parent <View> flips to RTL via the existing
+          // isAr branch above.
+          premedication !== null && premedication !== ''
+            ? React.createElement(
+                P.Text,
+                {
+                  style: styles.patientField,
+                  'data-testid': 'report-pdf-premedication',
+                },
+                isAr ? 'التخدير المبدئي: ' : 'Pre-medication: ',
+                premedication,
+              )
+            : null,
         ),
+        // Quick task 260812-ns0 — used devices (1:N with doctor_profile).
+        // Rendered as a compact name list with optional notes in the
+        // patient block footer (just before the procedure block). Empty
+        // array = the entire block is hidden.
+        usedDevices.length > 0
+          ? React.createElement(
+              P.View,
+              {
+                style: styles.usedDevicesBlock,
+                'data-testid': 'report-pdf-used-devices',
+              },
+              React.createElement(
+                P.Text,
+                { style: styles.usedDevicesLabel },
+                isAr ? 'الأجهزة المستخدمة' : 'Used devices',
+              ),
+              ...usedDevices.map((d) =>
+                React.createElement(
+                  P.Text,
+                  { key: d.id, style: styles.usedDevicesRow },
+                  d.name,
+                  d.notes !== null && d.notes !== ''
+                    ? React.createElement(
+                        P.Text,
+                        { style: styles.usedDevicesNotes },
+                        ` — ${d.notes}`,
+                      )
+                    : null,
+                ),
+              ),
+            )
+          : null,
       ),
 
       // Procedure block — duration is HH:MM:SS numeric; isolate it.
@@ -598,6 +724,20 @@ export function createReportPdfElement(
           ),
         ),
       ),
+      // Quick task 260812-ns0 — bottom band: the uploaded footer image
+      // (full-width, ~80px tall) renders below the existing fixed
+      // footer. Null when the doctor hasn't uploaded one; the band is
+      // hidden entirely in that case.
+      footerBox !== null
+        ? React.createElement(
+            P.Image,
+            {
+              src: footerBox.buffer,
+              style: FOOTER_BAND_STYLE,
+              'data-testid': 'report-pdf-footer-image',
+            },
+          )
+        : null,
     ),
   );
 }
