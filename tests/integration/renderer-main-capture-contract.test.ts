@@ -279,11 +279,13 @@ describe('G-03-5 — useVideoPreview guards malformed custom preset', () => {
 
 describe('G-03-6 — SettingsSidebar is mounted on every Settings page', () => {
   // ponytail: the shared SettingsSidebar component is the ONLY sidebar on
-  // all three Settings pages. The static-analysis contract pins (a) the
-  // exported function, (b) the data-active attribute that drives the
-  // active-tab highlight, and (c) the per-page import + render site so a
-  // future refactor cannot silently drop the sidebar from any of the
-  // three pages.
+  // all settings pages. Quick task 260812-n0h refactored the pages to
+  // render <SettingsLayout> (which mounts <SettingsSidebar> internally)
+  // instead of importing <SettingsSidebar> directly. The contract shifts
+  // from "page imports SettingsSidebar" to "page imports SettingsLayout"
+  // and "SettingsLayout imports SettingsSidebar" — both invariants are
+  // pinned so a future refactor cannot silently drop the sidebar from
+  // either layer.
   it('SettingsSidebar exports the SettingsSidebar function', () => {
     expect(SETTINGS_SIDEBAR_SRC.length).toBeGreaterThan(0);
     expect(SETTINGS_SIDEBAR_SRC).toMatch(/export\s+function\s+SettingsSidebar/);
@@ -296,23 +298,33 @@ describe('G-03-6 — SettingsSidebar is mounted on every Settings page', () => {
     expect(SETTINGS_SIDEBAR_SRC).toContain('data-active');
   });
 
-  it('SettingsHub imports and renders <SettingsSidebar />', () => {
-    expect(SETTINGS_HUB_SRC).toMatch(/import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/);
-    expect(SETTINGS_HUB_SRC).toMatch(/<SettingsSidebar\b/);
+  it('SettingsLayout is the single consumer of <SettingsSidebar /> on the settings pages', () => {
+    // Quick task 260812-n0h — the per-page import moved into the
+    // shared <SettingsLayout>. The literal `<SettingsSidebar` must
+    // appear inside SettingsLayout.tsx (the wiring is still there)
+    // and must NOT appear in any of the page files (they go through
+    // SettingsLayout's `activeTab` prop now).
+    const settingsLayoutSrc = read('src/renderer/src/components/SettingsLayout.tsx');
+    expect(settingsLayoutSrc).toMatch(/<SettingsSidebar\b/);
+    expect(settingsLayoutSrc).toMatch(/<SettingsSidebar[^>]*activeTab\s*=\s*\{activeTab\}/);
+    expect(SETTINGS_HUB_SRC).not.toMatch(/<SettingsSidebar\b/);
+    expect(SETTINGS_CAPTURE_SRC).not.toMatch(/<SettingsSidebar\b/);
+    expect(SETTINGS_USERS_SRC).not.toMatch(/<SettingsSidebar\b/);
   });
 
-  it('SettingsCapture imports and renders <SettingsSidebar activeTab="capture" />', () => {
-    expect(SETTINGS_CAPTURE_SRC).toMatch(
-      /import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/,
-    );
-    expect(SETTINGS_CAPTURE_SRC).toMatch(/<SettingsSidebar[^>]*activeTab\s*=\s*['"]capture['"]/);
+  it('SettingsHub passes no activeTab (no entry highlighted on the hub)', () => {
+    expect(SETTINGS_HUB_SRC).toMatch(/<SettingsLayout\b/);
+    expect(SETTINGS_HUB_SRC).not.toMatch(/activeTab\s*=\s*['"]/);
   });
 
-  it('SettingsUsers imports and renders <SettingsSidebar activeTab="users" />', () => {
-    expect(SETTINGS_USERS_SRC).toMatch(
-      /import\s+\{[^}]*SettingsSidebar[^}]*\}\s+from\s+['"]@\/components\/SettingsSidebar['"]/,
-    );
-    expect(SETTINGS_USERS_SRC).toMatch(/<SettingsSidebar[^>]*activeTab\s*=\s*['"]users['"]/);
+  it('SettingsCapture passes activeTab="capture" to SettingsLayout', () => {
+    expect(SETTINGS_CAPTURE_SRC).toMatch(/<SettingsLayout\b/);
+    expect(SETTINGS_CAPTURE_SRC).toMatch(/activeTab\s*=\s*['"]capture['"]/);
+  });
+
+  it('SettingsUsers passes activeTab="users" to SettingsLayout', () => {
+    expect(SETTINGS_USERS_SRC).toMatch(/<SettingsLayout\b/);
+    expect(SETTINGS_USERS_SRC).toMatch(/activeTab\s*=\s*['"]users['"]/);
   });
 });
 

@@ -1,9 +1,10 @@
 // Settings hub — first-class page replacing the prior transient header menu.
-// Per Plan 03-05 (G-03-3): the right-side sidebar nav is now the shared
-// <SettingsSidebar /> component (per Plan 03-06 G-03-6). Back returns to
-// the Patient List. Existing SettingsCapture and SettingsUsers pages are
-// reached through the sidebar entries; this page is a router, not a
-// destination, so it mounts <SettingsSidebar /> with no activeTab.
+// Per Plan 03-05 (G-03-3): the right-side sidebar nav is now part of the
+// shared SettingsLayout component (per Plan 03-06 G-03-6; refactored under
+// quick task 260812-n0h). Back returns to the Patient List. Existing
+// SettingsCapture and SettingsUsers pages are reached through the sidebar
+// entries; this page is a router, not a destination, so it passes no
+// activeTab to SettingsLayout.
 //
 // Phase 6 / Plan 02 — Profile card. The doctor can pre-fill the clinic
 // name + jump straight into the bilingual profile editor from the hub.
@@ -12,11 +13,16 @@
 // actual page bodies land in Plan 07-03 (Audit) + Plan 07-05 (Backup &
 // Restore). These paragraphs pre-introduce the surfaces so the doctor
 // knows what the sidebar entries do.
-import { ArrowLeft } from 'lucide-react';
+//
+// Quick task 260812-n0h — unified shell: this page now uses
+// SettingsLayout for the header / sidebar / grid so it matches every
+// other settings page. The Hub is the only page whose Back goes to
+// `patients` (instead of `settings-hub`); backLabel is "Back to patients"
+// to make that explicit.
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRoute } from '@/lib/router';
-import { SettingsSidebar } from '@/components/SettingsSidebar';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
 import { useEffect, useState } from 'react';
 
@@ -33,78 +39,61 @@ export default function SettingsHub(): JSX.Element {
   }, [profile?.clinicNameEn]);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl flex flex-col gap-4">
-        <header className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Workspace
-            </p>
-            <h1 className="text-2xl font-semibold">Settings</h1>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ name: 'patients' })}
-            data-testid="settings-hub-back"
-          >
-            <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
-            Back
-          </Button>
-        </header>
-
-        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
-          <SettingsSidebar />
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Settings</CardTitle>
-              <CardDescription>
-                Choose a section from the sidebar. Capture, Profile, Audit,
-                and Backup &amp; restore are available to every authenticated
-                doctor; Users is available to the first admin.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
-              <p>
-                <span className="font-medium text-foreground">Capture</span> — pick
-                a default device, choose a quality preset, and verify the live
-                preview before saving.
-              </p>
-              <p data-testid="settings-hub-profile-card">
-                <span className="font-medium text-foreground">Profile</span> —{' '}
-                {previewClinicName === ''
-                  ? 'add your clinic + doctor details for the report header.'
-                  : `report header currently shows ${previewClinicName}.`}{' '}
-                <Button
-                  variant="link"
-                  size="sm"
-                  className="px-1"
-                  onClick={() => navigate({ name: 'profile-edit' })}
-                  data-testid="settings-hub-profile-link"
-                >
-                  Open profile editor
-                </Button>
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Audit</span> —
-                review the read + write log for every action the system
-                recorded, filter by date or doctor, and export for a periodic
-                compliance review.
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Backup &amp; restore</span> —
-                snapshot the entire patient database + media to a zip on the
-                workstation, or unpack a previous backup into a staging folder
-                for review before activating.
-              </p>
-              <p>
-                <span className="font-medium text-foreground">Users</span> — add
-                or remove staff and reset PINs (first admin only).
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </main>
+    <SettingsLayout
+      title="Settings"
+      subtitle="Choose a section from the sidebar."
+      backTo={{ name: 'patients' }}
+      backTestId="settings-hub-back"
+      backLabel="Back to patients"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>Workspace</CardTitle>
+          <CardDescription>
+            Capture, Profile, Audit, and Backup &amp; restore are
+            available to every authenticated doctor; Users is available
+            to the first admin.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+          <p>
+            <span className="font-medium text-foreground">Capture</span> — pick
+            a default device, choose a quality preset, and verify the live
+            preview before saving.
+          </p>
+          <p data-testid="settings-hub-profile-card">
+            <span className="font-medium text-foreground">Profile</span> —{' '}
+            {previewClinicName === ''
+              ? 'add your clinic + doctor details for the report header.'
+              : `report header currently shows ${previewClinicName}.`}{' '}
+            <Button
+              variant="link"
+              size="sm"
+              className="px-1"
+              onClick={() => navigate({ name: 'profile-edit' })}
+              data-testid="settings-hub-profile-link"
+            >
+              Open profile editor
+            </Button>
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Audit</span> —
+            review the read + write log for every action the system
+            recorded, filter by date or doctor, and export for a periodic
+            compliance review.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Backup &amp; restore</span> —
+            snapshot the entire patient database + media to a zip on the
+            workstation, or unpack a previous backup into a staging folder
+            for review before activating.
+          </p>
+          <p>
+            <span className="font-medium text-foreground">Users</span> — add
+            or remove staff and reset PINs (first admin only).
+          </p>
+        </CardContent>
+      </Card>
+    </SettingsLayout>
   );
 }

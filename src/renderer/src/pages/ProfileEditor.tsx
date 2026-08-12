@@ -15,16 +15,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ImagePlus } from 'lucide-react';
+import { ImagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { SettingsSidebar } from '@/components/SettingsSidebar';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
-import { useRoute } from '@/lib/router';
 import type { DoctorProfile } from '@shared/ipc-contract';
 
 // PNG signature: 89 50 4E 47 0D 0A 1A 0A (8 bytes).
@@ -77,7 +76,6 @@ function profileFromPatch(p: DoctorProfile | null): Pick<
 }
 
 export default function ProfileEditor(): JSX.Element {
-  const { navigate } = useRoute();
   const { profile, loading, refresh, setLocal } = useDoctorProfile();
   // ponytail: visible strings flow through t() per Phase 7 i18n
   // contract. The Language Card's radio labels stay hard-coded
@@ -324,32 +322,17 @@ export default function ProfileEditor(): JSX.Element {
   const f = profileFromPatch(profile);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <SettingsSidebar activeTab="profile" />
-        <div className="flex flex-col gap-4">
-          <header className="flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              {t('profile.pageKicker')}
-            </p>
-            <h1 className="text-2xl font-semibold">{t('profile.pageTitle')}</h1>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => navigate({ name: 'settings-hub' })}
-            data-testid="profile-editor-back"
-          >
-            <ArrowLeft aria-hidden="true" />
-            {t('common.back')}
-          </Button>
-        </header>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('profile.cardClinicTitle')}</CardTitle>
-            <CardDescription>{t('profile.cardClinicDescription')}</CardDescription>
-          </CardHeader>
+    <SettingsLayout
+      title={t('profile.pageTitle')}
+      subtitle={t('profile.pageKicker')}
+      activeTab="profile"
+      backTestId="profile-editor-back"
+    >
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('profile.cardClinicTitle')}</CardTitle>
+          <CardDescription>{t('profile.cardClinicDescription')}</CardDescription>
+        </CardHeader>
           <CardContent className="flex flex-col gap-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="flex flex-col gap-2">
@@ -553,8 +536,6 @@ export default function ProfileEditor(): JSX.Element {
             </div>
           </CardContent>
         </Card>
-        </div>
-      </div>
-    </main>
+    </SettingsLayout>
   );
 }

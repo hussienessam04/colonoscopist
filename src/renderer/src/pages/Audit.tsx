@@ -20,7 +20,8 @@
 // "load" — gives the operator time to navigate away (e.g. accidental
 // click) before the audit row lands.
 //
-// Phase 7 / quick 20260811-audit-ui-polish: SettingsSidebar mounts in
+// Phase 7 / quick 20260811-audit-ui-polish: SettingsSidebar (now wrapped
+// in SettingsLayout per quick task 260812-n0h) mounts in
 // the left rail (mirrors ProfileEditor pattern) + sticky thead +
 // hover:bg-slate-50 rows + status color tokens (bg-{color}-100/800) +
 // 3 grey animate-pulse skeleton rows for loading + differentiated
@@ -28,14 +29,14 @@
 
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, ClipboardCopy } from 'lucide-react';
+import { ClipboardCopy } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { SettingsSidebar } from '@/components/SettingsSidebar';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import {
   Select,
   SelectContent,
@@ -52,7 +53,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useAudit } from '@/hooks/useAudit';
-import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
 import type { AuditEntry, UserPublic } from '@shared/ipc-contract';
 
@@ -131,7 +131,6 @@ function resolveUserDisplayName(
 }
 
 export default function Audit(): JSX.Element {
-  const { navigate } = useRoute();
   const { currentUser } = useSession();
   // ponytail: every visible string on this page is sourced from the
   // i18next bundles. D-24 parity test enforces EN↔AR key coverage.
@@ -235,28 +234,13 @@ export default function Audit(): JSX.Element {
   const fallbackUserName = currentUser?.fullName ?? 'unknown';
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto grid gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
-        <SettingsSidebar activeTab="audit" />
-        <div className="flex flex-col gap-4">
-          <header className="flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                {t('audit.pageKicker')}
-              </p>
-              <h1 className="text-2xl font-semibold">{t('audit.pageTitle')}</h1>
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => navigate({ name: 'settings-hub' })}
-              data-testid="audit-back"
-            >
-              <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
-              {t('common.back')}
-            </Button>
-          </header>
-
-          <Card data-testid="audit-filter-card">
+    <SettingsLayout
+      title={t('audit.pageTitle')}
+      subtitle={t('audit.pageKicker')}
+      activeTab="audit"
+      backTestId="audit-back"
+    >
+      <Card data-testid="audit-filter-card">
             <CardHeader className="pb-3">
               <CardTitle className="text-base">{t('audit.filtersTitle')}</CardTitle>
             </CardHeader>
@@ -473,7 +457,7 @@ export default function Audit(): JSX.Element {
             </CardContent>
           </Card>
 
-          <div className="flex items-center justify-between text-sm">
+      <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground" data-testid="audit-pagination">
               {t('audit.pageInfo', { page, totalPages })}
             </span>
@@ -498,8 +482,6 @@ export default function Audit(): JSX.Element {
               </Button>
             </div>
           </div>
-        </div>
-      </div>
 
       <Dialog
         open={detail !== null}
@@ -572,6 +554,6 @@ export default function Audit(): JSX.Element {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </main>
+    </SettingsLayout>
   );
 }

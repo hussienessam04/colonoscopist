@@ -1,7 +1,12 @@
 // Settings → Users (admin only). Per D-02 + D-03 + SET-04.
 // Lists users, allows add / reset PIN / remove (admin cannot remove themselves).
+//
+// Quick task 260812-n0h — page is now wrapped in <SettingsLayout> for the
+// shared header / sidebar / grid; the Add user trigger moved into the
+// header slot alongside the Back button. The admin-gate `!isAdmin` short
+// circuit still returns the inline Card with a "Back to patients" button.
 import { useEffect, useState } from 'react';
-import { ArrowLeft, MoreHorizontal, Plus } from 'lucide-react';
+import { MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -27,7 +32,7 @@ import { z } from 'zod';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
-import { SettingsSidebar } from '@/components/SettingsSidebar';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import { relativeTime } from '@/lib/format';
 import { toast } from 'sonner';
 import { IpcErrorException } from '@shared/errors';
@@ -146,99 +151,88 @@ export default function SettingsUsers(): JSX.Element {
   }
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto max-w-6xl flex flex-col gap-4">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-semibold">Settings · Users</h1>
-            <p className="text-sm text-muted-foreground">Add or remove staff; reset PINs.</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => navigate({ name: 'patients' })}>
-              <ArrowLeft className="size-4 mr-1" />
-              Back
+    <SettingsLayout
+      title="Users"
+      subtitle="Add or remove staff; reset PINs."
+      activeTab="users"
+      headerAction={
+        // Quick task 260812-n0h — Add user moved into the header slot,
+        // alongside Back. The dialog content stays the same.
+        <Dialog open={addOpen} onOpenChange={setAddOpen}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="size-4 mr-1" />
+              Add user
             </Button>
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogTrigger asChild>
-                <Button>
-                  <Plus className="size-4 mr-1" />
-                  Add user
-                </Button>
-              </DialogTrigger>
-              <AddUserDialog onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
-            </Dialog>
-          </div>
-        </header>
-
-        <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
-          <SettingsSidebar activeTab="users" />
-
-          <div className="rounded-md border bg-card">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-3 py-2">Name</th>
-                  <th className="px-3 py-2">Last login</th>
-                  <th className="px-3 py-2 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {loading ? (
-                  <tr>
-                    <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                      Loading…
+          </DialogTrigger>
+          <AddUserDialog onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
+        </Dialog>
+      }
+    >
+      <div className="rounded-md border bg-card">
+        <table className="w-full">
+          <thead>
+            <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+              <th className="px-3 py-2">Name</th>
+              <th className="px-3 py-2">Last login</th>
+              <th className="px-3 py-2 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr>
+                <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  Loading…
+                </td>
+              </tr>
+            ) : users.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  No users yet.
+                </td>
+              </tr>
+            ) : (
+              users.map((u) => {
+                const isSelf = currentUser?.id === u.id;
+                return (
+                  <tr key={u.id} className="border-b last:border-b-0">
+                    <td className="px-3 py-2 text-sm font-medium">
+                      {u.fullName}
+                      <span className="ml-2 text-xs text-muted-foreground">
+                        {u.isFirstAdmin ? 'Admin' : 'Staff'}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2 text-sm text-muted-foreground">
+                      {relativeTime(u.lastLoginAt)}
+                    </td>
+                    <td className="px-3 py-2 text-right">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
+                            <MoreHorizontal className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onSelect={() => setResetTarget(u)}>
+                            Reset PIN
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onSelect={() => setRemoveTarget(u)}
+                            disabled={isSelf}
+                            title={isSelf ? 'You cannot remove yourself' : undefined}
+                            data-testid={`remove-${u.id}`}
+                          >
+                            Remove
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
-                ) : users.length === 0 ? (
-                  <tr>
-                    <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
-                      No users yet.
-                    </td>
-                  </tr>
-                ) : (
-                  users.map((u) => {
-                    const isSelf = currentUser?.id === u.id;
-                    return (
-                      <tr key={u.id} className="border-b last:border-b-0">
-                        <td className="px-3 py-2 text-sm font-medium">
-                          {u.fullName}
-                          <span className="ml-2 text-xs text-muted-foreground">
-                            {u.isFirstAdmin ? 'Admin' : 'Staff'}
-                          </span>
-                        </td>
-                        <td className="px-3 py-2 text-sm text-muted-foreground">
-                          {relativeTime(u.lastLoginAt)}
-                        </td>
-                        <td className="px-3 py-2 text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" aria-label={`Actions for ${u.fullName}`}>
-                                <MoreHorizontal className="size-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onSelect={() => setResetTarget(u)}>
-                                Reset PIN
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => setRemoveTarget(u)}
-                                disabled={isSelf}
-                                title={isSelf ? 'You cannot remove yourself' : undefined}
-                                data-testid={`remove-${u.id}`}
-                              >
-                                Remove
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+                );
+              })
+            )}
+          </tbody>
+        </table>
       </div>
 
       {/* Reset PIN dialog */}
@@ -258,7 +252,7 @@ export default function SettingsUsers(): JSX.Element {
         onConfirm={() => void handleRemove()}
         onCancel={() => setRemoveTarget(null)}
       />
-    </main>
+    </SettingsLayout>
   );
 }
 

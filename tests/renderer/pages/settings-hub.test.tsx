@@ -83,7 +83,10 @@ describe('SettingsHub', () => {
     setAdminSession();
     await session.refresh();
     render(<SettingsHub />);
-    const back = await screen.findByRole('button', { name: /^back$/i });
+    // Quick task 260812-n0h — Hub's Back is labeled "Back to patients".
+    // Match the testid directly so future copy tweaks on the label
+    // (or sidebar buttons containing the word "back") don't break this.
+    const back = await screen.findByTestId('settings-hub-back');
     expect(back).toBeInTheDocument();
   });
 
@@ -137,7 +140,8 @@ describe('SettingsHub', () => {
     await session.refresh();
     const user = userEvent.setup();
     render(<SettingsHub />);
-    await user.click(await screen.findByRole('button', { name: /^back$/i }));
+    // Quick task 260812-n0h — click the testid-scoped Back button.
+    await user.click(await screen.findByTestId('settings-hub-back'));
     await waitFor(() => expect(getRoute().name).toBe('patients'));
   });
 

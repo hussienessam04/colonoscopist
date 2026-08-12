@@ -49,7 +49,7 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AlertTriangle, ArrowLeft, FolderOpen, Loader2, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, FolderOpen, Loader2, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -75,9 +75,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { SettingsSidebar } from '@/components/SettingsSidebar';
+import { SettingsLayout } from '@/components/SettingsLayout';
 import ConfirmDialog from '@/components/ConfirmDialog';
-import { useRoute } from '@/lib/router';
 import type { AuditEntry, RestorePreview } from '@shared/ipc-contract';
 
 function formatBytes(bytes: number): string {
@@ -136,7 +135,6 @@ function relativeTime(ts: number, nowMs: number, locale: string): string {
 
 export default function BackupRestore(): JSX.Element {
   const { t, i18n } = useTranslation();
-  const { navigate } = useRoute();
 
   // Backup state.
   const [backupInFlight, setBackupInFlight] = useState(false);
@@ -314,31 +312,13 @@ export default function BackupRestore(): JSX.Element {
 
   return (
     <TooltipProvider delayDuration={150}>
-      <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-6xl flex flex-col gap-4">
-          <header className="flex items-center justify-between gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-                {t('backup.pageKicker')}
-              </p>
-              <h1 className="text-2xl font-semibold leading-tight">
-                {t('backup.pageTitle')}
-              </h1>
-            </div>
-            <Button
-              variant="ghost"
-              onClick={() => navigate({ name: 'settings-hub' })}
-              data-testid="backup-restore-back"
-            >
-              <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
-              {t('common.back', { defaultValue: 'Back' })}
-            </Button>
-          </header>
-
-          <div className="grid gap-4 lg:grid-cols-[20rem_minmax(0,1fr)]">
-            <SettingsSidebar activeTab="backup-restore" />
-
-            <div className="grid gap-4 lg:grid-cols-2">
+      <SettingsLayout
+        title={t('backup.pageTitle')}
+        subtitle={t('backup.pageKicker')}
+        activeTab="backup-restore"
+        backTestId="backup-restore-back"
+      >
+        <div className="grid gap-4 lg:grid-cols-2">
               <Card data-testid="backup-card">
                 <CardHeader>
                   <CardTitle>{t('backup.sectionBackup')}</CardTitle>
@@ -505,8 +485,6 @@ export default function BackupRestore(): JSX.Element {
                 </CardContent>
               </Card>
             </div>
-          </div>
-        </div>
 
         {/*
           Preview Dialog — D-13 step 2. Shows the preview shape the main
@@ -640,7 +618,7 @@ export default function BackupRestore(): JSX.Element {
           }}
           onCancel={() => setRestoreConfirmOpen(false)}
         />
-      </main>
+    </SettingsLayout>
     </TooltipProvider>
   );
 }
