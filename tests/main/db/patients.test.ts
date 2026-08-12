@@ -56,10 +56,16 @@ async function bootstrapWithSecondUser(): Promise<{ doctor1: string; doctor2: st
 }
 
 function insertPatient(db: ReturnType<typeof import('../../../src/main/db').getDb>, id: string, fullName: string): void {
+  // Quick task 20260812 — mrn is NOT NULL after migration 0008, so the
+  // raw-SQL insert must supply one. We derive it deterministically from
+  // the id tail so duplicate ids across the suite (each test gets a
+  // fresh DB via mkdtempSync in beforeEach) never collide on the unique
+  // index. ponytail: same shape as the Phase 2 fixtures (MRN-001 etc.)
+  // so the assertions like `find by MRN` keep working if they exist.
   db.prepare(
-    `INSERT INTO patients (id, full_name, dob, created_at, updated_at)
-     VALUES (?, ?, '1980-01-01', ?, ?)`,
-  ).run(id, fullName, Date.now(), Date.now());
+    `INSERT INTO patients (id, full_name, dob, mrn, created_at, updated_at)
+     VALUES (?, ?, '1980-01-01', ?, ?, ?)`,
+  ).run(id, fullName, `MRN-T-${id.slice(-8)}`, Date.now(), Date.now());
 }
 
 function insertProcedure(
