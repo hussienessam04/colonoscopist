@@ -6,7 +6,8 @@ commits:
   - c7534fe: feat(patients): auto-generate MRN as serial number
   - 95bdeec: feat(patients-ui): remove MRN input from PatientForm, display as read-only
   - fbe7563: fix(patients): supply MRN in raw-SQL test inserts + drop duplicate-MRN assertion
-  - 37ab93a: docs(quick): complete auto-MRN task 260812-kza — SUMMARY + STATE row
+  - 37ab93a: docs(quick): complete auto-MRN task 26060812 — SUMMARY + STATE row
+  - 8439092: fix(migrations): drop 12-step table rebuild — FK constraint on existing DBs
 files_modified:
   - src/main/db/migrations.ts
   - src/main/db/migrations/0008_auto_mrn.sql (NEW)
@@ -36,7 +37,8 @@ files_modified:
   - tests/main/recorder/segments.test.ts (raw-SQL patient insert now supplies MRN)
   - tests/main/recorder/trim.test.ts (2 raw-SQL patient inserts now supply MRN)
   - tests/renderer/pages/patient-form.test.tsx (rewrite around the removed MRN input; add the read-only MRN label contract)
-tests_added: 4 (3 contract-guard cases in patients.test.ts + 1 migration test in 0008_auto_mrn.test.ts)
+  - tests/main/db/migrations/0008_auto_mrn.test.ts (FK regression guard: assert the migration SQL contains no DROP TABLE patients statement, comment-stripped)
+tests_added: 5 (3 contract-guard cases in patients.test.ts + 1 backfill test in 0008_auto_mrn.test.ts + 1 FK regression guard in 0008_auto_mrn.test.ts)
 ---
 
 # Quick task 260812-kza: change MRN in patients to auto serial num
