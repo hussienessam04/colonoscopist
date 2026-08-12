@@ -285,7 +285,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     <span className="font-medium text-foreground">
                       {t('patient.mrnExact')}:
                     </span>{' '}
-                    {patient.mrn ?? '—'}
+                    {patient.mrn}
                   </span>
                   <span>
                     <span className="font-medium text-foreground">DOB:</span>{' '}

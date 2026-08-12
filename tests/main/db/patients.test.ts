@@ -241,3 +241,65 @@ describe('patientRepo.list — Phase 7 cross-cutting filters (SRCH-01..03 + D-02
     expect(intersected.rows[0]?.fullName).toBe('Alice');
   });
 });
+
+// Quick task 20260812 — auto-MRN contract guards (migration 0008).
+// Per D-lock: mrn is auto-generated as MRN-NNNNNN, never user-supplied,
+// never editable. Three regression tests lock the shape so a future
+// refactor that re-introduces user MRN (or breaks the counter) fails here.
+describe('patientRepo — auto-MRN contract guards (quick task 20260812)', () => {
+  it('create() returns an mrn matching ^MRN-\\d{6}$', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    getDb();
+    await bootstrapWithSecondUser();
+    const { patientRepo } = await import('../../../src/main/db/patients');
+    const created = patientRepo.create({
+      fullName: 'Auto Mrn',
+      dob: '1980-01-01',
+      gender: null,
+      phone: null,
+      notes: null,
+    });
+    expect(created.mrn).toMatch(/^MRN-\d{6}$/);
+  });
+
+  it('two consecutive creates produce strictly increasing MRNs', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    getDb();
+    await bootstrapWithSecondUser();
+    const { patientRepo } = await import('../../../src/main/db/patients');
+    const a = patientRepo.create({
+      fullName: 'First',
+      dob: '1980-01-01',
+      gender: null,
+      phone: null,
+      notes: null,
+    });
+    const b = patientRepo.create({
+      fullName: 'Second',
+      dob: '1980-01-01',
+      gender: null,
+      phone: null,
+      notes: null,
+    });
+    const numA = Number(a.mrn.slice(4));
+    const numB = Number(b.mrn.slice(4));
+    expect(numB).toBe(numA + 1);
+  });
+
+  it('update() ignores any mrn in the patch (row mrn unchanged)', async () => {
+    const { getDb } = await import('../../../src/main/db');
+    getDb();
+    await bootstrapWithSecondUser();
+    const { patientRepo } = await import('../../../src/main/db/patients');
+    const created = patientRepo.create({
+      fullName: 'Original Name',
+      dob: '1980-01-01',
+      gender: null,
+      phone: null,
+      notes: null,
+    });
+    const updated = patientRepo.update(created.id, { fullName: 'Renamed' });
+    expect(updated.mrn).toBe(created.mrn);
+    expect(updated.fullName).toBe('Renamed');
+  });
+});

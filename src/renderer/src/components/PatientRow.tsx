@@ -56,7 +56,7 @@ export default function PatientRow({
       </td>
       <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.dob}</td>
       <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.gender ?? '—'}</td>
-      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.mrn ?? '—'}</td>
+      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.mrn}</td>
       <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.phone ?? '—'}</td>
       <td className="px-3 py-2 text-right align-top">
         <DropdownMenu>

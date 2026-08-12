@@ -278,7 +278,7 @@ export default function ReportEditor({
   const [patient, setPatient] = useState<{
     id: string;
     fullName: string;
-    mrn: string | null;
+    mrn: string;
     dob: string;
     gender: string | null;
   } | null>(null);
@@ -514,7 +514,7 @@ export default function ReportEditor({
               <h2 className="mb-2 text-sm font-bold text-slate-900">Patient</h2>
               <div className="flex flex-wrap gap-x-4 text-sm text-slate-700" data-testid="report-editor-patient-block">
                 <span>Name: <strong>{patient?.fullName ?? '—'}</strong></span>
-                <span>MRN: {patient?.mrn ?? '—'}</span>
+                <span>MRN: {patient?.mrn}</span>
                 <span>DOB: {patient?.dob ?? '—'}</span>
                 <span>Gender: {patient?.gender ?? '—'}</span>
               </div>
