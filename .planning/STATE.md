@@ -252,3 +252,4 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2026-08-11 | backup-restore-tests-polish | BackupRestore UI polish + last-backup indicator + 10 renderer tests + 12 main-side IPC tests |
 | 2026-08-11 | patients-list-polish | PatientsList UI polish: sticky thead, filter chips, empty-state CTA, pagination range, 6 renderer tests |
 | 2026-08-12 | change-mrn-auto-serial | Auto-generate MRN as serial number (migration 0008 + nextMrn counter + drop mrn from create/patch input + render Edit MRN read-only + 3 contract-guard + 1 migration test) |
+| 2026-08-12 | procedure-room-ui-polish | Move ProcedureRoom mid-procedure screenshot gallery from right sidebar to full-width bottom strip; rename Hide → Hide notes; testid seams preserved |
