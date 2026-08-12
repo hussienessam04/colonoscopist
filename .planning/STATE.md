@@ -6,9 +6,9 @@ current_plan: 07-06
 status: complete
 stopped_at: Phase 07 Plan 6 complete
 paused_at: —
-last_updated: "2026-08-11T09:04:00.000Z"
-last_activity: 2026-08-11
-last_activity_desc: Phase 7 Plan 6 complete — Playwright RTL smoke + integration tests + UAT.md
+last_updated: "2026-08-12T12:30:00.000Z"
+last_activity: 2026-08-12
+last_activity_desc: Quick task 260812-kza — auto-MRN: migration 0008 + nextMrn counter + drop mrn from create/patch input + render Edit MRN read-only
 progress:
   total_phases: 7
   completed_phases: 6
@@ -251,3 +251,4 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2026-08-11 | audit-ui-polish | Audit page: snake_case contract mismatch (NaN time), entityType filter ignored, missing SettingsSidebar, malformed metadata crash |
 | 2026-08-11 | backup-restore-tests-polish | BackupRestore UI polish + last-backup indicator + 10 renderer tests + 12 main-side IPC tests |
 | 2026-08-11 | patients-list-polish | PatientsList UI polish: sticky thead, filter chips, empty-state CTA, pagination range, 6 renderer tests |
+| 2026-08-12 | change-mrn-auto-serial | Auto-generate MRN as serial number (migration 0008 + nextMrn counter + drop mrn from create/patch input + render Edit MRN read-only + 3 contract-guard + 1 migration test) |
