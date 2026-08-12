@@ -5,6 +5,8 @@ date: 2026-08-12
 commits:
   - c7534fe: feat(patients): auto-generate MRN as serial number
   - 95bdeec: feat(patients-ui): remove MRN input from PatientForm, display as read-only
+  - fbe7563: fix(patients): supply MRN in raw-SQL test inserts + drop duplicate-MRN assertion
+  - 37ab93a: docs(quick): complete auto-MRN task 260812-kza — SUMMARY + STATE row
 files_modified:
   - src/main/db/migrations.ts
   - src/main/db/migrations/0008_auto_mrn.sql (NEW)
@@ -16,9 +18,25 @@ files_modified:
   - src/renderer/src/components/PatientRow.tsx
   - src/renderer/src/pages/PatientProcedures.tsx
   - src/renderer/src/pages/ReportEditor.tsx
-  - tests/main/db/patients.test.ts
-  - tests/main/db/migrations/0008_auto_mrn.test.ts (NEW)
-tests_added: 4 (3 contract-guard cases + 1 migration test, all gated by a fresh per-test mkdtempSync)
+  - tests/main/db/migrations.test.ts (migration count 5 -> 6)
+  - tests/main/db/migrations/0002_procedures.test.ts (migration count 5 -> 6)
+  - tests/main/db/migrations/0003_screenshots_and_trim.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/db/migrations/0008_auto_mrn.test.ts (NEW; uses pre-migration fixture file so the NULL-row backfill path is exercised)
+  - tests/main/db/patients.test.ts (3 new contract-guard cases; insertPatient helper now supplies MRN)
+  - tests/main/db/procedures-repo.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/db/report-screenshots-repo.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/db/reports-repo.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/db/screenshots-repo.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/ipc/procedure-notes.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/ipc/procedures.test.ts (6 raw-SQL patient inserts now supply MRN)
+  - tests/main/ipc/reports.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/ipc/screenshots.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/patients/create.test.ts (drop duplicate-MRN test; assert `^MRN-\d{6}$` instead of literal)
+  - tests/main/patients/search.test.ts (MRN filter test reads the auto-generated MRN back via getPatient before searching)
+  - tests/main/recorder/segments.test.ts (raw-SQL patient insert now supplies MRN)
+  - tests/main/recorder/trim.test.ts (2 raw-SQL patient inserts now supply MRN)
+  - tests/renderer/pages/patient-form.test.tsx (rewrite around the removed MRN input; add the read-only MRN label contract)
+tests_added: 4 (3 contract-guard cases in patients.test.ts + 1 migration test in 0008_auto_mrn.test.ts)
 ---
 
 # Quick task 260812-kza: change MRN in patients to auto serial num
@@ -51,7 +69,26 @@ MRN is now an auto-generated serial number (`MRN-000001`, `MRN-000002`, …) ass
 
 - `npx tsc -p tsconfig.node.json --noEmit` → clean.
 - `npx tsc -p tsconfig.web.json --noEmit` → clean.
-- `npx vitest run tests/main/db/patients.test.ts tests/main/db/migrations/0008_auto_mrn.test.ts tests/main/db/migrations/0002_procedures.test.ts` → 12/12 fail with **NODE_MODULE_VERSION 137 vs 128** ABI mismatch on `better-sqlite3` (existing prebuilt binding was compiled against Electron 32 / Node 20; this sandbox runs Node 24). Rebuilding requires Visual Studio Build Tools ("Desktop development with C++" workload), which is not available in this sandbox — `npm rebuild better-sqlite3` fails at `node-gyp` configure with `Could not find any Visual Studio installation`. Per STATE.md (Phase 03-07 P-Plan note) this kind of pre-existing environmental rebuild is out-of-scope for task verification.
+- `npm run test:unit` → **712/715 pass**; the 3 remaining failures are pre-existing and unrelated to this task:
+  - `tests/renderer/rtl/*` (8 files) — Playwright config issue (the RTL files use `test()` from `@playwright/test` but are being run by vitest, which is documented in STATE.md / Phase 7 / Plan 7 as out-of-scope until `npm run dev` is running).
+  - `tests/integration/pdf-smoke.test.ts` (3 cases) — `RUN_SMOKE=1`-gated PDF smoke that requires an active Electron render path; out-of-scope in this sandbox per Phase 7 / Plan 6 THRESHOLD DEVIATION note.
+
+## Bug fixes landed in `fbe7563` after the initial commits
+
+Three real bugs surfaced during the post-commit test run — all fixed in `fbe7563`:
+
+1. **`0008_auto_mrn.sql` SQLite UPDATE-with-CTE column reference** — SQLite's `UPDATE … SET col = cte.col` errors with `no such column: cte.col`. Switched to a correlated subquery: `SET mrn = (SELECT 'MRN-' || printf('%06d', seq) FROM numbered WHERE numbered.id = patients.id)`. Without this fix, `runMigrations(db)` aborts and every test that opens the DB fails with `SqliteError: no such column: numbered.seq`.
+
+2. **`0008_auto_mrn.test.ts` wrong DB path + wrong seed timing** — the original test used `path.join(tmpDir, 'app.db')`, but `dbPath()` resolves to `<userData>/data/app.db`. The fixture file ended up at the wrong location, so `getDb()` opened a fresh empty DB and the seeded NULL row never reached the migration's backfill. Fixed by `mkdirSync(path.join(tmpDir, 'data'), { recursive: true })` + writing the DB to `<tmpDir>/data/app.db`. Also added a `seedPreMigrationFixtures()` helper that runs the migration 0001 SQL verbatim + inserts the NULL/non-null fixtures BEFORE `getDb()` runs the migration chain, so 0008's backfill is exercised on a real NULL row.
+
+3. **17 raw-SQL `INSERT INTO patients` calls bypassed `patientRepo.create()`** — these are FK-seed helpers in repo / IPC tests (`tests/main/db/procedures-repo.test.ts`, `tests/main/ipc/procedures.test.ts`, etc.). After migration 0008, `mrn` is NOT NULL at the schema layer, so every raw SQL insert without an `mrn` column fails. Fixed by:
+   - adding `mrn` to the INSERT column list + parameter placeholders
+   - supplying `MRN-T-${id.slice(-8)}` in each `.run(…)` call so the per-test fresh DB never collides on the unique index
+   - also updating `migrations.test.ts` and `0002_procedures.test.ts` to expect 6 migrations (was 5)
+   - rewriting `create.test.ts` to drop the now-unreachable duplicate-MRN test + assert `^MRN-\d{6}$` instead of a literal
+   - rewriting `patient-form.test.tsx` to drop the now-removed MRN input + add the read-only MRN label contract
+
+The pre-existing `better-sqlite3` ABI mismatch (Node 24 = ABI 137, prebuilt binding compiled against Electron 32 = ABI 128) was resolved by `npx electron-rebuild` rebuilding the binding for Electron's ABI — `npm run test:unit` runs vitest under `electron --node-mode` via `scripts/run-vitest.cjs`, so the Electron-ABI binding is what loads.
 
 ## Manual smoke (next time the binding is rebuilt)
 
