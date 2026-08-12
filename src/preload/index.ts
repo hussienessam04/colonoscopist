@@ -105,8 +105,20 @@ const api: IpcContract = {
     uploadSignature: (input) =>
       ipcRenderer.invoke(IPC.PROFILE_UPLOAD_SIGNATURE, input),
     uploadLogo: (input) => ipcRenderer.invoke(IPC.PROFILE_UPLOAD_LOGO, input),
+    // Quick task 260812-ns0 — header / footer image uploads render as
+    // the top / bottom band on every PDF page.
+    uploadHeader: (input) =>
+      ipcRenderer.invoke(IPC.PROFILE_UPLOAD_HEADER, input),
+    uploadFooter: (input) =>
+      ipcRenderer.invoke(IPC.PROFILE_UPLOAD_FOOTER, input),
     getAssetDataUrl: (input) =>
       ipcRenderer.invoke(IPC.PROFILE_GET_ASSET_DATA_URL, input),
+  },
+  // Quick task 260812-ns0 — used-devices CRUD (1:N with doctor_profile).
+  usedDevices: {
+    list: () => ipcRenderer.invoke(IPC.USED_DEVICES_LIST),
+    add: (input) => ipcRenderer.invoke(IPC.USED_DEVICES_ADD, input),
+    remove: (input) => ipcRenderer.invoke(IPC.USED_DEVICES_REMOVE, input),
   },
   // Phase 6 / Plan 01 — Reports IPC. `getOrCreate` is the renderer's
   // entry point for the report editor (1:1 reports-per-procedure per

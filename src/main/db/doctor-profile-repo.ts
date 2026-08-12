@@ -27,6 +27,10 @@ export type DoctorProfileRow = {
   phone: string | null;
   signature_path: string | null;
   logo_path: string | null;
+  // Quick task 260812-ns0 — report-branding + procedure-defaults fields.
+  header_image_path: string | null;
+  footer_image_path: string | null;
+  premedication: string | null;
   // Phase 7 / Plan 07-01 — I18N-01 (per D-17): per-doctor language
   // override. NULL means "follow users.language" (the doctor has not
   // picked their own preference yet). The renderer-side i18n resolver
@@ -45,6 +49,9 @@ export type DoctorProfileUpsertInput = {
   clinicNameAr?: string | null;
   address?: string | null;
   phone?: string | null;
+  // Quick task 260812-ns0 — premedication (free-text clinic default;
+  // optional in profile.update; null clears, undefined leaves as-is).
+  premedication?: string | null;
   // Phase 7 / Plan 07-01 — I18N-01. Optional; undefined means "leave
   // the existing value as-is", null means "clear the per-doctor
   // override so the resolver falls back to users.language".
@@ -58,6 +65,8 @@ let cached: {
   updateCore: Stmt;
   updateSignature: Stmt;
   updateLogo: Stmt;
+  updateHeader: Stmt;
+  updateFooter: Stmt;
   getById: Stmt;
   getByUserId: Stmt;
 } | null = null;
@@ -69,17 +78,24 @@ function stmts(): NonNullable<typeof cached> {
     // Phase 7 / Plan 07-01 — I18N-01: include the language column on
     // insert. NULL on insert means "follow users.language" (the
     // wizard doesn't seed a per-doctor override).
+    // Quick task 260812-ns0 — header/footer/premedication default to
+    // NULL on insert so backfill rows for existing doctors get NULL.
     insert: db.prepare(
       `INSERT INTO doctor_profile
         (id, user_id, full_name_en, full_name_ar, clinic_name_en, clinic_name_ar,
-         address, phone, signature_path, logo_path, language, created_at, updated_at)
+         address, phone, signature_path, logo_path,
+         header_image_path, footer_image_path, premedication,
+         language, created_at, updated_at)
        VALUES
         (@id, @user_id, @full_name_en, @full_name_ar, @clinic_name_en, @clinic_name_ar,
-         @address, @phone, NULL, NULL, @language, @created_at, @updated_at)`,
+         @address, @phone, NULL, NULL,
+         NULL, NULL, NULL,
+         @language, @created_at, @updated_at)`,
     ),
     // Phase 7 / Plan 07-01 — I18N-01: language is part of the core
     // update so a single profile.update IPC can flip the doctor's
     // preferred language alongside other fields.
+    // Quick task 260812-ns0 — premedication joins the core update.
     updateCore: db.prepare(
       `UPDATE doctor_profile SET
          full_name_en = @full_name_en,
@@ -89,6 +105,7 @@ function stmts(): NonNullable<typeof cached> {
          address = @address,
          phone = @phone,
          language = @language,
+         premedication = @premedication,
          updated_at = @updated_at
        WHERE user_id = @user_id`,
     ),
@@ -98,6 +115,14 @@ function stmts(): NonNullable<typeof cached> {
     ),
     updateLogo: db.prepare(
       `UPDATE doctor_profile SET logo_path = @logo_path, updated_at = @updated_at
+       WHERE user_id = @user_id`,
+    ),
+    updateHeader: db.prepare(
+      `UPDATE doctor_profile SET header_image_path = @header_image_path, updated_at = @updated_at
+       WHERE user_id = @user_id`,
+    ),
+    updateFooter: db.prepare(
+      `UPDATE doctor_profile SET footer_image_path = @footer_image_path, updated_at = @updated_at
        WHERE user_id = @user_id`,
     ),
     getById: db.prepare(`SELECT * FROM doctor_profile WHERE id = ?`),
@@ -124,6 +149,10 @@ function rowToProfile(row: DoctorProfileRow): DoctorProfile {
     phone: row.phone,
     signaturePath: row.signature_path,
     logoPath: row.logo_path,
+    // Quick task 260812-ns0 — header/footer/premedication surfaces.
+    headerImagePath: row.header_image_path,
+    footerImagePath: row.footer_image_path,
+    premedication: row.premedication,
     // Phase 7 / Plan 07-01 — I18N-01: surface language for the
     // renderer. NULL means "follow users.language".
     language: row.language,
@@ -155,6 +184,11 @@ export const doctorProfileRepo = {
         address: input.address ?? null,
         phone: input.phone ?? null,
         language: updateLanguage,
+        // Quick task 260812-ns0 — `undefined` means "leave as-is" for
+        // premedication (mirrors the language contract). Existing
+        // callers that don't set premedication preserve whatever's in
+        // the DB.
+        premedication: input.premedication !== undefined ? input.premedication : existing.premedication,
         updated_at: now,
         user_id: input.userId,
       });
@@ -169,6 +203,9 @@ export const doctorProfileRepo = {
         address: input.address ?? null,
         phone: input.phone ?? null,
         language: input.language ?? null,
+        // Quick task 260812-ns0 — default NULL on insert (no per-row
+        // premedication seeded by the wizard).
+        premedication: input.premedication ?? null,
         created_at: now,
         updated_at: now,
       });
@@ -196,6 +233,25 @@ export const doctorProfileRepo = {
   updateLogoPath(userId: string, logoPath: string): void {
     stmts().updateLogo.run({
       logo_path: logoPath,
+      updated_at: Date.now(),
+      user_id: userId,
+    });
+  },
+
+  // Quick task 260812-ns0 — header / footer image uploads mirror the
+  // signature / logo pattern: file is committed to disk by the IPC
+  // handler first, then the path is written here.
+  updateHeaderImagePath(userId: string, headerImagePath: string): void {
+    stmts().updateHeader.run({
+      header_image_path: headerImagePath,
+      updated_at: Date.now(),
+      user_id: userId,
+    });
+  },
+
+  updateFooterImagePath(userId: string, footerImagePath: string): void {
+    stmts().updateFooter.run({
+      footer_image_path: footerImagePath,
       updated_at: Date.now(),
       user_id: userId,
     });

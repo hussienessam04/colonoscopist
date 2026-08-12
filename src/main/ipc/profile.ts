@@ -91,6 +91,22 @@ function writeProfileAsset(
   return path.relative(userData, absPath).split(path.sep).join('/');
 }
 
+// Quick task 260812-ns0 — header / footer image uploads. Same shape as
+// signature / logo: base64 → magic-byte sniff → write → path writeback.
+function uploadHeaderOrFooter(
+  kind: 'header' | 'footer',
+  userId: string,
+  input: { jpegBase64?: string; pngBase64?: string },
+): string {
+  const base64 = input.jpegBase64 ?? input.pngBase64;
+  if (!base64) {
+    throw new IpcErrorException(
+      ipcError('IPC_BAD_REQUEST', 'exactly one of jpegBase64 or pngBase64 is required'),
+    );
+  }
+  return writeProfileAsset(userId, kind, base64);
+}
+
 export function registerProfileIpc(): void {
   ipcMain.handle(IPC.PROFILE_GET, () => {
     try {
@@ -117,6 +133,9 @@ export function registerProfileIpc(): void {
       // null means "clear the per-doctor override so the resolver
       // falls back to users.language". The repo's upsert handles the
       // undefined-vs-explicit distinction.
+      //
+      // Quick task 260812-ns0 — `premedication` follows the same
+      // undefined-vs-explicit contract.
       const updated: DoctorProfile = doctorProfileRepo.upsert({
         userId,
         fullNameEn: input.fullNameEn,
@@ -126,6 +145,7 @@ export function registerProfileIpc(): void {
         address: input.address,
         phone: input.phone,
         language: input.language,
+        premedication: input.premedication,
       });
       const changedFields = Object.keys(input).filter(
         (k) => (input as Record<string, unknown>)[k] !== undefined,
@@ -183,6 +203,46 @@ export function registerProfileIpc(): void {
     }
   });
 
+  // Quick task 260812-ns0 — header / footer image uploads (top / bottom
+  // bands on the PDF report).
+  ipcMain.handle(IPC.PROFILE_UPLOAD_HEADER, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(profileUploadSchema, raw);
+      const relPath = uploadHeaderOrFooter('header', userId, input);
+      doctorProfileRepo.updateHeaderImagePath(userId, relPath);
+      audit({
+        action: 'profile.header_uploaded',
+        entityType: 'profile',
+        entityId: userId,
+        userId,
+        metadata: { headerImagePath: relPath },
+      });
+      return { headerImagePath: relPath };
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
+  ipcMain.handle(IPC.PROFILE_UPLOAD_FOOTER, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const input = safeParse(profileUploadSchema, raw);
+      const relPath = uploadHeaderOrFooter('footer', userId, input);
+      doctorProfileRepo.updateFooterImagePath(userId, relPath);
+      audit({
+        action: 'profile.footer_uploaded',
+        entityType: 'profile',
+        entityId: userId,
+        userId,
+        metadata: { footerImagePath: relPath },
+      });
+      return { footerImagePath: relPath };
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  });
+
   // Phase 6 UAT G-06-3 — image preview. ProfileEditor needs to render
   // the actual uploaded signature + logo as `<img>` previews. The
   // signature/logo_path columns store userData-relative paths; the
@@ -192,18 +252,24 @@ export function registerProfileIpc(): void {
   // into `<img src=...>`. Limited to ~2MB per asset (matches the
   // MediaServer's screenshot cap) — adequate for a 1-2MB signature
   // PNG or logo.
+  //
+  // Quick task 260812-ns0 — extended for header / footer previews.
   ipcMain.handle(IPC.PROFILE_GET_ASSET_DATA_URL, (_e, raw: unknown) => {
     try {
       const userId = requireSession();
       const input = safeParse(
-        z.object({ kind: z.enum(['signature', 'logo']) }),
+        z.object({ kind: z.enum(['signature', 'logo', 'header', 'footer']) }),
         raw,
       );
       const row = doctorProfileRepo.get(userId);
       if (row === null) {
         return { dataUrl: null };
       }
-      const relPath = input.kind === 'signature' ? row.signaturePath : row.logoPath;
+      const relPath =
+        input.kind === 'signature' ? row.signaturePath
+        : input.kind === 'logo' ? row.logoPath
+        : input.kind === 'header' ? row.headerImagePath
+        : row.footerImagePath;
       if (relPath === null) {
         return { dataUrl: null };
       }

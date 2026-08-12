@@ -195,12 +195,12 @@ describe('0008_auto_mrn migration', () => {
     const { getDb, closeDb } = await import('../../../../src/main/db');
 
     const db1 = getDb();
-    // Migration roster: 0001 + 0002 + 0003 + 0004 + 0007 + 0008 = 6 entries.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(6);
+    // Migration roster: 0001 + 0002 + 0003 + 0004 + 0007 + 0008 + 0009 = 7 entries.
+expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(6);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
 
     closeDb();
   });

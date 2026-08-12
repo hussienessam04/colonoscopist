@@ -11,6 +11,7 @@ import doctorProfileAndReportsSql from './migrations/0004_doctor_profile_and_rep
 // doctor_profile (D-17). One migration file per CONTEXT.md agent discretion
 // (covers both ALTER TABLEs in one place).
 import languageSql from './migrations/0007_doctor_profile_language_and_users_language.sql?raw';
+import profileHeaderFooterDevicesPremedicationSql from './migrations/0009_profile_header_footer_devices_premedication.sql?raw';
 // Quick task 20260812 — auto-generated MRN as serial number. Rebuilds the
 // patients table with mrn NOT NULL + a one-row counter table for atomic
 // increment (better-sqlite3 is sync + single-threaded inside db.transaction()).
@@ -33,6 +34,8 @@ const MIGRATIONS: Migration[] = [
   // Quick task 20260812 — auto-MRN. Migration 8 keeps the id namespace
   // continuous (5 was deliberately skipped by Phase 6 reserved numbers).
   { id: 8, name: 'auto_mrn', up: autoMrnSql },
+  // Quick task 260812-ns0 — header/footer/premedication/used-devices for Profile.
+  { id: 9, name: 'profile_header_footer_devices_premedication', up: profileHeaderFooterDevicesPremedicationSql },
 ];
 
 function loadMigrations(): typeof MIGRATIONS {

@@ -283,6 +283,10 @@ export const doctorProfileUpdateSchema = z
     // reads doctor_profile.language first, then falls back to
     // users.language for the active session.
     language: z.enum(['en', 'ar']).nullable().optional(),
+    // Quick task 260812-ns0 — premedication (free-text clinic default;
+    // surfaced in the PDF report header above findings). NULL clears;
+    // undefined leaves as-is (the repo's upsert keeps the existing value).
+    premedication: z.string().max(2000).nullish(),
   })
   .strict();
 
@@ -327,6 +331,19 @@ export type ReportUpdateInput = z.infer<typeof reportUpdateSchema>;
 export type ProfileUploadInput = z.infer<typeof profileUploadSchema>;
 export type ReportIdInput = z.infer<typeof reportIdSchema>;
 export type ReportProcedureInput = z.infer<typeof reportProcedureSchema>;
+
+// Quick task 260812-ns0 — used-devices CRUD.
+export const usedDeviceAddInput = z
+  .object({
+    name: z.string().min(1).max(120),
+    notes: z.string().max(500).nullish(),
+    sortOrder: z.number().int().optional(),
+  })
+  .strict();
+export type UsedDeviceAddInput = z.infer<typeof usedDeviceAddInput>;
+
+export const usedDeviceIdInput = z.object({ id: z.string().uuid() }).strict();
+export type UsedDeviceIdInput = z.infer<typeof usedDeviceIdInput>;
 
 // Phase 7 / Plan 07-01 — Backup/Restore + audit.log + language IPC
 // input validators (SET-05/06, AUDIT-01, I18N-01).

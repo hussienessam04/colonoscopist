@@ -9,6 +9,7 @@ import { registerProceduresIpc } from './ipc/procedures';
 import { registerRecordingIpc } from './ipc/recording';
 import { registerScreenshotsIpc } from './ipc/screenshots';
 import { registerProfileIpc } from './ipc/profile';
+import { registerUsedDevicesIpc } from './ipc/used-devices';
 import { registerReportsIpc } from './ipc/reports';
 import { registerBackupIpc } from './ipc/backup';
 import { registerRestoreIpc } from './ipc/restore';
@@ -77,6 +78,8 @@ app.whenReady().then(() => {
   // profile handlers don't need anything reports handlers don't already
   // have, but the canonical ordering keeps the surface coherent).
   registerProfileIpc();
+  // Quick task 260812-ns0 — used-devices CRUD IPC surface.
+  registerUsedDevicesIpc();
   registerReportsIpc();
   // Phase 7 / Plan 07-01 — Backup/Restore IPC (SET-05, SET-06).
   // Must register AFTER registerAuthIpc() so `requireSession()` resolves.

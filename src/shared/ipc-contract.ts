@@ -77,7 +77,13 @@ export const IPC = {
   PROFILE_UPDATE: 'profile:update',
   PROFILE_UPLOAD_SIGNATURE: 'profile:upload-signature',
   PROFILE_UPLOAD_LOGO: 'profile:upload-logo',
+  PROFILE_UPLOAD_HEADER: 'profile:upload-header',
+  PROFILE_UPLOAD_FOOTER: 'profile:upload-footer',
   PROFILE_GET_ASSET_DATA_URL: 'profile:get-asset-data-url',
+  // Quick task 260812-ns0 — used-devices CRUD.
+  USED_DEVICES_LIST: 'used-devices:list',
+  USED_DEVICES_ADD: 'used-devices:add',
+  USED_DEVICES_REMOVE: 'used-devices:remove',
   REPORTS_GET_OR_CREATE: 'reports:get-or-create',
   REPORTS_GET: 'reports:get',
   // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup of a
@@ -311,6 +317,13 @@ export type Screenshot = {
 //
 // Phase 7 / Plan 07-01 — I18N-01: `language` is the per-doctor
 // override (per D-17). NULL means "follow users.language".
+//
+// Quick task 260812-ns0 — report-branding + procedure-defaults fields:
+//   - headerImagePath / footerImagePath: userData-relative paths to
+//     the report header / footer image (PNG/JPEG); rendered as a top
+//     band and bottom band on every PDF page.
+//   - premedication: free-text clinic default; surfaces in the
+//     patient block header above findings.
 export type DoctorProfile = {
   id: string;
   userId: string;
@@ -322,7 +335,24 @@ export type DoctorProfile = {
   phone: string | null;
   signaturePath: string | null;
   logoPath: string | null;
+  headerImagePath: string | null;
+  footerImagePath: string | null;
+  premedication: string | null;
   language: 'en' | 'ar' | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Quick task 260812-ns0 — used devices (1:N with doctor_profile).
+// `profileId` points at the parent doctor_profile row id; the renderer's
+// API surface is keyed on `userId` (resolved server-side via the
+// doctor_profile.id lookup in the IPC handler).
+export type UsedDevice = {
+  id: string;
+  profileId: string;
+  name: string;
+  notes: string | null;
+  sortOrder: number;
   createdAt: number;
   updatedAt: number;
 };
@@ -537,14 +567,28 @@ export interface IpcContract {
       // their own preference yet). The i18n resolver reads this column
       // first, then falls back to the session's users.language.
       language?: 'en' | 'ar' | null;
+      // Quick task 260812-ns0 — premedication (free-text clinic default;
+      // surfaces in the PDF report header above findings).
+      premedication?: string | null;
     }) => Promise<DoctorProfile>;
         uploadSignature: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ signaturePath: string }>;
         uploadLogo: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ logoPath: string }>;
+        // Quick task 260812-ns0 — header / footer image uploads
+        // (rendered as the top / bottom band on every PDF page).
+        uploadHeader: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ headerImagePath: string }>;
+        uploadFooter: (input: { jpegBase64?: string; pngBase64?: string }) => Promise<{ footerImagePath: string }>;
         // Phase 6 UAT G-06-3 — image preview. Returns a data URL the
         // renderer can drop straight into <img src=...> for the
         // signature + logo previews. Returns { dataUrl: null } if the
         // asset is unset or the file is missing.
-        getAssetDataUrl: (input: { kind: 'signature' | 'logo' }) => Promise<{ dataUrl: string | null }>;
+        getAssetDataUrl: (input: { kind: 'signature' | 'logo' | 'header' | 'footer' }) => Promise<{ dataUrl: string | null }>;
+  };
+  // Quick task 260812-ns0 — used-devices CRUD (1:N with doctor_profile).
+  // The renderer keys by `userId` (server-side resolves to profile.id).
+  usedDevices: {
+    list: () => Promise<UsedDevice[]>;
+    add: (input: { name: string; notes?: string | null; sortOrder?: number }) => Promise<UsedDevice>;
+    remove: (input: { id: string }) => Promise<{ ok: true }>;
   };
   // Phase 6 / Plan 01 — Reports (RPT-01..05 + RPT-07). Per D-05 +
   // BLOCKER 4, no method accepts a `doctorId` field — main derives it from
