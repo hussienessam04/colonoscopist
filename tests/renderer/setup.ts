@@ -140,6 +140,16 @@ type MockApi = {
     pickZip: ReturnType<typeof vi.fn>;
     revealStaging: ReturnType<typeof vi.fn>;
   };
+  // Phase 8 / Plan 08-05 — License sub-page + LicenseGate modal. The
+  // status mock defaults to the unactivated state so a renderer test
+  // that mounts any page WITHOUT per-test seeding does not show the
+  // activation modal over the test render. Tests that exercise the
+  // License sub-page seed status/activate/pickAndActivate per-test.
+  license: {
+    status: ReturnType<typeof vi.fn>;
+    activate: ReturnType<typeof vi.fn>;
+    pickAndActivate: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -274,6 +284,28 @@ export function mockApi(): MockApi {
       unpack: vi.fn(),
       pickZip: vi.fn().mockResolvedValue(null),
       revealStaging: vi.fn().mockResolvedValue({ ok: true }),
+    },
+    // Phase 8 / Plan 08-06 — Default license.status() resolves to the
+    // 'unactivated' state so any renderer test that mounts a page without
+    // per-test seeding does not crash. The shape matches LicenseStatus
+    // from @shared/ipc-contract; activate + pickAndActivate reject so an
+    // accidental click surfaces as a test failure rather than a silent
+    // success.
+    license: {
+      status: vi.fn().mockResolvedValue({
+        state: 'unactivated',
+        vendorId: null,
+        licensedAt: null,
+        expiresAt: null,
+        trialStartedAt: null,
+        trialDaysRemaining: null,
+        machineId: 'a'.repeat(64),
+      }),
+      activate: vi.fn(),
+      pickAndActivate: vi.fn().mockResolvedValue({
+        ok: false,
+        code: 'IPC_LICENSE_CANCELLED' as const,
+      }),
     },
   };
   (window as unknown as { api: MockApi }).api = api;
