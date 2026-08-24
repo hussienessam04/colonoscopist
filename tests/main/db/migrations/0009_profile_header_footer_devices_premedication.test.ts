@@ -102,12 +102,15 @@ describe('0009_profile_header_footer_devices_premedication migration', () => {
     const { getDb, closeDb } = await import('../../../../src/main/db');
 
     const db1 = getDb();
-    // 0001 + 0002 + 0003 + 0004 + 0007 + 0008 + 0009 = 7 entries.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
+    // 0001 + 0002 + 0003 + 0004 + 0007 + 0008 + 0009 + 0010 + 0011 = 9 entries
+    // (0010 = report procedure-type + 8 box columns + templates table
+    // from quick task 20260812-redesign-report; 0011 = settings.trial_started_at
+    // from Phase 8 / Plan 01).
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
 
     closeDb();
   });

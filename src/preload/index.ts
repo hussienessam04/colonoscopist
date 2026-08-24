@@ -134,6 +134,13 @@ const api: IpcContract = {
     updateDraft: (input) => ipcRenderer.invoke(IPC.REPORTS_UPDATE_DRAFT, input),
     updateFinalized: (input) =>
       ipcRenderer.invoke(IPC.REPORTS_UPDATE_FINALIZED, input),
+    // Quick task 20260812-redesign-report — procedure-type toggle (set
+    // once), instrument picker, per-report premedication override.
+    setProcedureType: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_SET_PROCEDURE_TYPE, input),
+    setInstrument: (input) => ipcRenderer.invoke(IPC.REPORTS_SET_INSTRUMENT, input),
+    setPremedicationOverride: (input) =>
+      ipcRenderer.invoke(IPC.REPORTS_SET_PREMEDICATION_OVERRIDE, input),
     finalize: (input) => ipcRenderer.invoke(IPC.REPORTS_FINALIZE, input),
     regenPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_REGEN_PDF, input),
     openPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_OPEN_PDF, input),
@@ -146,6 +153,15 @@ const api: IpcContract = {
       ipcRenderer.invoke(IPC.REPORTS_REORDER_SCREENSHOTS, input),
     listScreenshots: (input) =>
       ipcRenderer.invoke(IPC.REPORTS_LIST_SCREENSHOTS, input),
+  },
+  // Quick task 20260812-redesign-report — global saved-text-templates
+  // library. Workstation-wide, scoped per box.
+  reportTemplates: {
+    listByScope: (input) =>
+      ipcRenderer.invoke(IPC.REPORT_TEMPLATES_LIST_BY_SCOPE, input),
+    listAll: () => ipcRenderer.invoke(IPC.REPORT_TEMPLATES_LIST_ALL, undefined),
+    add: (input) => ipcRenderer.invoke(IPC.REPORT_TEMPLATES_ADD, input),
+    remove: (input) => ipcRenderer.invoke(IPC.REPORT_TEMPLATES_REMOVE, input),
   },
   // Phase 7 / Plan 07-01 — Backup/Restore bridge (SET-05, SET-06).
   // The handlers in src/main/ipc/backup.ts + restore.ts own all
@@ -167,6 +183,13 @@ const api: IpcContract = {
     unpack: (input) => ipcRenderer.invoke(IPC.RESTORE_UNPACK, input),
     pickZip: () => ipcRenderer.invoke(IPC.RESTORE_PICK_ZIP),
     revealStaging: (input) => ipcRenderer.invoke(IPC.RESTORE_REVEAL_STAGING, input),
+  },
+  // Phase 8 / Plan 01 — license verify bridge (LIC-02/03). status() reads
+  // the cached LicenseStatus; activate() ships as a stub in Plan 01 and
+  // is filled by Plan 04 with the real loadAndVerifyLicense flow.
+  license: {
+    status: () => ipcRenderer.invoke(IPC.LICENSE_STATUS),
+    activate: (input) => ipcRenderer.invoke(IPC.LICENSE_ACTIVATE, input),
   },
 };
 

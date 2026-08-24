@@ -290,17 +290,74 @@ export const doctorProfileUpdateSchema = z
   })
   .strict();
 
-// reportUpdateSchema: patch only the four free-text fields. Per D-07 these
-// are the only patchable columns post-finalize. Status, procedure_id,
-// doctor_id, finalized_at, created_at are immutable post-insert.
+// reportUpdateSchema: patch only the 8 free-text box fields. Per D-07
+// these are the only patchable columns post-finalize. Status,
+// procedure_id, procedure_type, doctor_id, instrument,
+// premedication_override, finalized_at, created_at are immutable
+// post-insert (procedure_type is gated on the empty-state invariant
+// via the repo's setProcedureType guard). Quick task
+// 20260812-redesign-report — replaces the old 4-column shape.
 export const reportUpdateSchema = z
   .object({
-    findings: z.string().max(8000).optional(),
-    diagnosis: z.string().max(4000).optional(),
-    recommendations: z.string().max(4000).optional(),
-    procedureDetails: z.string().max(4000).optional(),
+    esophagus: z.string().max(8000).optional(),
+    stomach: z.string().max(8000).optional(),
+    pylorus: z.string().max(8000).optional(),
+    duodenum: z.string().max(8000).optional(),
+    colon: z.string().max(8000).optional(),
+    ileum: z.string().max(8000).optional(),
+    conclusion: z.string().max(8000).optional(),
+    recommendation: z.string().max(8000).optional(),
   })
   .strict();
+
+// reportProcedureTypeInput: id + the new procedure_type. Repo enforces
+// the empty-state invariant (procedure_type still 'colon' AND every box
+// column = '') so a second call after the doctor has typed anything
+// throws IPC_VALIDATION. Quick task 20260812-redesign-report.
+export const reportProcedureTypeInput = z
+  .object({
+    id: z.string().min(1),
+    procedureType: z.enum(['colon', 'upper_gi']),
+  })
+  .strict();
+
+// reportInstrumentInput: id + the picked used_devices.id, or null to
+// clear. Quick task 20260812-redesign-report.
+export const reportInstrumentInput = z
+  .object({
+    id: z.string().min(1),
+    instrument: z.string().uuid().nullable(),
+  })
+  .strict();
+
+// reportPremedicationOverrideInput: id + the per-report override text,
+// or null to clear (falls back to profile default). Quick task
+// 20260812-redesign-report.
+export const reportPremedicationOverrideInput = z
+  .object({
+    id: z.string().min(1),
+    override: z.string().max(2000).nullable(),
+  })
+  .strict();
+
+// reportTemplateAddInput: scope + label + body. UNIQUE(scope, label)
+// enforced at SQLite — duplicate label under same scope surfaces as
+// IPC_VALIDATION. Quick task 20260812-redesign-report.
+export const reportTemplateAddInput = z
+  .object({
+    scope: z.enum(['esophagus', 'stomach', 'pylorus', 'duodenum', 'colon', 'ileum', 'conclusion', 'recommendation']),
+    label: z.string().min(1).max(120),
+    body: z.string().min(1).max(8000),
+  })
+  .strict();
+
+export const reportTemplateScopeInput = z
+  .object({
+    scope: z.enum(['esophagus', 'stomach', 'pylorus', 'duodenum', 'colon', 'ileum', 'conclusion', 'recommendation']),
+  })
+  .strict();
+
+export const reportTemplateIdInput = z.object({ id: z.string().uuid() }).strict();
 
 // profileUploadSchema: the renderer's FileReader → base64 → IPC payload.
 // Either jpegBase64 OR pngBase64 is accepted (not both, not neither) so
@@ -331,6 +388,12 @@ export type ReportUpdateInput = z.infer<typeof reportUpdateSchema>;
 export type ProfileUploadInput = z.infer<typeof profileUploadSchema>;
 export type ReportIdInput = z.infer<typeof reportIdSchema>;
 export type ReportProcedureInput = z.infer<typeof reportProcedureSchema>;
+export type ReportProcedureTypeInput = z.infer<typeof reportProcedureTypeInput>;
+export type ReportInstrumentInput = z.infer<typeof reportInstrumentInput>;
+export type ReportPremedicationOverrideInput = z.infer<typeof reportPremedicationOverrideInput>;
+export type ReportTemplateAddInput = z.infer<typeof reportTemplateAddInput>;
+export type ReportTemplateScopeInput = z.infer<typeof reportTemplateScopeInput>;
+export type ReportTemplateIdInput = z.infer<typeof reportTemplateIdInput>;
 
 // Quick task 260812-ns0 — used-devices CRUD.
 export const usedDeviceAddInput = z
@@ -422,6 +485,18 @@ export type RestoreUnpackInput = z.infer<typeof restoreUnpackInput>;
 export type PickDestinationInput = z.infer<typeof pickDestinationInput>;
 export type PickZipInput = z.infer<typeof pickZipInput>;
 export type RestoreRevealStagingInput = z.infer<typeof restoreRevealStagingInput>;
+
+// Phase 8 / Plan 01 — license activation input validator (LIC-03).
+// Renderer never sends this; it's the IPC contract shape for the
+// LICENSE_ACTIVATE handler. The renderer gets the path from
+// `dialog.showOpenDialog` and forwards it; the IPC handler runs the
+// path through `verifyLicense` + writes the audit row.
+export const licenseActivateInput = z
+  .object({
+    licPath: z.string().min(1).max(2000),
+  })
+  .strict();
+export type LicenseActivateInput = z.infer<typeof licenseActivateInput>;
 
 export function assertNever(x: never): never {
   throw new Error(`Unhandled discriminant: ${JSON.stringify(x)}`);

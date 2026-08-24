@@ -96,6 +96,19 @@ export const IPC = {
   REPORTS_UPDATE_DRAFT: 'reports:update-draft',
   REPORTS_UPDATE_FINALIZED: 'reports:update-finalized',
   REPORTS_FINALIZE: 'reports:finalize',
+  // Quick task 20260812-redesign-report — procedure-type toggle
+  // (immutable after first non-empty edit) + instrument picker +
+  // per-report premedication override.
+  REPORTS_SET_PROCEDURE_TYPE: 'reports:set-procedure-type',
+  REPORTS_SET_INSTRUMENT: 'reports:set-instrument',
+  REPORTS_SET_PREMEDICATION_OVERRIDE: 'reports:set-premedication-override',
+  // Quick task 20260812-redesign-report — global saved-text-templates
+  // library for each of the 8 report boxes. Workstation-wide (no
+  // per-doctor scope).
+  REPORT_TEMPLATES_LIST_BY_SCOPE: 'report-templates:list-by-scope',
+  REPORT_TEMPLATES_LIST_ALL: 'report-templates:list-all',
+  REPORT_TEMPLATES_ADD: 'report-templates:add',
+  REPORT_TEMPLATES_REMOVE: 'report-templates:remove',
   REPORTS_OPEN_PDF: 'reports:open-pdf',
   REPORTS_REGEN_PDF: 'reports:regen-pdf',
   REPORTS_ATTACH_SCREENSHOT: 'reports:attach-screenshot',
@@ -136,6 +149,12 @@ export const IPC = {
   // picking any other path.
   RESTORE_REVEAL_STAGING: 'restore:reveal-staging',
   AUDIT_LOG: 'audit:log',
+  // Phase 8 / Plan 01 — license verify path (LIC-02/03/04).
+  // Both channels are EXEMPT from the IPC gate (Plan 03 ships the gate).
+  // Renderer reads `license.status()` on every App.tsx mount and after
+  // `license.activate()` to decide whether to render <LicenseGate>.
+  LICENSE_STATUS: 'license:status',
+  LICENSE_ACTIVATE: 'license:activate',
 } as const;
 
 // Phase 7 / Plan 07-01 — Restore preview shape returned by
@@ -361,18 +380,55 @@ export type UsedDevice = {
 // UNIQUE (1:1 reports-per-procedure); per D-06 finalized_at is frozen
 // after Finalize; per D-07 the four free-text fields are the only
 // patchable columns. pdfPath is userData-relative per Anti-Pattern 2.
+//
+// Quick task 20260812-redesign-report — replaced the four free-text
+// fields with 8 procedure-type-specific boxes (esophagus / stomach /
+// pylorus / duodenum / colon / ileum / conclusion / recommendation) +
+// procedureType ('colon' | 'upper_gi') + instrument (used_devices.id
+// pointer, NULL until chosen) + premedicationOverride (NULL = use
+// profile default). procedureType is set ONCE on first edit; the repo's
+// setProcedureType SQL guard rejects any update once the row has any
+// non-empty box.
 export type Report = {
   id: string;
   procedureId: string;
   doctorId: string;
-  findings: string;
-  diagnosis: string;
-  recommendations: string;
-  procedureDetails: string;
+  procedureType: 'colon' | 'upper_gi';
+  instrument: string | null;
+  premedicationOverride: string | null;
+  esophagus: string;
+  stomach: string;
+  pylorus: string;
+  duodenum: string;
+  colon: string;
+  ileum: string;
+  conclusion: string;
+  recommendation: string;
   status: 'draft' | 'finalized';
   finalizedAt: number | null;
   pdfPath: string | null;
   pdfGeneratedAt: number | null;
+  createdAt: number;
+  updatedAt: number;
+};
+
+// Quick task 20260812-redesign-report — global saved-text-template
+// row. Used for the editor's "Save current as template" + "Insert
+// template" dropdowns. No per-doctor profile_id — workstation-wide
+// library per the user's design decision.
+export type ReportTemplate = {
+  id: string;
+  scope:
+    | 'esophagus'
+    | 'stomach'
+    | 'pylorus'
+    | 'duodenum'
+    | 'colon'
+    | 'ileum'
+    | 'conclusion'
+    | 'recommendation';
+  label: string;
+  body: string;
   createdAt: number;
   updatedAt: number;
 };
@@ -401,6 +457,34 @@ export type ProcedurePartialJson = {
   deviceLostAt: number;
   deviceName: string;
 };
+
+// Phase 8 / Plan 01 — license verify types (LIC-02/03).
+// Per CONTEXT D-09 the verify path produces a discriminated state with
+// four arms; the renderer mirrors this shape on the renderer side via
+// `useLicenseStatus` (Plan 05).
+export type LicenseState =
+  | 'licensed'
+  | 'trial'
+  | 'expired'
+  | 'unactivated';
+
+export type LicenseStatus = {
+  state: LicenseState;
+  vendorId: string | null;
+  licensedAt: number | null;
+  expiresAt: number | null;
+  trialStartedAt: number | null;
+  trialDaysRemaining: number | null;
+  machineId: string; // SHA-256 hex (first 16 chars displayed as 4-char grouped blocks)
+};
+
+export type LicenseActivateInput = {
+  licPath: string; // absolute path from `dialog.showOpenDialog`
+};
+
+export type LicenseActivateResult =
+  | { ok: true; vendorId: string; licensedAt: number }
+  | { ok: false; code: 'IPC_LICENSE_INVALID'; reason: string };
 
 // What `contextBridge.exposeInMainWorld('api', api)` exposes to the renderer.
 export interface IpcContract {
@@ -606,18 +690,33 @@ export interface IpcContract {
     getByProcedure: (input: { procedureId: string }) => Promise<Report | null>;
     updateDraft: (input: {
       id: string;
-      findings?: string;
-      diagnosis?: string;
-      recommendations?: string;
-      procedureDetails?: string;
+      esophagus?: string;
+      stomach?: string;
+      pylorus?: string;
+      duodenum?: string;
+      colon?: string;
+      ileum?: string;
+      conclusion?: string;
+      recommendation?: string;
     }) => Promise<Report>;
     updateFinalized: (input: {
       id: string;
-      findings?: string;
-      diagnosis?: string;
-      recommendations?: string;
-      procedureDetails?: string;
+      esophagus?: string;
+      stomach?: string;
+      pylorus?: string;
+      duodenum?: string;
+      colon?: string;
+      ileum?: string;
+      conclusion?: string;
+      recommendation?: string;
     }) => Promise<Report>;
+    // Quick task 20260812-redesign-report — sets procedure_type ONCE
+    // on first edit. The repo throws IPC_VALIDATION if any box column
+    // is non-empty ("Procedure type is locked once the report has any
+    // content").
+    setProcedureType: (input: { id: string; procedureType: 'colon' | 'upper_gi' }) => Promise<Report>;
+    setInstrument: (input: { id: string; instrument: string | null }) => Promise<Report>;
+    setPremedicationOverride: (input: { id: string; override: string | null }) => Promise<Report>;
     finalize: (input: { id: string }) => Promise<Report>;
     regenPdf: (input: { id: string }) => Promise<{ pdfPath: string }>;
     // ponytail: `reveal: true` invokes `shell.showItemInFolder(abs)` —
@@ -636,6 +735,15 @@ export interface IpcContract {
     detachScreenshot: (input: { id: string; screenshotId: number }) => Promise<{ ok: true }>;
     reorderScreenshots: (input: { id: string; orderedIds: number[] }) => Promise<{ ok: true }>;
     listScreenshots: (input: { id: string }) => Promise<ReportScreenshot[]>;
+  };
+  // Quick task 20260812-redesign-report — global saved-text-templates
+  // library. Workstation-wide, scoped per box (esophagus / stomach /
+  // pylorus / duodenum / colon / ileum / conclusion / recommendation).
+  reportTemplates: {
+    listByScope: (input: { scope: ReportTemplate['scope'] }) => Promise<ReportTemplate[]>;
+    listAll: () => Promise<ReportTemplate[]>;
+    add: (input: { scope: ReportTemplate['scope']; label: string; body: string }) => Promise<ReportTemplate>;
+    remove: (input: { id: string }) => Promise<{ ok: true }>;
   };
   // Phase 7 / Plan 07-01 — Backup/Restore IPC (SET-05, SET-06). The
   // renderer surfaces the user-data folder as the active `data/` is
@@ -674,6 +782,17 @@ export interface IpcContract {
   // `list`); the `log` method was added in place to keep the surface
   // in one block. Plan 07-01 ships the AUDIT_LOG IPC channel as an
   // extension of the existing audit.* namespace.
+  //
+  // Phase 8 / Plan 01 — license verify path. status() returns the
+  // cached LicenseStatus; activate() reads the .lic at input.licPath
+  // and runs Ed25519 verify + audit row. Plan 04 fills activate()
+  // with the real loadAndVerifyLicense; Plan 01 ships a stub that
+  // throws IPC_NOT_IMPLEMENTED so the IPC surface compiles for
+  // Plan 02/03 + downstream consumers.
+  license: {
+    status: () => Promise<LicenseStatus>;
+    activate: (input: LicenseActivateInput) => Promise<LicenseActivateResult>;
+  };
 }
 
 declare global {

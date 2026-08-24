@@ -118,3 +118,14 @@ export function screenshotAbsPath(
 export function restoreStagingDir(timestamp: number): string {
   return path.join(app.getPath('userData'), `data-restore-${timestamp}`);
 }
+
+// Phase 8 / Plan 01 — license sidecar storage (LIC-02 + D-10 verbatim).
+// The shipped `.lic` artifact is an archiver-produced zip of `license.json` +
+// `license.sig`. After activation, the verify-side files are unpacked here
+// as flat files so the boot-time verify path reads them without a yauzl
+// round-trip on every cold start. Sibling of media/, profiles/, reports/.
+export function licenseDir(): string {
+  const dir = path.join(dataDir(), 'license');
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}

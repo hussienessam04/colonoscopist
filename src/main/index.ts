@@ -11,8 +11,13 @@ import { registerScreenshotsIpc } from './ipc/screenshots';
 import { registerProfileIpc } from './ipc/profile';
 import { registerUsedDevicesIpc } from './ipc/used-devices';
 import { registerReportsIpc } from './ipc/reports';
+// Quick task 20260812-redesign-report — global saved-text-templates
+// library for each report box. Registered AFTER registerReportsIpc()
+// so the same session store is initialized.
+import { registerReportTemplatesIpc } from './ipc/report-templates';
 import { registerBackupIpc } from './ipc/backup';
 import { registerRestoreIpc } from './ipc/restore';
+import { registerLicenseIpc } from './ipc/license';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -24,6 +29,7 @@ import {
   shutdownMediaServer,
 } from './recorder/init';
 import { Recorder } from './recorder/recorder';
+import { getLicenseStatus } from './license';
 
 const APP_NAME = 'Colonoscopist';
 const APP_USER_MODEL_ID = 'com.colonoscopist.app';
@@ -46,6 +52,17 @@ app.whenReady().then(() => {
   recorderSingleton = {
     newRecorder: () => recorderModule.newRecorder(),
   };
+  // Phase 8 / Plan 01 — license IPC must register BEFORE every other
+  // handler so LICENSE_STATUS + LICENSE_ACTIVATE are exempt from the
+  // gate (Plan 03 ships the gate). Warming the cache here means the
+  // renderer's first `license.status()` IPC call returns instantly
+  // instead of paying the verify cost on the renderer hot path.
+  registerLicenseIpc();
+  void getLicenseStatus()
+    .then(() => logStartup('license-status-cached'))
+    .catch((err: unknown) =>
+      logStartup(`license-status-cache-failed:${(err as Error).message ?? 'unknown'}`),
+    );
   registerAuthIpc();
   registerUsersIpc();
   registerAuditIpc();
@@ -81,6 +98,8 @@ app.whenReady().then(() => {
   // Quick task 260812-ns0 — used-devices CRUD IPC surface.
   registerUsedDevicesIpc();
   registerReportsIpc();
+  // Quick task 20260812-redesign-report — saved-text-templates IPC.
+  registerReportTemplatesIpc();
   // Phase 7 / Plan 07-01 — Backup/Restore IPC (SET-05, SET-06).
   // Must register AFTER registerAuthIpc() so `requireSession()` resolves.
   registerBackupIpc();

@@ -77,8 +77,11 @@ describe('db migrations', () => {
     // Phase 7 / Plan 07-01 added migration 0007 (doctor_profile.language +
     // users.language). Quick task 20260812 added migration 0008 (auto-MRN).
     // Quick task 20260812 added migration 0009 (header/footer/premedication/
-    // used_devices for Profile). Total now = 7.
-    expect(migrations).toHaveLength(7);
+    // used_devices for Profile). Quick task 20260812-redesign-report
+    // added migration 0010 (procedure_type + 8 box columns + templates).
+    // Phase 8 / Plan 01 added migration 0011 (settings.trial_started_at).
+    // Total now = 9.
+    expect(migrations).toHaveLength(9);
     expect(migrations[0].id).toBe(1);
 
     // Phase 7 / Plan 07-01 — verify migration 0007 added the language
@@ -114,28 +117,30 @@ describe('db migrations', () => {
 
     // First open
     const db1 = getDb();
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
+    // Phase 8 / Plan 01 added migration 0011 (settings.trial_started_at).
+    // Total now = 9.
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(7);
+    expect(count).toBe(9);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(
       `SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name`,
     ).all() as { name: string }[]).map((r) => r.name);
-    expect(tables).toEqual(expect.arrayContaining(['users', 'patients', 'audit_log', 'settings']));
+    expect(tables).toEqual(expect.arrayContaining(['users', 'patients', 'audit_log', 'settings', 'report_text_templates']));
 
     // ponytail: re-running migrations on the same db is a no-op for
     // 0007 — the _migrations row prevents the ALTER TABLEs from firing
     // a second time (which would otherwise throw `duplicate column`).
     closeDb();
 
-    // Third open — confirm migration count stays at 7 (idempotency).
+    // Third open — confirm migration count stays at 9 (idempotency).
     const db3 = getDb();
-    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(7);
+    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
     closeDb();
   });
 });

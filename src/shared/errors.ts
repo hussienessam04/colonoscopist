@@ -20,7 +20,13 @@ export type IpcError =
   | { code: 'IPC_BAD_REQUEST'; message: string }
   // Plan 01 stub: handlers whose real implementation lands in Plan 03
   // throw this so the renderer contract surface doesn't need to shift.
-  | { code: 'IPC_NOT_IMPLEMENTED'; message: string };
+  | { code: 'IPC_NOT_IMPLEMENTED'; message: string }
+  // Phase 8 / Plan 01 — license gate rejection codes (LIC-02/03/04).
+  // INVALID = never activated OR tampered .lic; EXPIRED = trial ran
+  // out without activation. Renderer reads the code to choose modal
+  // copy (per CONTEXT D-05).
+  | { code: 'IPC_LICENSE_INVALID'; message: string }
+  | { code: 'IPC_LICENSE_EXPIRED'; message: string };
 
 export class IpcErrorException extends Error {
   readonly ipc: IpcError;
@@ -52,6 +58,10 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
     case 'IPC_BAD_REQUEST':
       return { code, message };
     case 'IPC_NOT_IMPLEMENTED':
+      return { code, message };
+    case 'IPC_LICENSE_INVALID':
+      return { code, message };
+    case 'IPC_LICENSE_EXPIRED':
       return { code, message };
   }
 }
