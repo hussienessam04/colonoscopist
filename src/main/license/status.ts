@@ -1,16 +1,22 @@
-// Phase 8 / Plan 01 — License status cache (LIC-02/03).
+// Phase 8 / Plan 01 + Plan 02 — License status cache (LIC-02/03).
 //
 // Per RESEARCH §Pattern 5: `computeLicenseStatus()` reads the sidecar
 // from `<userData>/data/license/{license.json,license.sig}` on every call;
 // `getLicenseStatus()` memoizes the result so the boot-time + per-render
 // reads don't repeat the verify cost. Plan 04's `loadAndVerifyLicense`
 // invalidates the cache after a successful activation.
+//
+// Plan 02 extends the fall-through branch with the 14-day trial clock
+// (`trial.ts:getTrialState()` + `readTrialStartedAt()`). The clock is a
+// UI countdown, NOT a permission per D-02 + PITFALLS §Pitfall 6; the
+// IPC gate (Plan 03) handles the permission to write.
 
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { licenseDir } from '../paths';
 import { verifyLicense, VENDOR_PUBLIC_KEY_HEX } from './verify';
 import { computeMachineFingerprint } from './fingerprint';
+import { getTrialState, readTrialStartedAt, TRIAL_DURATION_MS } from './trial';
 import type { LicenseStatus as ContractLicenseStatus } from '@shared/ipc-contract';
 
 export type LicenseState = ContractLicenseStatus['state'];
@@ -20,9 +26,9 @@ let cached: LicenseStatus | null = null;
 
 /**
  * Read the sidecar + verify + return the canonical LicenseStatus. The
- * trial branch is stubbed for Plan 01 (returns `unactivated` when no
- * license + no trial row exists); Plan 02 fills the trial clock
- * (readTrialStartedAt / getTrialState) on top of this shape.
+ * fall-through branch consumes `trial.ts:getTrialState()` for the 14-day
+ * trial window; Plan 02 wires that here. Plan 04's `loadAndVerifyLicense`
+ * writes the license.activated / license.invalid audit rows.
  */
 export async function computeLicenseStatus(): Promise<LicenseStatus> {
   const licDir = licenseDir();
@@ -56,16 +62,30 @@ export async function computeLicenseStatus(): Promise<LicenseStatus> {
     // loadAndVerifyLicense writes the license.invalid audit row.
   }
 
-  // No license (or invalid sidecar) → unactivated for Plan 01. Plan 02
-  // extends this with trialStartedAt / trialDaysRemaining via
-  // readTrialStartedAt() + the 14-day expiry check.
+  // No license (or invalid sidecar) → fall back to trial / expired / unactivated.
+  const trial = getTrialState();
+  if (trial) {
+    return {
+      state: 'trial',
+      vendorId: null,
+      licensedAt: null,
+      expiresAt: trial.expiresAt,
+      // surfaced for the renderer's "trial started Xd ago" copy if needed
+      trialStartedAt: trial.expiresAt - TRIAL_DURATION_MS,
+      trialDaysRemaining: trial.daysRemaining,
+      machineId,
+    };
+  }
+
+  // No license + no active trial (either expired or never started).
+  const trialStartedAt = readTrialStartedAt();
   return {
-    state: 'unactivated',
+    state: trialStartedAt !== null ? 'expired' : 'unactivated',
     vendorId: null,
     licensedAt: null,
     expiresAt: null,
-    trialStartedAt: null,
-    trialDaysRemaining: null,
+    trialStartedAt,
+    trialDaysRemaining: 0,
     machineId,
   };
 }

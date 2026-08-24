@@ -83,6 +83,17 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
     ).run('language', language, now);
 
+    // INSERT settings trial_started_at — LIC-01 + D-01 verbatim.
+    // First-write-wins: no `ON CONFLICT UPDATE` so reinstalling the app
+    // on the same machine preserves the trial (the settings row persists
+    // in `<userData>/data/app.db`; the DB file is NOT deleted by the
+    // Electron installer). A fresh DB starts a fresh 14-day window.
+    // Value is the wizard's `now` (Unix ms) — `trial.ts:getTrialState()`
+    // computes `expiresAt = value + 14d`.
+    db.prepare(
+      `INSERT INTO settings (key, value, updated_at) VALUES (?, ?, ?)`,
+    ).run('trial_started_at', String(now), now);
+
     // INSERT doctor_profile (Phase 6 / D-01..D-04). New admins get a
     // doctor_profile row alongside the users row so the ProfileEditor
     // has something to render. The migration 0004 backfill handles the
@@ -100,6 +111,18 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
       `INSERT INTO audit_log (user_id, action, entity_type, entity_id, metadata, outcome, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
     ).run(userId, 'auth.bootstrap.completed', 'user', userId, JSON.stringify({ clinicName, language }), 'ok', now);
+
+    // INSERT audit_log license.trial_started — first-launch trial marker
+    // (LIC-01 + AUDIT-01 + D-11). The Audit sub-page (Phase 7 D-05)
+    // surfaces this row in the `license.*` filter so the clinic owner
+    // can see when the trial started (and forward the timestamp to the
+    // vendor if needed). Per D-11: userId is set explicitly because the
+    // transaction runs BEFORE `session.set()` (same as the
+    // auth.bootstrap.completed row above).
+    db.prepare(
+      `INSERT INTO audit_log (user_id, action, entity_type, entity_id, metadata, outcome, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).run(userId, 'license.trial_started', 'license', null, JSON.stringify({ trialStartedAt: now }), 'ok', now);
   });
   txn();
 
