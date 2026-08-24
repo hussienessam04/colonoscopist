@@ -20,17 +20,32 @@
 // (Backup & Restore). Audit + Backup & Restore buttons are NOT admin-gated
 // per UI-SPEC §Implementation Bindings — every doctor sees them. Visual
 // order is Capture → Profile → Audit → Backup & Restore → Users.
+//
+// Phase 8 / Plan 08-05 — License entry (LIC-03). Sits BETWEEN Audit and
+// Backup & Restore per CONTEXT D-04. The icon is `KeyRound` from the same
+// lucide-react set (matches the sibling icons). The button is NOT
+// admin-gated — every doctor sees it. The active highlight keys on the
+// new `activeTab === 'license'` value; the route union's `{name:
+// 'license'}` was added to lib/router.ts so the navigate() call compiles.
 
-import { FileSearch, HardDrive, Shield, UserCircle, Video } from 'lucide-react';
+import { FileSearch, HardDrive, KeyRound, Shield, UserCircle, Video } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
 import { useRoute } from '@/lib/router';
 
-export type SettingsTab = 'capture' | 'users' | 'profile' | 'audit' | 'backup-restore';
+export type SettingsTab =
+  | 'capture'
+  | 'users'
+  | 'profile'
+  | 'audit'
+  | 'license'
+  | 'backup-restore';
 
 export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX.Element {
   const { navigate } = useRoute();
   const { currentUser } = useSession();
+  const { t } = useTranslation();
   const isAdmin = currentUser?.isFirstAdmin ?? false;
 
   return (
@@ -67,6 +82,16 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <FileSearch className="size-4 mr-2" aria-hidden="true" />
         Audit
+      </Button>
+      <Button
+        variant={activeTab === 'license' ? 'default' : 'outline'}
+        className="justify-start"
+        onClick={() => navigate({ name: 'license' })}
+        data-testid="settings-hub-license"
+        data-active={activeTab === 'license' ? 'true' : 'false'}
+      >
+        <KeyRound className="size-4 mr-2" aria-hidden="true" />
+        {t('license.sidebarEntry')}
       </Button>
       <Button
         variant={activeTab === 'backup-restore' ? 'default' : 'outline'}

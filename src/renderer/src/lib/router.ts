@@ -30,7 +30,11 @@ export type Route =
   // Quick task 20260811 — Patient procedures surface moved out of the
   // Patient List accordion (reverted) into its own page, reached via
   // "View procedures" on the patient actions dropdown.
-  | { name: 'patient-procedures'; patientId: string };
+  | { name: 'patient-procedures'; patientId: string }
+  // Phase 8 / Plan 05 — License sub-page (LIC-03). Reached via
+  // SettingsSidebar; the boot-time <LicenseGate> modal navigates here
+  // on the 'Activate now' button click. The route carries no params.
+  | { name: 'license' };
 
 export const initialRoute: Route = { name: 'login' };
 

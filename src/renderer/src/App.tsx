@@ -31,6 +31,13 @@ import BackupRestore from './pages/BackupRestore';
 // PatientRow dropdown's "View procedures" item. The route variant
 // landed in the same quick task.
 import PatientProcedures from './pages/PatientProcedures';
+// Phase 8 / Plan 08-05 — License sub-page (LIC-03) + boot-time
+// <LicenseGate> modal (LIC-03 first-launch prompt per CONTEXT D-05).
+// The modal is mounted ABOVE the route switch so it fires on
+// `state: 'unactivated'` or `state: 'expired'` regardless of which
+// authenticated route is active.
+import LicenseGate from './components/LicenseGate';
+import License from './pages/License';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -76,39 +83,66 @@ export default function App(): JSX.Element {
     );
   }
 
+  // Phase 8 / Plan 08-05 — LIC-03: wrap the route render in
+  // <LicenseGate> so the boot-time activation modal appears above
+  // EVERY authenticated route when status is `unactivated` or
+  // `expired`. LicenseGate reads license.status() internally — the
+  // modal surfaces immediately on first paint.
+  let routeElement: JSX.Element;
   switch (route.name) {
     case 'wizard':
-      return <Wizard />;
+      routeElement = <Wizard />;
+      break;
     case 'login':
-      return <Login />;
+      routeElement = <Login />;
+      break;
     case 'patients':
-      return <PatientsList />;
+      routeElement = <PatientsList />;
+      break;
     case 'patient-new':
-      return <PatientForm mode="create" />;
+      routeElement = <PatientForm mode="create" />;
+      break;
     case 'patient-edit':
-      return <PatientForm mode="edit" patientId={route.id} />;
+      routeElement = <PatientForm mode="edit" patientId={route.id} />;
+      break;
     case 'settings-hub':
-      return <SettingsHub />;
+      routeElement = <SettingsHub />;
+      break;
     case 'settings-users':
-      return <SettingsUsers />;
+      routeElement = <SettingsUsers />;
+      break;
     case 'settings-capture':
-      return <SettingsCapture />;
+      routeElement = <SettingsCapture />;
+      break;
     case 'procedure-preview':
-      return <ProcedurePreview />;
+      routeElement = <ProcedurePreview />;
+      break;
     case 'procedure-room':
-      return <ProcedureRoom />;
+      routeElement = <ProcedureRoom />;
+      break;
     case 'procedure-review':
-      return <ProcedureReview procedureId={route.procedureId} />;
+      routeElement = <ProcedureReview procedureId={route.procedureId} />;
+      break;
     case 'profile-edit':
-      return <ProfileEditor />;
+      routeElement = <ProfileEditor />;
+      break;
     case 'report-editor':
-      return <ReportEditor procedureId={route.procedureId} reportId={route.reportId} />;
+      routeElement = (
+        <ReportEditor procedureId={route.procedureId} reportId={route.reportId} />
+      );
+      break;
     case 'audit':
-      return <Audit />;
+      routeElement = <Audit />;
+      break;
     case 'backup-restore':
-      return <BackupRestore />;
+      routeElement = <BackupRestore />;
+      break;
+    case 'license':
+      routeElement = <License />;
+      break;
     case 'patient-procedures':
-      return <PatientProcedures patientId={route.patientId} />;
+      routeElement = <PatientProcedures patientId={route.patientId} />;
+      break;
     default:
       // The only unhandled variant is `patient-detail`, preserved in the
       // Route union for backward-compat with persisted deep-links + audit
@@ -117,6 +151,9 @@ export default function App(): JSX.Element {
       // deep-links that still carry 'patient-detail' fall through to the
       // Patient List so the renderer never re-renders the Phase 1
       // placeholder.
-      return <PatientsList />;
+      routeElement = <PatientsList />;
+      break;
   }
+
+  return <LicenseGate>{routeElement}</LicenseGate>;
 }
