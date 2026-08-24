@@ -155,6 +155,13 @@ export const IPC = {
   // `license.activate()` to decide whether to render <LicenseGate>.
   LICENSE_STATUS: 'license:status',
   LICENSE_ACTIVATE: 'license:activate',
+  // Phase 8 / Plan 04 — picker + activate one-shot (D-06 verbatim).
+  // Renderer invokes this with NO arguments; main opens the file dialog
+  // and, on user-confirmed path, calls loadAndVerifyLicense(). On cancel
+  // (user closed the dialog), returns {ok:false, code:'IPC_LICENSE_CANCELLED'}.
+  // This channel is EXEMPT from the IPC gate (Plan 04 also adds it to
+  // EXEMPT_CHANNELS in src/main/license/gate.ts).
+  LICENSE_PICK_AND_ACTIVATE: 'license:pick-and-activate',
 } as const;
 
 // Phase 7 / Plan 07-01 — Restore preview shape returned by
@@ -789,9 +796,16 @@ export interface IpcContract {
   // with the real loadAndVerifyLicense; Plan 01 ships a stub that
   // throws IPC_NOT_IMPLEMENTED so the IPC surface compiles for
   // Plan 02/03 + downstream consumers.
+  //
+  // Phase 8 / Plan 04 — picker + activate. NO input arg — the IPC owns
+  // the dialog. Returns LicenseActivateResult on success/failure or
+  // {ok:false, code:'IPC_LICENSE_CANCELLED'} on dialog cancel.
+  // Renderer never composes paths (Phase 7 D-13 verbatim); the dialog
+  // picker is the only legitimate source of `.lic` paths.
   license: {
     status: () => Promise<LicenseStatus>;
     activate: (input: LicenseActivateInput) => Promise<LicenseActivateResult>;
+    pickAndActivate: () => Promise<LicenseActivateResult | { ok: false; code: 'IPC_LICENSE_CANCELLED' }>;
   };
 }
 

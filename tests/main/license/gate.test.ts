@@ -224,11 +224,13 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
     }
   });
 
-  it('EXEMPT_CHANNELS contains the 12 channels named in CONTEXT D-08 verbatim', async () => {
+  it('EXEMPT_CHANNELS contains the 12 channels named in CONTEXT D-08 verbatim + Plan 04 picker channel', async () => {
     const { EXEMPT_CHANNELS } = await import('../../../src/main/license/gate');
-    // Auth (8) + License (2) + Audit (2) = 12
-    expect(EXEMPT_CHANNELS.size).toBe(12);
-    // Verify the names match exactly (D-08 verbatim).
+    // Auth (8) + License (3) + Audit (2) = 13
+    // Plan 04 adds `license:pick-and-activate` to D-08's 12 — the user
+    // is actively activating when they invoke this channel.
+    expect(EXEMPT_CHANNELS.size).toBe(13);
+    // Verify the names match exactly (D-08 verbatim + Plan 04's picker).
     const expected = [
       'auth:status',
       'auth:bootstrap',
@@ -240,6 +242,7 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
       'auth:accept-recovery-file',
       'license:status',
       'license:activate',
+      'license:pick-and-activate',
       'audit:list',
       'audit:log',
     ];

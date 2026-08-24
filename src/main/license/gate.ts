@@ -47,6 +47,12 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // License self-service (renderer needs to render + resolve the modal).
   IPC.LICENSE_STATUS,
   IPC.LICENSE_ACTIVATE,
+  // Phase 8 / Plan 04 — picker + activate one-shot (D-06 verbatim).
+  // The user is actively activating when they invoke this channel; the
+  // gate MUST pass through even when state is 'unactivated' / 'expired'.
+  // Plan 04 owns this entry (Plan 03 ships the initial EXEMPT_CHANNELS
+  // set with LICENSE_ACTIVATE only).
+  IPC.LICENSE_PICK_AND_ACTIVATE,
   // Audit (workstation-level event log continues regardless of license state).
   IPC.AUDIT_LIST,
   IPC.AUDIT_LOG,

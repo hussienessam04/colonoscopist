@@ -187,9 +187,15 @@ const api: IpcContract = {
   // Phase 8 / Plan 01 — license verify bridge (LIC-02/03). status() reads
   // the cached LicenseStatus; activate() ships as a stub in Plan 01 and
   // is filled by Plan 04 with the real loadAndVerifyLicense flow.
+  //
+  // Phase 8 / Plan 04 — picker + activate one-shot. NO input arg —
+  // the IPC owns the dialog. Returns LicenseActivateResult on
+  // success/failure or {ok:false, code:'IPC_LICENSE_CANCELLED'} on
+  // dialog cancel.
   license: {
     status: () => ipcRenderer.invoke(IPC.LICENSE_STATUS),
     activate: (input) => ipcRenderer.invoke(IPC.LICENSE_ACTIVATE, input),
+    pickAndActivate: () => ipcRenderer.invoke(IPC.LICENSE_PICK_AND_ACTIVATE),
   },
 };
 
