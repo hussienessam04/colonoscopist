@@ -4,15 +4,15 @@ milestone: v1.1
 milestone_name: milestone
 current_plan: 07-06
 status: complete
-stopped_at: Phase 07 Plan 6 complete
+stopped_at: Phase 08 context gathered
 paused_at: —
-last_updated: "2026-08-12T13:40:00.000Z"
-last_activity: 2026-08-12
-last_activity_desc: Quick task 260812-n0h — settings shell unified across 6 pages via SettingsLayout
+last_updated: "2026-08-24T14:01:47.018Z"
+last_activity: 2026-08-11
+last_activity_desc: Phase 7 Plan 6 complete — Playwright RTL smoke + backup/restore roundtrip + AR PDF magic integration tests + 07-UAT.md
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 6
-  total_plans: 40
+  total_plans: 41
   completed_plans: 40
 ---
 
@@ -174,9 +174,9 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 
 ## Session
 
-**Last session:** 2026-08-11T09:04:00.000Z
-**Stopped at:** Phase 07 Plan 6 complete (Phase 7 plan execution complete; /gsd-verify-work 7 next)
-**Resume file:** .planning/phases/07-search-history-audit-ui-backup-restore-arabic-rtl/07-06-SUMMARY.md
+**Last session:** 2026-08-24T14:01:46.963Z
+**Stopped at:** Phase 08 context gathered
+**Resume file:** .planning/phases/08-licensing-ed25519-signed-lic-14-day-trial-activation-flow/08-CONTEXT.md
 
 ## Performance Metrics
 
@@ -240,7 +240,6 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 - [Phase 7 P06]: backup-restore-roundtrip.test.ts uses `wizardBootstrap({...})` to seed the first admin + doctor_profile row + DB schema in beforeAll — closest match to "real DB roundtrip" (D-16) without diverging from the production seed path. The plan template's synthetic `INSERT INTO users` would have tested a different code path than the real wizard
 - [Phase 7 P06]: Integration tests use `describe.skipIf(!smokeEnabled)` + a `describe('disabled — set RUN_SMOKE=1')` placeholder block instead of the plan template's `itSmoke = smokeEnabled ? it : it.skip` pattern — vitest-native, single env-var read per file, test runner output is honest (no dangling it() refs / no silent skips)
 
-
 ## Quick Tasks Completed
 
 | Date | Slug | Description |
@@ -254,4 +253,5 @@ See: `.planning/PROJECT.md` (updated 2026-07-31)
 | 2026-08-12 | change-mrn-auto-serial | Auto-generate MRN as serial number (migration 0008 + nextMrn counter + drop mrn from create/patch input + render Edit MRN read-only + 3 contract-guard + 1 migration test) |
 | 2026-08-12 | procedure-room-ui-polish | Move ProcedureRoom mid-procedure screenshot gallery from right sidebar to full-width bottom strip; rename Hide → Hide notes; testid seams preserved |
 | 2026-08-12 | unify-settings-layout-and-navbar | Extract SettingsLayout + refactor 6 settings pages onto unified shell (kicker + h1 + subtitle + right-side action + Back); testid contracts preserved |
+| 2026-08-12 | redesign-report-procedure-type | Complete report redesign: per-report procedure_type ('colon'/'upper_gi', immutable once any box is non-empty), 8 procedure-type-specific boxes (esophagus/stomach/pylorus/duodenum for upper_gi; colon/ileum for colon; +always-on conclusion + recommendation), instrument picker fed by usedDevices, per-report premedication override (defaults from settings), global saved-text-templates library per box scope, redesigned ReportEditor UI matching the supplied sample (header band + instrument/premedication row + patient info row + boxes column + screenshots column + signature/footer), migration 0010 + new report-templates table, 6 new IPC channels, 4 reports-repo tests + 8 report-editor tests rewritten/added, all 732 unit tests pass (3 pre-existing pdf-smoke failures unrelated). |
 | 2026-08-12 | profile-assets-premedication-devices | Profile: add header + footer image uploads (PDF top/bottom bands), used-devices CRUD card, premedication input; migration 0009 + 2x2 Assets grid + new Procedure defaults card |
