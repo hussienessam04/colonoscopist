@@ -248,11 +248,22 @@ Plans:
 **Tracer-first decomposition:** Plan 01 ships the production-quality end-to-end verify-path slice (Ed25519 verify + embedded public key + `Object.freeze` + `@noble/ed25519` install + IPC `LICENSE_STATUS`/`LICENSE_ACTIVATE` + migration 0011 + paths.licenseDir + roundtrip integration test) covering LIC-02; Plan 02 wires the 14-day trial clock (settings.trial_started_at + wizard transaction + audit row) covering LIC-01; Plan 03 ships the `licenseGated` helper + wraps every existing `register*()` call + audit row on gate rejection + gate-blocks integration test covering LIC-04; Plan 04 ships `loadAndVerifyLicense` + the `LICENSE_PICK_AND_ACTIVATE` IPC channel (wraps `dialog.showOpenDialog` + verify in one main-side call, Phase 7 D-13 verbatim pattern) + vendor `scripts/gen-license.cjs` + .gitignore rules + LICENSE_ACTIVATE handler + extends `EXEMPT_CHANNELS` for the new picker channel completing LIC-02/LIC-03 activation; Plan 05 ships the License sub-page + SettingsSidebar entry + boot-time `<LicenseGate>` modal + `useLicenseStatus` hook + bilingual i18n completing LIC-03 UI; Plan 06 ships `scripts/check-license-gate.cjs` grep gate + audit/UI/RTL tests + `08-UAT.md` acceptance plan. Wave 1 = Plan 01. Wave 2 = Plans 02, 03 (parallel; depends on 01). Wave 3 = Plan 04 (depends on 01, 03), Plan 05 (depends on 01, 02, 04). Wave 4 = Plan 06 (depends on all).
 
 Plans:
+**Wave 1**
+
 - [ ] 08-01-PLAN.md — Tracer: `@noble/ed25519` + `@noble/hashes` install + `src/main/license/{verify,fingerprint,status,index}.ts` + IPC `LICENSE_STATUS` + `LICENSE_ACTIVATE` exemptions + migration 0011 + `paths.licenseDir()` + roundtrip integration test (Wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 08-02-PLAN.md — Trial clock: `src/main/license/trial.ts` + `wizardBootstrap` writes `trial_started_at` inside `db.transaction` + audit `license.trial_started` row + reboot integration test (Wave 2, depends_on: 08-01)
 - [ ] 08-03-PLAN.md — IPC gate: `src/main/license/gate.ts` (`licenseGated` + `EXEMPT_CHANNELS`) + wrap every existing `register*()` call + audit `license.gate_rejected` row + gate-blocks integration test (Wave 2, depends_on: 08-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 08-04-PLAN.md — Activation: `src/main/license/load-license.ts` (yauzl + verify + sidecar write + cache invalidation) + `LICENSE_PICK_AND_ACTIVATE` IPC channel (wraps `dialog.showOpenDialog` + verify in one main-side call, Phase 7 D-13 verbatim pattern) + vendor `scripts/gen-license.cjs` + `.gitignore` extensions + audit `license.activated` + `license.invalid` rows + extends `EXEMPT_CHANNELS` for the picker channel (Wave 3, depends_on: 08-01, 08-03)
 - [ ] 08-05-PLAN.md — Renderer UI: `pages/License.tsx` + `SettingsSidebar` entry + Route union + `App.tsx` `<LicenseGate>` wrapper + `useLicenseStatus` hook + bilingual i18n keys (EN + AR) (Wave 3, depends_on: 08-01, 08-02, 08-04)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 08-06-PLAN.md — Audit + grep gate + tests + UAT: `scripts/check-license-gate.cjs` + audit tests + gate-coverage test + license.test.tsx + Playwright RTL + `08-UAT.md` acceptance plan (Wave 4, depends_on: 08-01, 08-02, 08-03, 08-04, 08-05)
 
 ---
