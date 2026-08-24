@@ -53,10 +53,20 @@ beforeEach(() => {
   handlers.clear();
   spawnMock.mockReset();
   spawnMock.mockImplementation(() => {
+    // Phase 8 / Plan 03 — the IPC gate (licenseGated) calls
+    // getLicenseStatus() on every gated handler invocation; the cached
+    // status reader fires `readDiskSerialWmic` (a `spawn('wmic', ...)`
+    // call) on the first uncached read. Without `stdout` here, the
+    // fingerprint code path crashes with `Cannot read properties of
+    // undefined (reading 'on')`. The mock now exposes the same
+    // `--stdout-on + exit` shape `readDiskSerialWmic` expects; the
+    // handler emits `close` immediately so the fingerprint reads ''
+    // (degraded fallback per Pitfall 5).
     return {
       stderr: { on: () => undefined },
+      stdout: { on: () => undefined },
       on: (e: string, cb: (...a: unknown[]) => void) => {
-        if (e === 'exit') {
+        if (e === 'exit' || e === 'close') {
           Promise.resolve().then(() => cb(0, null));
         }
       },

@@ -14,6 +14,7 @@ import { auditRepo, type AuditListRow } from '../db/audit';
 import { auditFilterInput, auditLogInput } from '@shared/validators';
 import { session } from '../auth/session';
 import { IpcErrorException, ipcError } from '@shared/errors';
+import { licenseGated } from '../license';
 import { z } from 'zod';
 
 // ponytail: copied from patients.ts + auth.ts — same gate shape across
@@ -80,18 +81,21 @@ function toAuditEntry(row: AuditListRow): AuditEntry {
 }
 
 export function registerAuditIpc(): void {
-  ipcMain.handle(IPC.AUDIT_LIST, (_e, raw) => {
+  // Phase 8 / Plan 03 — audit channels are EXEMPT (per CONTEXT D-08: the
+  // audit-on-every-read pattern continues regardless of license state).
+  // The wrapper is applied anyway for grep-gate consistency.
+  ipcMain.handle(IPC.AUDIT_LIST, licenseGated(IPC.AUDIT_LIST, (_e, raw) => {
     const filter = auditFilterInput.parse(raw ?? {});
     const { rows, total } = auditRepo.list(filter);
     return { rows: rows.map(toAuditEntry), total };
-  });
+  }));
 
   // AUDIT-01 / D-08 — renderer-side "audit-on-every-read" channel.
   // Requires a session (writes the row's user_id from session.currentUserId
   // unless the caller explicitly passes a different one — but per Phase 2
   // BLOCKER 4, the schema does NOT expose a userId field; session is the
   // single source of truth for who is performing the action).
-  ipcMain.handle(IPC.AUDIT_LOG, (_e, raw) => {
+  ipcMain.handle(IPC.AUDIT_LOG, licenseGated(IPC.AUDIT_LOG, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(auditLogInput, raw);
@@ -106,7 +110,7 @@ export function registerAuditIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 function asIpcError(err: unknown): Error {

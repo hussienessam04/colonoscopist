@@ -36,6 +36,7 @@ import { IpcErrorException, ipcError } from '@shared/errors';
 import { createBackup, revealBackup } from '../backup';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -74,7 +75,11 @@ function asIpcError(err: unknown): Error {
 }
 
 export function registerBackupIpc(): void {
-  ipcMain.handle(IPC.BACKUP_CREATE, async (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. BACKUP_*
+  // channels are GATED; expired licenses cannot create or reveal backup
+  // zip files (the trial period still lets you keep using the installed
+  // app — backups are a separate workflow).
+  ipcMain.handle(IPC.BACKUP_CREATE, licenseGated(IPC.BACKUP_CREATE, async (_e, raw) => {
     const userId = requireSession();
     const input = safeParse(backupCreateInput, raw);
     try {
@@ -110,9 +115,9 @@ export function registerBackupIpc(): void {
       });
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.BACKUP_REVEAL, (_e, raw) => {
+  ipcMain.handle(IPC.BACKUP_REVEAL, licenseGated(IPC.BACKUP_REVEAL, (_e, raw) => {
     requireSession();
     const input = safeParse(backupRevealInput, raw);
     try {
@@ -121,7 +126,7 @@ export function registerBackupIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 7 / Plan 07-05 — D-11 verbatim dialog.showSaveDialog wrapper.
   // Pre-fills the suggested filename with a UTC timestamp suffix so
@@ -129,7 +134,7 @@ export function registerBackupIpc(): void {
   // null when the user cancels — the renderer short-circuits without
   // invoking BACKUP_CREATE. No audit row for the picker itself (it's
   // a UI-only action; the CREATE call writes the audit trail).
-  ipcMain.handle(IPC.BACKUP_PICK_DESTINATION, async (_e, raw) => {
+  ipcMain.handle(IPC.BACKUP_PICK_DESTINATION, licenseGated(IPC.BACKUP_PICK_DESTINATION, async (_e, raw) => {
     requireSession();
     safeParse(pickDestinationInput, raw);
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
@@ -142,5 +147,5 @@ export function registerBackupIpc(): void {
       return null;
     }
     return result.filePath;
-  });
+  }));
 }

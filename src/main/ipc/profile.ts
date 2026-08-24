@@ -25,6 +25,7 @@ import { audit } from '../db/audit';
 import { session } from '../auth/session';
 import { profileAssetPath, profileDir } from '../paths';
 import { detectImageFormat, extensionForFormat } from '../pdf/embed-image';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -108,7 +109,10 @@ function uploadHeaderOrFooter(
 }
 
 export function registerProfileIpc(): void {
-  ipcMain.handle(IPC.PROFILE_GET, () => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. PROFILE_*
+  // channels are GATED; expired licenses cannot view / update the
+  // doctor profile or upload signature/logo/header/footer images.
+  ipcMain.handle(IPC.PROFILE_GET, licenseGated(IPC.PROFILE_GET, () => {
     try {
       const userId = requireSession();
       const row = doctorProfileRepo.get(userId);
@@ -122,9 +126,9 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROFILE_UPDATE, (_e, raw) => {
+  ipcMain.handle(IPC.PROFILE_UPDATE, licenseGated(IPC.PROFILE_UPDATE, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(doctorProfileUpdateSchema, raw);
@@ -161,9 +165,9 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROFILE_UPLOAD_SIGNATURE, (_e, raw) => {
+  ipcMain.handle(IPC.PROFILE_UPLOAD_SIGNATURE, licenseGated(IPC.PROFILE_UPLOAD_SIGNATURE, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(profileUploadSchema, raw);
@@ -181,9 +185,9 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROFILE_UPLOAD_LOGO, (_e, raw) => {
+  ipcMain.handle(IPC.PROFILE_UPLOAD_LOGO, licenseGated(IPC.PROFILE_UPLOAD_LOGO, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(profileUploadSchema, raw);
@@ -201,11 +205,11 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Quick task 260812-ns0 — header / footer image uploads (top / bottom
   // bands on the PDF report).
-  ipcMain.handle(IPC.PROFILE_UPLOAD_HEADER, (_e, raw) => {
+  ipcMain.handle(IPC.PROFILE_UPLOAD_HEADER, licenseGated(IPC.PROFILE_UPLOAD_HEADER, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(profileUploadSchema, raw);
@@ -222,9 +226,9 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROFILE_UPLOAD_FOOTER, (_e, raw) => {
+  ipcMain.handle(IPC.PROFILE_UPLOAD_FOOTER, licenseGated(IPC.PROFILE_UPLOAD_FOOTER, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(profileUploadSchema, raw);
@@ -241,7 +245,7 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 6 UAT G-06-3 — image preview. ProfileEditor needs to render
   // the actual uploaded signature + logo as `<img>` previews. The
@@ -254,7 +258,7 @@ export function registerProfileIpc(): void {
   // PNG or logo.
   //
   // Quick task 260812-ns0 — extended for header / footer previews.
-  ipcMain.handle(IPC.PROFILE_GET_ASSET_DATA_URL, (_e, raw: unknown) => {
+  ipcMain.handle(IPC.PROFILE_GET_ASSET_DATA_URL, licenseGated(IPC.PROFILE_GET_ASSET_DATA_URL, (_e, raw: unknown) => {
     try {
       const userId = requireSession();
       const input = safeParse(
@@ -290,7 +294,7 @@ export function registerProfileIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 // Re-export for the test suite; not part of the IPC surface.

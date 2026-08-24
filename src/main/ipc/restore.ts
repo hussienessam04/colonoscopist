@@ -41,6 +41,7 @@ import { IpcErrorException, ipcError } from '@shared/errors';
 import { previewRestore, unpackRestore } from '../backup/restore';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -79,7 +80,11 @@ function asIpcError(err: unknown): Error {
 }
 
 export function registerRestoreIpc(): void {
-  ipcMain.handle(IPC.RESTORE_PREVIEW, async (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. RESTORE_*
+  // channels are GATED; expired licenses cannot preview / unpack /
+  // pick / reveal restore artifacts. The gated surface matches the
+  // backup surface (SET-05/06 ship-gate + LIC-04).
+  ipcMain.handle(IPC.RESTORE_PREVIEW, licenseGated(IPC.RESTORE_PREVIEW, async (_e, raw) => {
     const userId = requireSession();
     const input = safeParse(restorePreviewInput, raw);
     try {
@@ -115,9 +120,9 @@ export function registerRestoreIpc(): void {
       });
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.RESTORE_UNPACK, async (_e, raw) => {
+  ipcMain.handle(IPC.RESTORE_UNPACK, licenseGated(IPC.RESTORE_UNPACK, async (_e, raw) => {
     const userId = requireSession();
     const input = safeParse(restoreUnpackInput, raw);
     try {
@@ -152,13 +157,13 @@ export function registerRestoreIpc(): void {
       });
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 7 / Plan 07-05 — D-13 verbatim dialog.showOpenDialog wrapper.
   // returns null when the operator cancels; the renderer short-circuits
   // without calling preview/unpack. The .zip filter keeps non-zip files
   // out of the restore pipeline even if the user types a wrong path.
-  ipcMain.handle(IPC.RESTORE_PICK_ZIP, async (_e, raw) => {
+  ipcMain.handle(IPC.RESTORE_PICK_ZIP, licenseGated(IPC.RESTORE_PICK_ZIP, async (_e, raw) => {
     requireSession();
     safeParse(pickZipInput, raw);
     const result = await dialog.showOpenDialog({
@@ -170,7 +175,7 @@ export function registerRestoreIpc(): void {
       return null;
     }
     return result.filePaths[0];
-  });
+  }));
 
   // Phase 7 / Plan 07-05 — open the staging directory in the OS file
   // manager. Uses shell.openPath (NOT showItemInFolder) because the
@@ -178,7 +183,7 @@ export function registerRestoreIpc(): void {
   // `{ ok: true }` even when openPath prints a non-empty error string
   // (the doctor can manually navigate); we only surface true
   // exceptions through asIpcError.
-  ipcMain.handle(IPC.RESTORE_REVEAL_STAGING, async (_e, raw) => {
+  ipcMain.handle(IPC.RESTORE_REVEAL_STAGING, licenseGated(IPC.RESTORE_REVEAL_STAGING, async (_e, raw) => {
     requireSession();
     const input = safeParse(restoreRevealStagingInput, raw);
     try {
@@ -196,5 +201,5 @@ export function registerRestoreIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }

@@ -15,6 +15,7 @@ import { patientRepo, type PatientCreateInput } from '../db/patients';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
 import { userRepo } from '../db/users';
+import { licenseGated } from '../license';
 import {
   idInput,
   patientInput,
@@ -181,53 +182,56 @@ export function getPatient(id: string): Patient | null {
 }
 
 export function registerPatientsIpc(): void {
-  ipcMain.handle(IPC.PATIENTS_LIST, (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. PATIENTS_*
+  // channels are GATED (not in EXEMPT_CHANNELS); an expired license
+  // blocks both reads + writes.
+  ipcMain.handle(IPC.PATIENTS_LIST, licenseGated(IPC.PATIENTS_LIST, (_e, raw) => {
     try {
       return listPatients(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PATIENTS_GET, (_e, raw: string) => {
+  ipcMain.handle(IPC.PATIENTS_GET, licenseGated(IPC.PATIENTS_GET, (_e, raw: string) => {
     try {
       return getPatient(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PATIENTS_CREATE, (_e, raw) => {
+  ipcMain.handle(IPC.PATIENTS_CREATE, licenseGated(IPC.PATIENTS_CREATE, (_e, raw) => {
     try {
       return createPatient(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PATIENTS_UPDATE, (_e, raw: { id: string; patch: unknown }) => {
+  ipcMain.handle(IPC.PATIENTS_UPDATE, licenseGated(IPC.PATIENTS_UPDATE, (_e, raw: { id: string; patch: unknown }) => {
     try {
       return updatePatient(raw.id, raw.patch);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PATIENTS_SOFT_DELETE, (_e, raw: string) => {
+  ipcMain.handle(IPC.PATIENTS_SOFT_DELETE, licenseGated(IPC.PATIENTS_SOFT_DELETE, (_e, raw: string) => {
     try {
       return softDeletePatient(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PATIENTS_RESTORE, (_e, raw: string) => {
+  ipcMain.handle(IPC.PATIENTS_RESTORE, licenseGated(IPC.PATIENTS_RESTORE, (_e, raw: string) => {
     try {
       return restorePatient(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 function asIpcError(err: unknown): Error {

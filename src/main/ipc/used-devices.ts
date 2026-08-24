@@ -23,6 +23,7 @@ import { usedDevicesRepo } from '../db/used-devices-repo';
 import { doctorProfileRepo } from '../db/doctor-profile-repo';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
+import { licenseGated } from '../license';
 
 function requireSession(): string {
   const id = session.currentUserId;
@@ -81,7 +82,10 @@ function asIpcError(err: unknown): Error {
 }
 
 export function registerUsedDevicesIpc(): void {
-  ipcMain.handle(IPC.USED_DEVICES_LIST, () => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. USED_DEVICES_*
+  // channels are GATED; expired licenses cannot view / add / remove
+  // instruments from the doctor's used-devices library.
+  ipcMain.handle(IPC.USED_DEVICES_LIST, licenseGated(IPC.USED_DEVICES_LIST, () => {
     try {
       const userId = requireSession();
       const profileId = resolveProfileId(userId);
@@ -97,9 +101,9 @@ export function registerUsedDevicesIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.USED_DEVICES_ADD, (_e, raw) => {
+  ipcMain.handle(IPC.USED_DEVICES_ADD, licenseGated(IPC.USED_DEVICES_ADD, (_e, raw) => {
     try {
       const userId = requireSession();
       const profileId = resolveProfileId(userId);
@@ -121,9 +125,9 @@ export function registerUsedDevicesIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.USED_DEVICES_REMOVE, (_e, raw) => {
+  ipcMain.handle(IPC.USED_DEVICES_REMOVE, licenseGated(IPC.USED_DEVICES_REMOVE, (_e, raw) => {
     try {
       const userId = requireSession();
       const { id } = safeParse(usedDeviceIdInput, raw);
@@ -139,5 +143,5 @@ export function registerUsedDevicesIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }

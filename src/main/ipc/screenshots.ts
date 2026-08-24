@@ -30,6 +30,7 @@ import {
   screenshotsDeleteInput,
   screenshotsUpdateAnnotationInput,
 } from '@shared/validators';
+import { licenseGated } from '../license';
 
 const MIN_DECODED_BYTES = 2_000;
 const MAX_DECODED_BYTES = 6_000_000;
@@ -76,7 +77,10 @@ function asIpcError(err: unknown): Error {
 }
 
 export function registerScreenshotsIpc(): void {
-  ipcMain.handle(IPC.SCREENSHOTS_ADD, (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. SCREENSHOTS_*
+  // channels are GATED; expired licenses cannot add / list / delete /
+  // annotate screenshots.
+  ipcMain.handle(IPC.SCREENSHOTS_ADD, licenseGated(IPC.SCREENSHOTS_ADD, (_e, raw) => {
     try {
       const { procedureId, timestampInVideoMs, jpegBase64 } = safeParse(
         screenshotsAddInput,
@@ -154,9 +158,9 @@ export function registerScreenshotsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.SCREENSHOTS_LIST, (_e, raw) => {
+  ipcMain.handle(IPC.SCREENSHOTS_LIST, licenseGated(IPC.SCREENSHOTS_LIST, (_e, raw) => {
     try {
       const { procedureId } = safeParse(screenshotsListInput, raw);
       const userId = requireSession();
@@ -172,9 +176,9 @@ export function registerScreenshotsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.SCREENSHOTS_DELETE, (_e, raw) => {
+  ipcMain.handle(IPC.SCREENSHOTS_DELETE, licenseGated(IPC.SCREENSHOTS_DELETE, (_e, raw) => {
     try {
       const { id } = safeParse(screenshotsDeleteInput, raw, 'id');
       const userId = requireSession();
@@ -204,9 +208,9 @@ export function registerScreenshotsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.SCREENSHOTS_UPDATE_ANNOTATION, (_e, raw) => {
+  ipcMain.handle(IPC.SCREENSHOTS_UPDATE_ANNOTATION, licenseGated(IPC.SCREENSHOTS_UPDATE_ANNOTATION, (_e, raw) => {
     try {
       const { id, annotation } = safeParse(screenshotsUpdateAnnotationInput, raw, 'id');
       const userId = requireSession();
@@ -225,7 +229,7 @@ export function registerScreenshotsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 // Re-export for tests; not part of the IPC surface.

@@ -22,6 +22,7 @@ import { autoDetectPreset, type MatchedPattern } from '../capture/auto-detect-pr
 import { canonicalizeOrThrow } from '../capture/canonicalize';
 import { audit } from '../db/audit';
 import { session } from '../auth/session';
+import { licenseGated } from '../license';
 
 function requireSession(): string {
   const id = session.currentUserId;
@@ -158,51 +159,54 @@ export function noDeviceAudit(input: unknown): { ok: true } {
 }
 
 export function registerCaptureIpc(): void {
-  ipcMain.handle(IPC.CAPTURE_LIST_DEVICES, async () => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. CAPTURE_*
+  // channels are GATED; an unlicensed workstation cannot enumerate
+  // devices, change its default, or read/write presets.
+  ipcMain.handle(IPC.CAPTURE_LIST_DEVICES, licenseGated(IPC.CAPTURE_LIST_DEVICES, async () => {
     try {
       return await listDevices();
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.CAPTURE_GET_DEFAULT_DEVICE, () => {
+  ipcMain.handle(IPC.CAPTURE_GET_DEFAULT_DEVICE, licenseGated(IPC.CAPTURE_GET_DEFAULT_DEVICE, () => {
     try {
       return getDefaultDevice();
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.CAPTURE_SET_DEFAULT_DEVICE, (_e, raw) => {
+  ipcMain.handle(IPC.CAPTURE_SET_DEFAULT_DEVICE, licenseGated(IPC.CAPTURE_SET_DEFAULT_DEVICE, (_e, raw) => {
     try {
       return setDefaultDevice(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.CAPTURE_GET_PRESET, (_e, raw) => {
+  ipcMain.handle(IPC.CAPTURE_GET_PRESET, licenseGated(IPC.CAPTURE_GET_PRESET, (_e, raw) => {
     try {
       return getPreset(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.CAPTURE_SET_PRESET, (_e, raw) => {
+  ipcMain.handle(IPC.CAPTURE_SET_PRESET, licenseGated(IPC.CAPTURE_SET_PRESET, (_e, raw) => {
     try {
       return setPreset(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.CAPTURE_NO_DEVICE_AUDIT, (_e, raw) => {
+  ipcMain.handle(IPC.CAPTURE_NO_DEVICE_AUDIT, licenseGated(IPC.CAPTURE_NO_DEVICE_AUDIT, (_e, raw) => {
     try {
       return noDeviceAudit(raw);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }

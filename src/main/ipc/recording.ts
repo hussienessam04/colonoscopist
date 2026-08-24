@@ -18,6 +18,7 @@ import { session } from '../auth/session';
 import { Recorder, type RecorderDeps } from '../recorder/recorder';
 import { getMediaServer, recorderRegistry } from '../recorder/registry';
 import { recordingStartInput, procedureIdInput } from '@shared/validators';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -82,7 +83,10 @@ export type StartInput = {
 export type StartResult = { procedureId: string; startedAt: number; previewUrl: string };
 
 export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
-  ipcMain.handle(IPC.RECORDING_START, async (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. RECORDING_*
+  // channels are GATED; without an active license the renderer cannot
+  // start / stop / pause / resume a recording, nor fetch the media URL.
+  ipcMain.handle(IPC.RECORDING_START, licenseGated(IPC.RECORDING_START, async (_e, raw) => {
     try {
       const parsed = safeParse(recordingStartInput, raw, 'patientId');
       const doctorId = requireSession();
@@ -150,13 +154,13 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Stop / Pause / Resume all look up the ACTIVE recorder from
   // recorderRegistry by procedureId rather than calling buildRecorder()
   // (which would return a brand-new Recorder in 'idle' state, making stop()
   // a no-op via its `state === 'idle'` early return).
-  ipcMain.handle(IPC.RECORDING_STOP, async (_e, raw) => {
+  ipcMain.handle(IPC.RECORDING_STOP, licenseGated(IPC.RECORDING_STOP, async (_e, raw) => {
     try {
       const doctorId = requireSession();
       const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
@@ -176,9 +180,9 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.RECORDING_PAUSE, async (_e, raw) => {
+  ipcMain.handle(IPC.RECORDING_PAUSE, licenseGated(IPC.RECORDING_PAUSE, async (_e, raw) => {
     try {
       requireSession();
       const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
@@ -192,9 +196,9 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.RECORDING_RESUME, async (_e, raw) => {
+  ipcMain.handle(IPC.RECORDING_RESUME, licenseGated(IPC.RECORDING_RESUME, async (_e, raw) => {
     try {
       requireSession();
       const { procedureId } = safeParse(procedureIdInput, raw, 'procedureId');
@@ -208,13 +212,13 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 5 / Plan 03 — long-lived media server URL. The renderer's
   // <video> element composes `/media/<patientId>/<procedureId>/<videoFile>`
   // against this URL. The server is started by initRecorder() and stays
   // bound across ProcedureReview sessions.
-  ipcMain.handle(IPC.RECORDING_GET_MEDIA_URL, () => {
+  ipcMain.handle(IPC.RECORDING_GET_MEDIA_URL, licenseGated(IPC.RECORDING_GET_MEDIA_URL, () => {
     try {
       requireSession();
       const server = getMediaServer();
@@ -228,7 +232,7 @@ export function registerRecordingIpc(deps: RegisterRecordingIpcDeps): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 export const __test = {

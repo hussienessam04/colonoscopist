@@ -25,6 +25,7 @@ import {
   proceduresTrimInput,
   proceduresRestoreInput,
 } from '@shared/validators';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -73,7 +74,10 @@ export type CreateProcedureInput = {
 export function registerProceduresIpc(opts: {
   createProcedure: (input: CreateProcedureInput) => Procedure;
 }): void {
-  ipcMain.handle(IPC.PROCEDURES_CREATE, (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. PROCEDURES_*
+  // channels are GATED; without an active license the renderer cannot
+  // create / read / list / finalize / trim / restore any procedure row.
+  ipcMain.handle(IPC.PROCEDURES_CREATE, licenseGated(IPC.PROCEDURES_CREATE, (_e, raw) => {
     try {
       const { patientId } = safeParse(proceduresCreateInput, raw, 'patientId');
       const doctorId = requireSession();
@@ -102,9 +106,9 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROCEDURES_GET, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_GET, licenseGated(IPC.PROCEDURES_GET, (_e, raw) => {
     try {
       const { id } = safeParse(proceduresGetInput, raw, 'id');
       const userId = requireSession();
@@ -119,9 +123,9 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROCEDURES_LIST, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_LIST, licenseGated(IPC.PROCEDURES_LIST, (_e, raw) => {
     try {
       const parsed = safeParse(proceduresListQueryInput, raw ?? {});
       const userId = requireSession();
@@ -148,9 +152,9 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROCEDURES_FINALIZE, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_FINALIZE, licenseGated(IPC.PROCEDURES_FINALIZE, (_e, raw) => {
     try {
       const parsed = safeParse(proceduresFinalizeInput, raw, 'id');
       const userId = requireSession();
@@ -175,10 +179,10 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Procedure notes — append-only chronological log per D-06/D-07/D-09.
-  ipcMain.handle(IPC.PROCEDURE_NOTES_CREATE, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURE_NOTES_CREATE, licenseGated(IPC.PROCEDURE_NOTES_CREATE, (_e, raw) => {
     try {
       const { procedureId, body } = safeParse(procedureNoteCreateInput, raw);
       const userId = requireSession();
@@ -214,9 +218,9 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROCEDURE_NOTES_LIST, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURE_NOTES_LIST, licenseGated(IPC.PROCEDURE_NOTES_LIST, (_e, raw) => {
     try {
       const { procedureId } = safeParse(procedureNoteListInput, raw);
       const userId = requireSession();
@@ -232,7 +236,7 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 5 / Plan 03 — Trim + Restore real handlers.
   //
@@ -244,7 +248,7 @@ export function registerProceduresIpc(opts: {
   // `procedures.restore` is the inverse: safeParse → requireSession →
   // restoreFromOriginal (validates video_path_original != null + file on
   // disk) → audit `procedure.restored`.
-  ipcMain.handle(IPC.PROCEDURES_TRIM, async (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_TRIM, licenseGated(IPC.PROCEDURES_TRIM, async (_e, raw) => {
     try {
       const { id, inMs, outMs } = safeParse(proceduresTrimInput, raw, 'id');
       const doctorId = requireSession();
@@ -312,9 +316,9 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.PROCEDURES_RESTORE, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_RESTORE, licenseGated(IPC.PROCEDURES_RESTORE, (_e, raw) => {
     try {
       const { id } = safeParse(proceduresRestoreInput, raw, 'id');
       const doctorId = requireSession();
@@ -348,11 +352,11 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 5 / Plan 02 — pause-marker source for the review scrubber (D-11).
   // Returns rows in their canonical order (segmentIndex ASC).
-  ipcMain.handle(IPC.PROCEDURES_LIST_SEGMENTS, (_e, raw) => {
+  ipcMain.handle(IPC.PROCEDURES_LIST_SEGMENTS, licenseGated(IPC.PROCEDURES_LIST_SEGMENTS, (_e, raw) => {
     try {
       const { procedureId } = safeParse(
         z.object({ procedureId: z.string().uuid() }),
@@ -372,7 +376,7 @@ export function registerProceduresIpc(opts: {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 function defaultPresetSummary(): import('@shared/ipc-contract').PresetSummary {

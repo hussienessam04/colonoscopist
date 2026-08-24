@@ -30,7 +30,14 @@ import {
 } from '@shared/ipc-contract';
 import { IpcErrorException, ipcError } from '@shared/errors';
 
-import { reportUpdateSchema, reportIdSchema, reportProcedureSchema } from '@shared/validators';
+import {
+  reportUpdateSchema,
+  reportIdSchema,
+  reportProcedureSchema,
+  reportProcedureTypeInput,
+  reportInstrumentInput,
+  reportPremedicationOverrideInput,
+} from '@shared/validators';
 import { reportsRepo } from '../db/reports-repo';
 import { reportScreenshotsRepo } from '../db/report-screenshots-repo';
 import { audit } from '../db/audit';
@@ -43,6 +50,7 @@ import { existsSync, readFileSync } from 'node:fs';
 // it. Falls back doctor_profile.language → users.language → 'en'.
 import { doctorProfileRepo } from '../db/doctor-profile-repo';
 import { userRepo } from '../db/users';
+import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
   const issue = err.issues[0];
@@ -76,6 +84,23 @@ function asIpcError(err: unknown): Error {
     wrapped.ipcError = err.ipc;
     return wrapped;
   }
+  // ponytail: a bare `ipcError(...)` plain object thrown by accident
+  // (instead of `throw new IpcErrorException(ipcError(...))`) would
+  // stringify as "[object Object]" and surface a useless toast. Detect
+  // the structural shape and surface the real message.
+  if (
+    typeof err === 'object' &&
+    err !== null &&
+    'code' in err &&
+    'message' in err &&
+    typeof (err as { code: unknown }).code === 'string' &&
+    typeof (err as { message: unknown }).message === 'string'
+  ) {
+    const ipcErr = err as { code: string; message: string };
+    const wrapped = new Error(ipcErr.message) as Error & { ipcError?: unknown };
+    wrapped.ipcError = ipcErr;
+    return wrapped;
+  }
   if (err instanceof Error) return err;
   return new Error(String(err));
 }
@@ -85,7 +110,10 @@ function fieldList(patch: Record<string, unknown>): string[] {
 }
 
 export function registerReportsIpc(): void {
-  ipcMain.handle(IPC.REPORTS_GET_OR_CREATE, (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. REPORTS_*
+  // channels are GATED; expired licenses cannot view / create / edit /
+  // finalize / regenerate / open / print any clinical report.
+  ipcMain.handle(IPC.REPORTS_GET_OR_CREATE, licenseGated(IPC.REPORTS_GET_OR_CREATE, (_e, raw) => {
     try {
       const doctorId = requireSession();
       const { procedureId } = safeParse(reportProcedureSchema, raw, 'procedureId');
@@ -106,9 +134,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_GET, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_GET, licenseGated(IPC.REPORTS_GET, (_e, raw) => {
     try {
       requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
@@ -116,13 +144,13 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 7 / Plan 07-02 — SRCH-03 + D-03: read-only lookup of a
   // report by procedureId. Returns null when no report exists (vs
   // getOrCreate which would create a draft). Used by the Patient
   // List accordion expansion.
-  ipcMain.handle(IPC.REPORTS_GET_BY_PROCEDURE, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_GET_BY_PROCEDURE, licenseGated(IPC.REPORTS_GET_BY_PROCEDURE, (_e, raw) => {
     try {
       requireSession();
       const { procedureId } = safeParse(reportProcedureSchema, raw, 'procedureId');
@@ -130,63 +158,175 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_UPDATE_DRAFT, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_UPDATE_DRAFT, licenseGated(IPC.REPORTS_UPDATE_DRAFT, (_e, raw) => {
     try {
       const userId = requireSession();
-      const { id, findings, diagnosis, recommendations, procedureDetails } = safeParse(
+      const {
+        id,
+        esophagus,
+        stomach,
+        pylorus,
+        duodenum,
+        colon,
+        ileum,
+        conclusion,
+        recommendation,
+      } = safeParse(
         reportUpdateSchema.extend({ id: z.string().min(1) }),
         raw,
         'id',
       );
       const updated = reportsRepo.updateDraft(id, {
-        findings,
-        diagnosis,
-        recommendations,
-        procedureDetails,
+        esophagus,
+        stomach,
+        pylorus,
+        duodenum,
+        colon,
+        ileum,
+        conclusion,
+        recommendation,
       });
       audit({
         action: 'report.updated',
         entityType: 'report',
         entityId: id,
         userId,
-        metadata: { fields: fieldList({ findings, diagnosis, recommendations, procedureDetails }) },
+        metadata: {
+          fields: fieldList({
+            esophagus,
+            stomach,
+            pylorus,
+            duodenum,
+            colon,
+            ileum,
+            conclusion,
+            recommendation,
+          }),
+        },
       });
       return updated;
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_UPDATE_FINALIZED, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_UPDATE_FINALIZED, licenseGated(IPC.REPORTS_UPDATE_FINALIZED, (_e, raw) => {
     try {
       const userId = requireSession();
-      const { id, findings, diagnosis, recommendations, procedureDetails } = safeParse(
+      const {
+        id,
+        esophagus,
+        stomach,
+        pylorus,
+        duodenum,
+        colon,
+        ileum,
+        conclusion,
+        recommendation,
+      } = safeParse(
         reportUpdateSchema.extend({ id: z.string().min(1) }),
         raw,
         'id',
       );
       const updated = reportsRepo.updateFinalized(id, {
-        findings,
-        diagnosis,
-        recommendations,
-        procedureDetails,
+        esophagus,
+        stomach,
+        pylorus,
+        duodenum,
+        colon,
+        ileum,
+        conclusion,
+        recommendation,
       });
       audit({
         action: 'report.admin_edited',
         entityType: 'report',
         entityId: id,
         userId,
-        metadata: { fields: fieldList({ findings, diagnosis, recommendations, procedureDetails }) },
+        metadata: {
+          fields: fieldList({
+            esophagus,
+            stomach,
+            pylorus,
+            duodenum,
+            colon,
+            ileum,
+            conclusion,
+            recommendation,
+          }),
+        },
       });
       return updated;
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_FINALIZE, (_e, raw) => {
+  // Quick task 20260812-redesign-report — set procedure_type ONCE.
+  // The repo's setProcedureType guards on the empty-state invariant
+  // (procedure_type still 'colon' AND every box column = ''). The
+  // audit row marks this as report.type_changed for traceability.
+  ipcMain.handle(IPC.REPORTS_SET_PROCEDURE_TYPE, licenseGated(IPC.REPORTS_SET_PROCEDURE_TYPE, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id, procedureType } = safeParse(reportProcedureTypeInput, raw, 'id');
+      const updated = reportsRepo.setProcedureType(id, procedureType);
+      audit({
+        action: 'report.type_changed',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { procedureType },
+      });
+      return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
+
+  // Quick task 20260812-redesign-report — set the instrument picker
+  // (a used_devices.id) on the report. NULL clears.
+  ipcMain.handle(IPC.REPORTS_SET_INSTRUMENT, licenseGated(IPC.REPORTS_SET_INSTRUMENT, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id, instrument } = safeParse(reportInstrumentInput, raw, 'id');
+      const updated = reportsRepo.setInstrument(id, instrument);
+      audit({
+        action: 'report.instrument_changed',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { instrument },
+      });
+      return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
+
+  // Quick task 20260812-redesign-report — per-report premedication
+  // override. NULL clears (renderer falls back to profile default).
+  ipcMain.handle(IPC.REPORTS_SET_PREMEDICATION_OVERRIDE, licenseGated(IPC.REPORTS_SET_PREMEDICATION_OVERRIDE, (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id, override } = safeParse(reportPremedicationOverrideInput, raw, 'id');
+      const updated = reportsRepo.setPremedicationOverride(id, override);
+      audit({
+        action: 'report.premedication_changed',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { overrideLength: override === null ? 0 : override.length },
+      });
+      return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
+
+  ipcMain.handle(IPC.REPORTS_FINALIZE, licenseGated(IPC.REPORTS_FINALIZE, (_e, raw) => {
     try {
       const userId = requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
@@ -202,9 +342,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_REGEN_PDF, async (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_REGEN_PDF, licenseGated(IPC.REPORTS_REGEN_PDF, async (_e, raw) => {
     try {
       const userId = requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
@@ -231,14 +371,14 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
   // Phase 6 UAT G-06-11 — return the PDF bytes so the renderer can build
   // a blob: URL and load it in the print-preview iframe. The PDF lives
   // under <userData>/data/reports/<reportId>.pdf which the MediaServer
   // does NOT serve (its path-safety check restricts to
   // data/media/patients/). A direct IPC is the cleanest bridge.
-  ipcMain.handle(IPC.REPORTS_GET_PDF_BLOB, async (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_GET_PDF_BLOB, licenseGated(IPC.REPORTS_GET_PDF_BLOB, async (_e, raw) => {
     try {
       // ponytail: requireSession() is invoked for its gate side-effect (throws
       // IPC_AUTH_REQUIRED if no session). The userId itself isn't needed in
@@ -268,9 +408,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_OPEN_PDF, async (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_OPEN_PDF, licenseGated(IPC.REPORTS_OPEN_PDF, async (_e, raw) => {
     try {
       const userId = requireSession();
       // ponytail: accept an optional `reveal` flag — when true, the
@@ -323,9 +463,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_ATTACH_SCREENSHOT, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_ATTACH_SCREENSHOT, licenseGated(IPC.REPORTS_ATTACH_SCREENSHOT, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(
@@ -351,9 +491,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_DETACH_SCREENSHOT, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_DETACH_SCREENSHOT, licenseGated(IPC.REPORTS_DETACH_SCREENSHOT, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(
@@ -378,9 +518,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_REORDER_SCREENSHOTS, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_REORDER_SCREENSHOTS, licenseGated(IPC.REPORTS_REORDER_SCREENSHOTS, (_e, raw) => {
     try {
       const userId = requireSession();
       const input = safeParse(
@@ -405,9 +545,9 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.REPORTS_LIST_SCREENSHOTS, (_e, raw) => {
+  ipcMain.handle(IPC.REPORTS_LIST_SCREENSHOTS, licenseGated(IPC.REPORTS_LIST_SCREENSHOTS, (_e, raw) => {
     try {
       requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
@@ -421,7 +561,7 @@ export function registerReportsIpc(): void {
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 // Re-export for the test suite; not part of the IPC surface.

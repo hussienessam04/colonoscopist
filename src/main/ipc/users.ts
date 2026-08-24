@@ -8,34 +8,38 @@ import { IPC } from '@shared/ipc-contract';
 import { createUser, removeUser, resetPin } from '../auth';
 import { resetPinInput, userInput, userRemoveInput } from '@shared/validators';
 import { IpcErrorException } from '@shared/errors';
+import { licenseGated } from '../license';
 
 export function registerUsersIpc(): void {
-  ipcMain.handle(IPC.USERS_CREATE, async (_e, raw) => {
+  // Phase 8 / Plan 03 — wrap every handler with `licenseGated`. USERS_*
+  // are gated; without an active license the renderer cannot add /
+  // remove / resetPin another doctor.
+  ipcMain.handle(IPC.USERS_CREATE, licenseGated(IPC.USERS_CREATE, async (_e, raw) => {
     const parsed = userInput.parse(raw);
     try {
       return await createUser(parsed);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.USERS_REMOVE, (_e, raw) => {
+  ipcMain.handle(IPC.USERS_REMOVE, licenseGated(IPC.USERS_REMOVE, (_e, raw) => {
     const parsed = userRemoveInput.parse(raw);
     try {
       return removeUser(parsed);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 
-  ipcMain.handle(IPC.USERS_RESET_PIN, async (_e, raw) => {
+  ipcMain.handle(IPC.USERS_RESET_PIN, licenseGated(IPC.USERS_RESET_PIN, async (_e, raw) => {
     const parsed = resetPinInput.parse(raw);
     try {
       return await resetPin(parsed);
     } catch (err) {
       throw asIpcError(err);
     }
-  });
+  }));
 }
 
 function asIpcError(err: unknown): Error {
