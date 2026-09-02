@@ -27,8 +27,10 @@
 //             hides the modal — it does not grant license validity.
 //
 // Per-plan verbatim: file is mounted ABOVE the switch in App.tsx so
-// the modal appears regardless of which authenticated route is
-// active.
+// the modal appears above every authenticated route when status is
+// `unactivated` or `expired`. The `wizard` and `login` routes are
+// exempt: they are first-launch entry points and gating them with
+// the activation modal is contradictory (see G-08-3).
 
 import { useState, type ReactNode } from 'react';
 import {
@@ -48,20 +50,25 @@ const SESSION_STORAGE_KEY = 'license.modal.dismissed';
 
 export function LicenseGate({ children }: { children: ReactNode }): JSX.Element {
   const { status } = useLicenseStatus();
-  const { navigate } = useRoute();
+  const { route, navigate } = useRoute();
   const { t } = useTranslation();
   const [dismissedThisSession, setDismissedThisSession] = useState(
     () => sessionStorage.getItem(SESSION_STORAGE_KEY) === '1',
   );
 
-  // ponytail: short-circuit on three early-return cases — status not
+  // ponytail: short-circuit on four early-return cases — status not
   // loaded yet, already dismissed this session, license state is
-  // fine. The showModal predicate stays a single boolean so the JSX
-  // reads naturally without nesting ternaries.
+  // fine, OR the active route is `wizard` / `login` (first-launch
+  // entry points; gating them with the activation modal is
+  // contradictory UX — see G-08-3). The showModal predicate stays a
+  // single boolean so the JSX reads naturally without nesting
+  // ternaries.
   const showModal =
     !dismissedThisSession &&
     status !== null &&
-    (status.state === 'unactivated' || status.state === 'expired');
+    (status.state === 'unactivated' || status.state === 'expired') &&
+    route.name !== 'wizard' &&
+    route.name !== 'login';
 
   function dismiss(): void {
     sessionStorage.setItem(SESSION_STORAGE_KEY, '1');
