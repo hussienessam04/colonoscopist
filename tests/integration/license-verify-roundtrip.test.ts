@@ -90,7 +90,7 @@ describe.skipIf(!smokeEnabled)('license verify roundtrip (LIC-02 + Pitfall 2)', 
     expect(extractedSig.equals(signature)).toBe(true);
     expect(extractedSig.length).toBe(64);
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: extractedJson,
       signature: extractedSig,
       publicKeyHex: VENDOR_PUBLIC_KEY_HEX,
@@ -135,7 +135,7 @@ describe.skipIf(!smokeEnabled)('license verify roundtrip (LIC-02 + Pitfall 2)', 
     const mutated = Buffer.from(json);
     mutated[14] = (mutated[14] ?? 0) ^ 0x01;
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: mutated,
       signature,
       publicKeyHex: VENDOR_PUBLIC_KEY_HEX,

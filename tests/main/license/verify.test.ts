@@ -44,7 +44,7 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     const fingerprint = hashFingerprint({ cpuModel: 'test-cpu', diskSerial: 'test-disk', mac: '00:11:22:33:44:55' });
     const { json, sig, publicKeyHex } = await makeSignedLicense(pub, k.secretKey, fingerprint);
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: json,
       signature: sig,
       publicKeyHex,
@@ -72,7 +72,7 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     // Sanity: tampered bytes still parse as valid JSON (just a different value).
     expect(() => JSON.parse(tampered.toString('utf8'))).not.toThrow();
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: tampered,
       signature: sig,
       publicKeyHex,
@@ -90,7 +90,7 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     const tamperedSig = Buffer.from(sig);
     tamperedSig[0] = (tamperedSig[0] ?? 0) ^ 0x01;
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: json,
       signature: tamperedSig,
       publicKeyHex,
@@ -110,7 +110,7 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     const verifier = ed.keygen();
     const pubVerifier = await ed.getPublicKeyAsync(verifier.secretKey);
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: json,
       signature: sig,
       publicKeyHex: Buffer.from(pubVerifier).toString('hex'),
@@ -127,7 +127,7 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     const fingerprintB = hashFingerprint({ cpuModel: 'test-cpu', diskSerial: 'disk-B', mac: 'AA:BB:CC:DD:EE:FF' });
     const { json, sig, publicKeyHex } = await makeSignedLicense(pub, k.secretKey, fingerprintA);
 
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: json,
       signature: sig,
       publicKeyHex,
@@ -141,10 +141,10 @@ describe('verifyLicense (LIC-02 + Pitfall 6)', () => {
     expect(VENDOR_PUBLIC_KEY_HEX).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it('malformed JSON returns MALFORMED_PAYLOAD', () => {
+  it('malformed JSON returns MALFORMED_PAYLOAD', async () => {
     const garbage = Buffer.from('this is not JSON', 'utf8');
     const sig = Buffer.alloc(64); // length-valid but wrong
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: garbage,
       signature: sig,
       publicKeyHex: VENDOR_PUBLIC_KEY_HEX,
