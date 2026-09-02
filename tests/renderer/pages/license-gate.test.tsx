@@ -120,6 +120,33 @@ describe('LicenseGate modal (LIC-03 + D-05)', () => {
     expect(screen.queryByTestId('license-gate-modal')).not.toBeInTheDocument();
   });
 
+  // Phase 8 / Plan 09 — G-08-3 regression guard: the wizard IS the
+  // path to start the trial, so gating it with the activation modal
+  // is contradictory. LicenseGate must exempt `wizard` and `login`
+  // (the two first-launch entry points) from the showModal predicate.
+  // The beforeEach defaults the route to 'patients' — these tests
+  // override to 'wizard' / 'login' before renderGate() runs.
+  it("wizard route does NOT render the modal even when state='unactivated' (G-08-3 regression guard)", async () => {
+    setRoute({ name: 'wizard' });
+    await renderGate(licenseStatusFor('unactivated'));
+    // Children render cleanly — the wizard form is reachable.
+    expect(screen.getByTestId('route-children')).toBeInTheDocument();
+    // No modal, no Activate button — wizard never sees the gate.
+    expect(screen.queryByTestId('license-gate-modal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('license-gate-activate-now')).not.toBeInTheDocument();
+  });
+
+  it("login route does NOT render the modal even when state='expired' (G-08-3 regression guard)", async () => {
+    setRoute({ name: 'login' });
+    await renderGate(licenseStatusFor('expired'));
+    // First-time PIN setup screen stays reachable even after expiry —
+    // the doctor must still be able to authenticate into the app to
+    // reach the License sub-page and renew.
+    expect(screen.getByTestId('route-children')).toBeInTheDocument();
+    expect(screen.queryByTestId('license-gate-modal')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('license-gate-activate-now')).not.toBeInTheDocument();
+  });
+
   it("'Continue in trial' click sets sessionStorage flag + modal disappears", async () => {
     await renderGate(licenseStatusFor('unactivated'));
     const user = userEvent.setup();
