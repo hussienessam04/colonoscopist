@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 7
+current_plan: 8
 status: testing
-stopped_at: UAT Test 1 failed with ERR_REQUIRE_ESM boot blocker; gap-closure plan 08-07 executed
+stopped_at: UAT Test 10 (Bilingual License UI) pending; G-08-1 + G-08-2 resolved
 paused_at: —
-last_updated: "2026-09-02T00:01:00Z"
+last_updated: "2026-09-02T00:03:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 07 (G-08-1 ESM/CJS fix) executed; app boots cleanly
+last_activity_desc: Phase 08 Plan 08 (G-08-2 wizard cache invalidation) executed; negative control proven
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 48
-  completed_plans: 47
+  total_plans: 49
+  completed_plans: 48
 ---
 
 **Current Plan:** 1
