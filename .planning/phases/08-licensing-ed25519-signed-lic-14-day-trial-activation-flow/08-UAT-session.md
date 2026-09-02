@@ -1,36 +1,34 @@
 ---
 status: testing
 phase: 08-licensing-ed25519-signed-lic-14-day-trial-activation-flow
-source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md
+source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md
 started: 2026-09-02T00:00:00Z
-updated: 2026-09-02T00:03:00Z
+updated: 2026-09-02T00:05:00Z
 ---
 
 ## Current Test
 
-number: 10
-name: Bilingual License UI (EN + AR)
+number: 1
+name: Cold Start Smoke Test
 expected: |
-  Switch app language to AR (Wizard or Settings → Profile → Language). Every License UI string translates: status labels, trial days remaining, vendor + licensed-at labels, machine id label, Load button, modal title + body, "Continue in trial" + "Activate now". RTL layout renders without right-edge overflow at 1280×800. Sidebar badge renders in Arabic ("مفعّل", "تجريبي", "منتهي", "غير مفعّل").
+  Fresh install (no .lic, no prior app data). Launch the app. App boots without errors. The wizard appears and asks for PIN + clinic info. After completion, the app shows the Patient List with the Settings sidebar showing a License entry. License status returns 'trial' with 14 days remaining.
 awaiting: user response
 
 ## Tests
 
 ### 1. Cold Start Smoke Test
 expected: Fresh install (no .lic, no prior app data) — app boots cleanly, wizard appears, completes, migration 0011 applies, license status returns trial/14-days-remaining after wizard bootstrap. No errors in main process console.
-result: pass
-note: "Plan 08-07 dynamic-import fix verified via build (out/main/index.js emits 2 await import('@noble/ed25519')/await import('@noble/hashes/sha2.js') lines, zero require() calls) + 16/16 unit tests pass. Original ERR_REQUIRE_ESM crash resolved."
+result: issue
+reported: "User shared screenshot: LicenseGate modal 'Activate Colonoscopist' with 'Continue in trial' + 'Activate now' buttons fires ON TOP OF the wizard. The user is mid-wizard ('Set up your clinic', PIN + clinic + language fields visible) and the modal blocks the form. This is different from the previous G-08-2 (post-wizard cache); this is the modal firing DURING the wizard itself. App.tsx:158 wraps every route (including 'wizard') with <LicenseGate>; LicenseGate.tsx has no wizard-route awareness, so it fires for state='unactivated' regardless of route."
+severity: major
 
 ### 2. Fresh Install Starts 14-Day Trial
 expected: After wizard completion, Settings → License shows a status card reading "Trial" with "14 days remaining". The audit page shows a `license.trial_started` row.
-result: issue
-reported: "User saw the LicenseGate modal firing with 'Continue in trial' + 'Activate now' buttons immediately after wizard completion. Per LicenseGate.tsx:64,80, the modal fires only when state==='unactivated', and 'Continue in trial' is only rendered for state==='unactivated'. So the cached state is 'unactivated' even though wizardBootstrap should have written the trial_started_at row."
-severity: major
+result: pending
 
 ### 3. LicenseGate Modal Appears on First Boot (unactivated)
-expected: Clear `<userData>/data/license/` sidecar, restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, a "Continue in trial" outline button, and an "Activate now" primary button. The modal is dismissable per-session.
-result: pass
-note: "Modal fires with both buttons. Per Test 2 diagnosis, this is the symptom of the cache-staleness bug — modal fires because state is stale-unactivated, not because it was designed to fire after wizard."
+expected: Clear `<userData>/data/license/` sidecar AND wipe the trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, a "Continue in trial" outline button (only for unactivated), and an "Activate now" primary button. The modal is dismissable per-session.
+result: pending
 
 ### 4. Activate via Valid .lic File
 expected: Settings → License → click "Load .lic file…" → file picker opens filtered to `*.lic`. Pick a valid Ed25519-signed `license.json` + `license.sig` sidecar that matches this workstation's fingerprint. Toast success appears. Page updates to show "Licensed · Perpetual" badge (green dot), vendor id, licensed-at timestamp, and machine id grouped in 4-char blocks.
@@ -48,25 +46,25 @@ reason: "Requires a real .lic (vendor-signed) to mutate. Same dependency as Test
 expected: Click "Load .lic file…" → click Cancel in the OS file dialog. No toast appears, no audit row written, license state unchanged.
 result: blocked
 blocked_by: third-party
-reason: "Requires navigating to Settings → License sub-page, which loads via the renderer route. Verifiable after G-08-2 fix is shipped. Also benefits from a real .lic to confirm cancel path doesn't trigger side effects."
+reason: "Requires navigating to Settings → License sub-page. Also benefits from a real .lic to confirm cancel path doesn't trigger side effects."
 
 ### 7. Gated IPC Channels Block Without License
 expected: From a fresh install (no license, no trial), invoke `procedures.create` via the renderer — returns `{ ok: false, code: 'IPC_LICENSE_INVALID' }`. `patients.list` returns the same. `auth.status`, `auth.bootstrap`, `audit.log`, and `license.status` continue to work. Each gated rejection writes a `license.gate_rejected` audit row with the channel + fingerprintHash + code metadata.
 result: blocked
-blocked_by: prior-phase
-reason: "Requires creating a patient + procedure via the renderer to invoke procedures.create. The renderer reaches the procedure route only after G-08-2 fix clears the stale-unactivated state."
+blocked_by: third-party
+reason: "Requires setting an expired trial or wiping the trial row to reach the unactivated state — vendor .lic would resolve to 'licensed' which exempts this test."
 
 ### 8. Sidebar Badge Reflects License State
 expected: Settings sidebar License entry shows a colored dot + label: green dot + "Licensed · Perpetual" when licensed; blue + "تجريبي"/"Trial" when on trial; red + "Expired"/"منتهي" when past 14d; gray + "Not activated"/"غير مفعّل" when unactivated.
 result: blocked
 blocked_by: third-party
-reason: "Requires a licensed (green) badge to verify Perpetual state. Other states (blue/red/gray) need either trial-data manipulation or vendor .lic. Only 'gray / Not activated' is observable from current build."
+reason: "Requires a licensed (green) badge to verify Perpetual state. Only 'gray / Not activated' or 'blue / Trial' are observable from current build (after G-08-2 fix)."
 
 ### 9. License Sub-page Shows Machine ID + Vendor
 expected: After activation, the License sub-page status card shows: vendor id (raw string), licensed-at timestamp, and machine id grouped 4-char (`xxxx-xxxx-xxxx-xxxx`) with a Copy button. Clicking Copy puts the raw id on the clipboard and surfaces a "Copied" toast.
 result: blocked
 blocked_by: third-party
-reason: "Vendor id + licensed-at only populate after successful .lic activation. Machine id group + Copy button are observable from current unactivated state."
+reason: "Vendor id + licensed-at only populate after successful .lic activation. Machine id group + Copy button are observable from current build (test those parts)."
 
 ### 10. Bilingual License UI (EN + AR)
 expected: Switch app language to AR (Wizard or Settings → Profile → Language). Every License UI string translates: status labels, trial days remaining, vendor + licensed-at labels, machine id label, Load button, modal title + body, "Continue in trial" + "Activate now". RTL layout renders without right-edge overflow at 1280×800. Sidebar badge renders in Arabic ("مفعّل", "تجريبي", "منتهي", "غير مفعّل").
@@ -75,9 +73,9 @@ result: pending
 ## Summary
 
 total: 10
-passed: 2
+passed: 0
 issues: 1
-pending: 1
+pending: 3
 skipped: 0
 blocked: 6
 
@@ -129,3 +127,24 @@ blocked: 6
     - "Add integration test case: warm cache, call wizardBootstrap, assert next license.status returns state='trial' (not the stale 'unactivated')"
     - "Re-run unit + integration suites to confirm no regression"
   debug_session: "Plan 08-08 commits: b8bedc2 (import + post-commit call in wizardBootstrap) + 9b7ea0e (new tests/integration/license-cache-invalidation-on-wizard.test.ts + package.json registration) + 8ce8a01 (SUMMARY). Verification: typecheck:node clean, 3/3 wizard unit tests pass, RUN_SMOKE=1 smoke 5/5 pass (2 new + 3 existing reboot). Negative control proven: commenting out invalidateLicenseCache() makes new test FAIL with 'expected unactivated to be trial' while the audit-row sibling test still passes — proves the test exercises the cache pathway and the transaction is untouched. Restoring the line restores the green."
+
+- gap_id: G-08-3
+  truth: "On first launch (no license, no trial, no users row), the wizard renders cleanly without LicenseGate modal interference. The wizard IS the path to start the trial; gating it with the activation modal breaks first-launch UX."
+  status: resolved
+  resolved_by: 08-09-PLAN.md
+  resolved_at: 2026-09-02
+  reason: "User screenshot: LicenseGate modal 'Activate Colonoscopist' with 'Continue in trial' + 'Activate now' fires ON TOP of the in-progress wizard. Blocks the wizard form. App.tsx:158 wraps EVERY route (including 'wizard') with <LicenseGate>; LicenseGate.tsx has no wizard-route exemption, so it fires for state='unactivated' regardless of route. The wizard is the gateway to activation — gating it with the activation modal is contradictory."
+  severity: major
+  test: 1
+  root_cause: "src/renderer/src/components/LicenseGate.tsx:64 — the showModal predicate fires for state==='unactivated' regardless of the active route. App.tsx:158 wraps EVERY route (including 'wizard') with <LicenseGate>. On first launch there is no users row → wizardBootstrap has not run → no settings.trial_started_at row → state='unactivated' → modal fires → blocks the wizard form. The wizard IS the path to start the trial; gating it with the activation modal is contradictory."
+  artifacts:
+    - path: "src/renderer/src/components/LicenseGate.tsx"
+      issue: "showModal predicate has no wizard-route exemption — fires for state==='unactivated' regardless of route"
+    - path: "src/renderer/src/App.tsx:158"
+      issue: "Wraps EVERY route (including 'wizard') with <LicenseGate>; no route-based exemption at the App level either"
+  missing:
+    - "Widen useRoute() destructure in LicenseGate.tsx to also pull route"
+    - "Add route.name !== 'wizard' && route.name !== 'login' to the showModal predicate"
+    - "Add 2 new test cases (wizard route + login route exemption) to tests/renderer/pages/license-gate.test.tsx"
+    - "Re-run typecheck:web + license-gate tests to confirm no regression to the 6 existing cases"
+  debug_session: "Plan 08-09 commits: db1dfb7 (LicenseGate.tsx: widen destructure + widen predicate + header comment update) + 7636ee5 (license-gate.test.tsx: 2 new regression-guard test cases) + a7070fa (SUMMARY). Verification: typecheck:web no new errors, license-gate tests 8/8 pass (6 existing + 2 new). Wizard now renders cleanly on first launch; modal still gates every authenticated route as before."
