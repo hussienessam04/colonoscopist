@@ -23,7 +23,7 @@
     "test:integration:smoke": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
     "test:integration:smoke:optin": "node scripts/run-vitest.cjs --run tests/integration/trim-smoke.test.ts",
     "test:integration:smoke:phase7": "node scripts/run-vitest.cjs --run tests/integration/backup-restore-roundtrip.test.ts tests/integration/ar-pdf-magic.test.ts",
-    "test:integration:smoke:phase8": "node scripts/run-vitest.cjs --run tests/integration/license-verify-roundtrip.test.ts tests/integration/license-trial-survives-reboot.test.ts tests/integration/license-gate-blocks-procedure.test.ts",
+    "test:integration:smoke:phase8": "node scripts/run-vitest.cjs --run tests/integration/license-verify-roundtrip.test.ts tests/integration/license-trial-survives-reboot.test.ts tests/integration/license-gate-blocks-procedure.test.ts tests/integration/license-cache-invalidation-on-wizard.test.ts",
     "test:e2e": "playwright test",
     "_integration_smoke_note": "The trim-smoke test is opt-in via RUN_SMOKE=1. Default runs skip; CI runs with RUN_SMOKE=1 npm run test:integration:smoke:optin (or set RUN_SMOKE in the CI env).",
     "postinstall": "node node_modules/electron/install.js && electron-rebuild && node scripts/fix-electron-path.cjs"
