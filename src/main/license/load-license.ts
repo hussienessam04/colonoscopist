@@ -86,7 +86,7 @@ export async function loadAndVerifyLicense(
 
   // Step 4: Verify. verifyLicense is a pure function — no I/O, no side
   // effects. Frozen by export per PITFALLS §Pitfall 6 + D-09.
-  const result = verifyLicense({
+  const result = await verifyLicense({
     licenseJson: json,
     signature,
     publicKeyHex: VENDOR_PUBLIC_KEY_HEX,

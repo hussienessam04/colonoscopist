@@ -16,14 +16,7 @@
 //   (Pitfall 2: canonicalization breaks signatures).
 
 import { createHash } from 'node:crypto';
-import * as ed from '@noble/ed25519';
-import { sha512 } from '@noble/hashes/sha2.js';
 import yauzl from 'yauzl';
-
-// ponytail: sha512 hookup is REQUIRED for @noble/ed25519 v3 — the
-// library's default hash is undefined in the v3 release. Without this
-// line, ed.verify() throws synchronously (A1 in RESEARCH Assumptions Log).
-ed.hashes.sha512 = sha512;
 
 // Embedded Ed25519 public key (32 bytes hex). The matching private key
 // lives ONLY on the vendor machine at $LICENSE_SIGNING_KEY_PATH. A
@@ -122,13 +115,23 @@ export function parseLicenseSidecar(zipBuffer: Buffer): Promise<{
   });
 }
 
-function _verifyLicense(args: {
+async function _verifyLicense(args: {
   licenseJson: Buffer;
   signature: Buffer;
   publicKeyHex: string;
   machineFingerprint: string;
-}): VerifyResult {
+}): Promise<VerifyResult> {
   const { licenseJson, signature, publicKeyHex, machineFingerprint } = args;
+
+  // ponytail: dynamic ESM import — @noble/ed25519 v3 + @noble/hashes are pure ESM,
+  // and the compiled CJS main module cannot statically `require()` them. The
+  // dynamic `await import()` is the only interop shape that works under
+  // electron-vite's externalizeDepsPlugin. Mirrors src/main/backup/index.ts:52.
+  // sha512 hookup is REQUIRED for v3 — without it, ed.verify() throws
+  // synchronously (A1 in RESEARCH Assumptions Log).
+  const ed = await import('@noble/ed25519');
+  const { sha512 } = await import('@noble/hashes/sha2.js');
+  ed.hashes.sha512 = sha512;
 
   // Step 1: parse the JSON payload. JSON.parse errors surface as MALFORMED_PAYLOAD.
   let payload: {

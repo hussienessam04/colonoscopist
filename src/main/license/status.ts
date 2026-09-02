@@ -40,7 +40,7 @@ export async function computeLicenseStatus(): Promise<LicenseStatus> {
   if (existsSync(jsonPath) && existsSync(sigPath)) {
     const json = readFileSync(jsonPath);
     const sig = readFileSync(sigPath);
-    const result = verifyLicense({
+    const result = await verifyLicense({
       licenseJson: json,
       signature: sig,
       publicKeyHex: VENDOR_PUBLIC_KEY_HEX,
