@@ -10,6 +10,7 @@ import { session } from './session';
 import { backoff, clearBackoff, LOCKOUT_THRESHOLD, SENTINEL_LOCKED_UNTIL, nextBackoffMs } from './rate-limit';
 import { ipcError, IpcErrorException } from '@shared/errors';
 import type { LoginResult, RecoveryResponse, UserPublic } from '@shared/ipc-contract';
+import { invalidateLicenseCache } from '../license';
 
 function stripPin(row: UserRow): UserPublic {
   return {
@@ -125,6 +126,13 @@ export async function wizardBootstrap(input: { fullName: string; clinicName: str
     ).run(userId, 'license.trial_started', 'license', null, JSON.stringify({ trialStartedAt: now }), 'ok', now);
   });
   txn();
+
+  // Plan 08-08 (G-08-2): clear the memoized license status cache so the
+  // next `getLicenseStatus()` IPC after wizard completion returns the
+  // fresh `state: 'trial'` shape (not the stale pre-wizard `'unactivated'`).
+  // Mirrors `load-license.ts:117-119` post-commit pattern; keep both call
+  // sites symmetric for future readers.
+  invalidateLicenseCache();
 
   return { accepted: true, userId, clinicName };
 }
