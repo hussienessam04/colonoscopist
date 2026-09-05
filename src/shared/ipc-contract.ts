@@ -65,6 +65,10 @@ export const IPC = {
   SCREENSHOTS_LIST: 'screenshots:list',
   SCREENSHOTS_DELETE: 'screenshots:delete',
   SCREENSHOTS_UPDATE_ANNOTATION: 'screenshots:update-annotation',
+  // Phase 8 / Plan 14 — permanent crop. The renderer does the pixel work
+  // on a canvas and ships the cropped JPEG bytes; main validates the rect
+  // against the original dimensions and overwrites the source file.
+  SCREENSHOTS_CROP: 'screenshots:crop',
   PROCEDURES_TRIM: 'procedures:trim',
   PROCEDURES_RESTORE: 'procedures:restore',
   // Phase 5 / Plan 02 — pause markers from procedure_segments. Renderer
@@ -335,6 +339,26 @@ export type Screenshot = {
   annotation: string | null;
   createdAt: number;
 };
+
+// Phase 8 / Plan 14 — screenshot crop (SCRN-02 extended). The renderer
+// crops on a canvas and sends the encoded JPEG bytes; `cropRect` +
+// `originalDimensions` are carried for main-side bounds validation and
+// the `screenshot.cropped` audit row. `croppedBytes` rides the channel
+// as base64 for the same reason `screenshots.add` does — structured
+// clone of a large Uint8Array across contextBridge is lossy in some
+// Electron versions, base64 is the shape already proven in Phase 5.
+export type CropRect = { x: number; y: number; width: number; height: number };
+
+export type ScreenshotCropInput = {
+  id: number;
+  jpegBase64: string;
+  originalDimensions: { width: number; height: number };
+  cropRect: CropRect;
+};
+
+export type ScreenshotCropResult =
+  | { ok: true; newDimensions: { width: number; height: number }; byteSize: number }
+  | { ok: false; code: 'IPC_SCREENSHOT_NOT_FOUND' | 'IPC_INVALID_CROP' | string };
 
 // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per CONTEXT.md D-02 the
 // bilingual EN+AR fields are parallel nullable columns; AR columns are
@@ -638,6 +662,8 @@ export interface IpcContract {
     list: (input: { procedureId: string }) => Promise<Screenshot[]>;
     delete: (input: { id: number }) => Promise<{ ok: true }>;
     updateAnnotation: (input: { id: number; annotation: string | null }) => Promise<Screenshot>;
+    // Phase 8 / Plan 14 — permanent crop. Overwrites the source JPEG.
+    crop: (input: ScreenshotCropInput) => Promise<ScreenshotCropResult>;
   };
   // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per Phase 2 BLOCKER 4
   // + D-07, the renderer never sends a `userId` or `doctorId` field — main

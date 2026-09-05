@@ -26,7 +26,12 @@ export type IpcError =
   // out without activation. Renderer reads the code to choose modal
   // copy (per CONTEXT D-05).
   | { code: 'IPC_LICENSE_INVALID'; message: string }
-  | { code: 'IPC_LICENSE_EXPIRED'; message: string };
+  | { code: 'IPC_LICENSE_EXPIRED'; message: string }
+  // Phase 8 / Plan 14 — screenshot crop (SCRN-02 extended). NOT_FOUND =
+  // no screenshots row for the supplied id; INVALID_CROP = the crop rect
+  // falls outside the reported original dimensions.
+  | { code: 'IPC_SCREENSHOT_NOT_FOUND'; message: string }
+  | { code: 'IPC_INVALID_CROP'; message: string };
 
 export class IpcErrorException extends Error {
   readonly ipc: IpcError;
@@ -62,6 +67,10 @@ export function ipcError(code: IpcError['code'], message: string, extra: Partial
     case 'IPC_LICENSE_INVALID':
       return { code, message };
     case 'IPC_LICENSE_EXPIRED':
+      return { code, message };
+    case 'IPC_SCREENSHOT_NOT_FOUND':
+      return { code, message };
+    case 'IPC_INVALID_CROP':
       return { code, message };
   }
 }

@@ -95,6 +95,8 @@ const api: IpcContract = {
     delete: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_DELETE, input),
     updateAnnotation: (input) =>
       ipcRenderer.invoke(IPC.SCREENSHOTS_UPDATE_ANNOTATION, input),
+    // Phase 8 / Plan 14 — permanent crop; overwrites the source JPEG.
+    crop: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_CROP, input),
   },
   // Phase 6 / Plan 01 — Doctor profile IPC. `get` reads the row keyed by
   // the active session; `update` writes the bilingual name/clinic/contact

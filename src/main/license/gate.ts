@@ -56,6 +56,10 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // Audit (workstation-level event log continues regardless of license state).
   IPC.AUDIT_LIST,
   IPC.AUDIT_LOG,
+  // Phase 8 / Plan 14 — cropping an already-captured screenshot is a
+  // routine clinical action on existing data, not new capture. The
+  // gated SCREENSHOTS_ADD still blocks new captures when unlicensed.
+  IPC.SCREENSHOTS_CROP,
 ]);
 
 export type LicenseGateError =

@@ -29,8 +29,10 @@ import {
   screenshotsListInput,
   screenshotsDeleteInput,
   screenshotsUpdateAnnotationInput,
+  screenshotCropInput,
 } from '@shared/validators';
 import { licenseGated } from '../license';
+import { cropScreenshot } from '../screenshots/crop';
 
 const MIN_DECODED_BYTES = 2_000;
 const MAX_DECODED_BYTES = 6_000_000;
@@ -226,6 +228,21 @@ export function registerScreenshotsIpc(): void {
         },
       });
       return updated;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
+
+  // Phase 8 / Plan 14 — crop. EXEMPT from the license gate (see
+  // gate.ts): cropping is a routine clinical action on a screenshot the
+  // doctor already captured, not new data capture. The `licenseGated`
+  // wrap stays for grep-consistency — it returns the handler unchanged
+  // for exempt channels.
+  ipcMain.handle(IPC.SCREENSHOTS_CROP, licenseGated(IPC.SCREENSHOTS_CROP, (_e, raw) => {
+    try {
+      const parsed = safeParse(screenshotCropInput, raw, 'id');
+      const userId = requireSession();
+      return cropScreenshot(parsed, userId);
     } catch (err) {
       throw asIpcError(err);
     }

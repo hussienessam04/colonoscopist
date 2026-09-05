@@ -235,6 +235,28 @@ export const screenshotsUpdateAnnotationInput = z.object({
   annotation: z.string().min(1).max(1000).nullable(),
 });
 
+// Phase 8 / Plan 14 — crop input. Same 8 MB base64 cap as `add` (the
+// cropped image is always a subset of an already-capped original, so the
+// cap is belt-and-braces). Bounds of `cropRect` vs `originalDimensions`
+// are checked in the handler, not here — zod cannot express the
+// cross-field comparison without a refine that hides which side failed.
+export const screenshotCropInput = z
+  .object({
+    id: z.number().int().positive(),
+    jpegBase64: z.string().min(1).max(8_000_000),
+    originalDimensions: z.object({
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    }),
+    cropRect: z.object({
+      x: z.number().int().nonnegative(),
+      y: z.number().int().nonnegative(),
+      width: z.number().int().positive(),
+      height: z.number().int().positive(),
+    }),
+  })
+  .strict();
+
 export const proceduresTrimInput = z
   .object({
     id: z.string().uuid(),
@@ -261,6 +283,7 @@ export type ScreenshotsAddInput = z.infer<typeof screenshotsAddInput>;
 export type ScreenshotsListInput = z.infer<typeof screenshotsListInput>;
 export type ScreenshotsDeleteInput = z.infer<typeof screenshotsDeleteInput>;
 export type ScreenshotsUpdateAnnotationInput = z.infer<typeof screenshotsUpdateAnnotationInput>;
+export type ScreenshotCropInputParsed = z.infer<typeof screenshotCropInput>;
 export type ProceduresTrimInput = z.infer<typeof proceduresTrimInput>;
 export type ProceduresRestoreInput = z.infer<typeof proceduresRestoreInput>;
 
