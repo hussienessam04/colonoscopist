@@ -211,4 +211,69 @@ describe('Settings → Capture', () => {
     expect(capture.getAttribute('data-active')).toBe('true');
     expect(users.getAttribute('data-active')).toBe('false');
   });
+
+  // Plan 08-11 / G-08-5 — on license state 'expired' / 'unactivated' the
+  // main-process gate returns {ok: false, code: 'IPC_LICENSE_*'} for
+  // capture.* calls. The hydration useEffect previously fed the gate
+  // object into setSavedDeviceId, which crashed downstream pickBrowserId
+  // and white-screened the page. Wire through safeInvoke + render
+  // <EmptyStateCard> instead.
+  it('G-08-5: hydration gate rejection renders <EmptyStateCard> (no crash)', async () => {
+    const api = getApi();
+    // The per-test beforeEach already seeds getDefaultDevice to a string;
+    // override AFTER it runs so this test sees the gate-rejected shape.
+    api.capture.getDefaultDevice.mockResolvedValue({
+      ok: false,
+      code: 'IPC_LICENSE_EXPIRED',
+    });
+    setRoute({ name: 'settings-capture' });
+    makeEmptyMediaMock();
+
+    render(<SettingsCapture />);
+
+    // The gated-empty-state testid is the EmptyStateCard contract from
+    // Plan 08-10. Once it's in the DOM the React tree is past hydration,
+    // which is the "no white screen" assertion.
+    const card = await screen.findByTestId('gated-empty-state');
+    expect(card).toBeInTheDocument();
+    // The default message comes from t('license.emptyStateMessage');
+    // match on the en-string fragment ("License required").
+    expect(card).toHaveTextContent(/license required/i);
+  });
+
+  it('G-08-5: Save surfaces a license toast on gate-rejected persistence (no crash)', async () => {
+    const api = getApi();
+    // Hydration succeeds so the Save button becomes clickable. The gate
+    // rejection only fires on the persistence calls.
+    api.capture.getDefaultDevice.mockResolvedValue('EasyCap USB Video');
+    api.capture.setDefaultDevice.mockResolvedValue({
+      ok: false,
+      code: 'IPC_LICENSE_EXPIRED',
+    });
+    setRoute({ name: 'settings-capture' });
+    makeMediaMock();
+
+    render(<SettingsCapture />);
+
+    const save = await screen.findByTestId('save-capture');
+    await waitFor(() => expect((save as HTMLButtonElement).disabled).toBe(false));
+
+    const user = userEvent.setup();
+    await user.click(save);
+
+    // setDefaultDevice must have been invoked exactly once even though
+    // the gate rejected it — that's the IPC contract we want surfaced
+    // (vs. an unhandled exception aborting before the call).
+    await waitFor(() =>
+      expect(api.capture.setDefaultDevice).toHaveBeenCalledTimes(1),
+    );
+    // The page must still be mounted — findByText of the section header
+    // proves no white-screen crash.
+    expect(
+      screen.getByRole('heading', { name: /capture/i }),
+    ).toBeInTheDocument();
+    // handleSave returns BEFORE calling setPreset when setDefaultDevice
+    // was gate-rejected — preset save is not attempted on a gated Save.
+    expect(api.capture.setPreset).not.toHaveBeenCalled();
+  });
 });

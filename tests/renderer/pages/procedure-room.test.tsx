@@ -4,6 +4,10 @@
 // The recording controls moved to ProcedureRoom (Step 2).
 // D-01 / D-02 / D-07 / D-08 / Q-B / BLOCKER 5.
 // Plan 03-05 Task 2 — reachability test from PatientRow into Procedure Preview (G-03-4).
+// Plan 08-11 / G-08-5 — ProcedureRoom gated-IPC regression test (added at
+// the bottom of this file). The canonical ProcedureRoom test file is
+// procedure-room-timer.test.tsx; this regression lives here per the plan
+// so the G-08-5 audit trail points at the SettingsCapture plan's sibling.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -11,6 +15,7 @@ import userEvent from '@testing-library/user-event';
 import { getApi } from '../setup';
 import { setRoute, getRoute } from '@/store/route';
 import ProcedurePreview from '@/pages/ProcedurePreview';
+import ProcedureRoom from '@/pages/ProcedureRoom';
 import PatientsList from '@/pages/PatientsList';
 import { session } from '@/store/session';
 import type { CaptureDevice, Patient } from '@shared/ipc-contract';
@@ -193,5 +198,50 @@ describe('Plan 03-05 — Procedure Preview reachability from PatientRow', () => 
 
     await waitFor(() => expect(getRoute().name).toBe('procedure-preview'));
     expect(getRoute()).toMatchObject({ name: 'procedure-preview', patientId: ALICE.id });
+  });
+});
+
+// Plan 08-11 / G-08-5 — ProcedureRoom gated-IPC graceful degrade. On
+// license state 'expired' / 'unactivated' the main-process gate returns
+// {ok:false, code:'IPC_LICENSE_*'} for capture.* reads. Previously the
+// hydration useEffect fed the gate object into setSavedDevice, which the
+// page then treated as a canonical deviceId — pickBrowserId({ok:false})
+// crashed and the React tree white-screened. With safeInvoke the result
+// is null, savedDevice stays null, the existing no-device overlay renders
+// naturally (lines 365-378 in ProcedureRoom.tsx).
+describe('Plan 08-11 / G-08-5 — ProcedureRoom gated-IPC graceful degrade', () => {
+  it('renders the no-device overlay when getDefaultDevice is gate-rejected (no crash)', async () => {
+    const api = getApi();
+    // Override the per-test beforeEach default for this regression.
+    api.capture.getDefaultDevice.mockResolvedValue({
+      ok: false,
+      code: 'IPC_LICENSE_EXPIRED',
+    });
+    // ProcedureRoom subscribes to recording.onStatus on mount and the
+    // cleanup path calls the returned unsubscribe — without an impl that
+    // returns a function, the cleanup throws. Match the canonical pattern
+    // from procedure-room-timer.test.tsx.
+    api.recording.onStatus.mockImplementation(
+      () => (): void => undefined,
+    );
+
+    setRoute({
+      name: 'procedure-room',
+      patientId: 'pat-1',
+      procedureId: '00000000-0000-4000-8000-000000000050',
+    });
+
+    render(<ProcedureRoom />);
+
+    // No white screen — the existing no-device overlay is the canonical
+    // UX for "no saved default device" and ProcedureRoom renders it
+    // uniformly when savedDevice stays null after a gate rejection.
+    expect(
+      await screen.findByText(/no device selected/i),
+    ).toBeInTheDocument();
+    // The page header survives hydration so the React tree is intact.
+    expect(
+      screen.getByRole('heading', { name: /procedure room/i }),
+    ).toBeInTheDocument();
   });
 });
