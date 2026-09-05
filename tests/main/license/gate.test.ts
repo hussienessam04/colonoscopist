@@ -224,12 +224,15 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
     }
   });
 
-  it('EXEMPT_CHANNELS contains the 12 channels named in CONTEXT D-08 verbatim + Plan 04 picker channel', async () => {
+  it('EXEMPT_CHANNELS contains the 12 channels named in CONTEXT D-08 verbatim + Plan 04 picker channel + Plan 14 crop', async () => {
     const { EXEMPT_CHANNELS } = await import('../../../src/main/license/gate');
     // Auth (8) + License (3) + Audit (2) = 13
     // Plan 04 adds `license:pick-and-activate` to D-08's 12 — the user
     // is actively activating when they invoke this channel.
-    expect(EXEMPT_CHANNELS.size).toBe(13);
+    // Plan 14 adds `screenshots:crop` — cropping an already-captured
+    // screenshot is a routine action on existing data (screenshots:add
+    // stays gated, so new capture is still blocked when unlicensed).
+    expect(EXEMPT_CHANNELS.size).toBe(14);
     // Verify the names match exactly (D-08 verbatim + Plan 04's picker).
     const expected = [
       'auth:status',
@@ -245,6 +248,7 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
       'license:pick-and-activate',
       'audit:list',
       'audit:log',
+      'screenshots:crop',
     ];
     for (const ch of expected) {
       expect(EXEMPT_CHANNELS.has(ch)).toBe(true);

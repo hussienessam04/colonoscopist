@@ -73,4 +73,33 @@ describe('ScreenshotLightbox', () => {
     fireEvent.click(screen.getByTestId('screenshot-lightbox-close'));
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  // Plan 08-14 — Crop entry point.
+  it('renders a Crop button that opens the crop modal', () => {
+    render(
+      <ScreenshotLightbox
+        screenshot={fixture}
+        patientId="p1"
+        procedureId="proc1"
+        mediaBaseUrl="http://127.0.0.1:51731"
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('screenshot-crop-modal')).toBeNull();
+    fireEvent.click(screen.getByTestId('screenshot-lightbox-crop'));
+    expect(screen.getByTestId('screenshot-crop-modal')).toBeInTheDocument();
+  });
+
+  it('does NOT render the Crop button when the media server has not bound', () => {
+    render(
+      <ScreenshotLightbox
+        screenshot={fixture}
+        patientId="p1"
+        procedureId="proc1"
+        mediaBaseUrl={null}
+        onClose={vi.fn()}
+      />,
+    );
+    expect(screen.queryByTestId('screenshot-lightbox-crop')).toBeNull();
+  });
 });
