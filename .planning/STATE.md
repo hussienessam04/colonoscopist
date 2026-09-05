@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 18
+current_plan: 19
 status: testing
-stopped_at: Phase 08 Plan 18 shipped (crop modal diagnostics + cacheBuster refresh + media-server URL fallback)
+stopped_at: Phase 08 Plan 19 shipped (getBlob ArrayBuffer fix — "browser rejected blob" resolved)
 paused_at: —
-last_updated: "2026-09-02T00:17:00Z"
+last_updated: "2026-09-02T00:18:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 18 (G-08-11 crop modal diagnostics + Retry + cacheBuster refresh + fallbackSrc) shipped; 34/34 tests pass on affected files
+last_activity_desc: Phase 08 Plan 19 (G-08-12 getBlob IPC ArrayBuffer serialization fix) shipped; 43/43 tests pass on affected files
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 59
-  completed_plans: 59
+  total_plans: 60
+  completed_plans: 60
 ---
 
 **Current Plan:** 1
