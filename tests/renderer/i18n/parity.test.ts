@@ -69,7 +69,18 @@ describe('i18n parity check (D-24)', () => {
     // ponytail: the reverse direction catches "added AR but forgot
     // EN" — symmetric with the forward check. Orphans are usually
     // typos but they break symmetry and indicate a stale key.
-    const orphan = arKeys.filter((k) => !enKeys.includes(k));
+    //
+    // Plan 08-13 exception: CLDR plural categories differ per language.
+    // Arabic has six (_zero/_one/_two/_few/_many/_other); English has
+    // two (_one/_other). An AR-only plural variant is legitimate as
+    // long as its BASE key exists in EN — that is what i18next falls
+    // back to. Anything else is a real orphan.
+    const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+    const orphan = arKeys.filter((k) => {
+      if (enKeys.includes(k)) return false;
+      const base = k.replace(PLURAL_SUFFIX, '');
+      return base === k || !enKeys.includes(base);
+    });
     expect(orphan, `Orphaned AR keys (no EN counterpart): ${orphan.join(', ')}`).toEqual([]);
   });
 

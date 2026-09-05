@@ -119,7 +119,9 @@ describe('License sub-page (LIC-03 + I18N-03)', () => {
     await renderPage(licenseStatusFor('unactivated'));
     const dot = await screen.findByTestId('license-status-dot');
     expect(dot.getAttribute('data-state')).toBe('unactivated');
-    expect(dot.className).toContain('bg-slate-400');
+    // Plan 08-13 / UI audit Warning 7 — bg-slate-400 was too muted at
+    // clinical glance distance; the unactivated dot is bg-slate-500 now.
+    expect(dot.className).toContain('bg-slate-500');
     const label = await screen.findByTestId('license-status-label');
     expect(label.textContent).toMatch(/not activated/i);
     const button = screen.getByTestId('license-load-lic');
