@@ -36,6 +36,8 @@ import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useTrim } from '@/hooks/useTrim';
 import { captureScreenshot } from '@/lib/capture-screenshot';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { safeInvoke } from '@/lib/ipc-result';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import type { Patient, Procedure, Screenshot } from '@shared/ipc-contract';
 
 function formatTimestamp(ms: number | null): string {
@@ -107,6 +109,7 @@ export default function ProcedureReview({
     refresh,
     removeScreenshot,
     updateAnnotation,
+    gated: proceduresGated,
   } = useProcedures(procedureId);
   const { report, refresh: refreshReport } = useReport({ procedureId });
   const lastLost = useLastLost();
@@ -115,9 +118,14 @@ export default function ProcedureReview({
   // Fetch the patient row separately so the metadata sidebar shows the
   // full name (procedure.patientId is a UUID, not human-readable).
   const [patient, setPatient] = useState<Patient | null>(null);
+  // Plan 08-10 / G-08-4 — gate-rejected flag. Either the local
+  // patients.get OR the useProcedures hook may flip it.
+  const [patientGated, setPatientGated] = useState(false);
+  const gated = patientGated || proceduresGated;
   useEffect(() => {
     if (!procedure?.patientId) {
       setPatient(null);
+      setPatientGated(false);
       return;
     }
     let cancelled = false;
@@ -130,11 +138,23 @@ export default function ProcedureReview({
     const promise = window.api.patients?.get?.(procedure.patientId);
     if (promise && typeof promise.then === 'function') {
       promise
-        .then((row) => {
-          if (!cancelled) setPatient(row);
+        .then(async (raw) => {
+          if (cancelled) return;
+          const row = await safeInvoke(Promise.resolve(raw));
+          if (cancelled) return;
+          if (row === null) {
+            setPatientGated(true);
+            setPatient(null);
+            return;
+          }
+          setPatient(row);
+          setPatientGated(false);
         })
         .catch(() => {
-          if (!cancelled) setPatient(null);
+          if (!cancelled) {
+            setPatient(null);
+            setPatientGated(true);
+          }
         });
     } else if (!cancelled) {
       setPatient(null);
@@ -334,6 +354,7 @@ export default function ProcedureReview({
 
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
           <div className="flex flex-col gap-3" data-testid="procedure-review-left">
+            {gated ? <EmptyStateCard /> : null}
             <div className="overflow-hidden rounded-lg bg-slate-900">
               {mediaUrl.url && videoSrc ? (
                 <video

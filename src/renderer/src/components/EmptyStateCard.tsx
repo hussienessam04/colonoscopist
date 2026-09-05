@@ -2,6 +2,10 @@
 // returns {ok: false}. Renders above the LicenseGate modal-aware content
 // with a "License required" message + an "Open License settings" button
 // that navigates to the License sub-page (Plan 05).
+//
+// ponytail: default export — every consumer page imports it as
+// `import EmptyStateCard from '@/components/EmptyStateCard'`. The named
+// export is preserved for tree-shakers that prefer a named import.
 
 import { useTranslation } from 'react-i18next';
 import { useRoute } from '@/lib/router';
@@ -28,3 +32,5 @@ export function EmptyStateCard({ message }: { message?: string }): JSX.Element {
     </div>
   );
 }
+
+export default EmptyStateCard;

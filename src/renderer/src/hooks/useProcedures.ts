@@ -26,6 +26,7 @@ import type {
   ProcedureSegment,
   Screenshot,
 } from '@shared/ipc-contract';
+import { safeInvoke } from '@/lib/ipc-result';
 import { screenshotToastStore } from '@/store/screenshot-toast';
 
 export type UseProceduresResult = {
@@ -35,6 +36,10 @@ export type UseProceduresResult = {
   screenshots: Screenshot[];
   loading: boolean;
   error: string | null;
+  // Plan 08-10 / G-08-4 — gate-rejected flag. When ANY of the four
+  // gated IPC calls returns {ok:false}, the consumer renders
+  // <EmptyStateCard> instead of a stale empty table.
+  gated: boolean;
   refresh: () => Promise<void>;
   removeScreenshot: (screenshotId: number) => void;
   updateAnnotation: (id: number, annotation: string | null) => Promise<void>;
@@ -47,6 +52,10 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Plan 08-10 / G-08-4 — gate-rejected flag (separate from `error` so
+  // the consumer can branch on license-gate state without parsing
+  // `error`).
+  const [gated, setGated] = useState(false);
   // ponytail: refreshInFlightRef guards against concurrent refresh calls
   // (e.g. fast double-click on a Capture button). The second call awaits
   // the first so the local state stays consistent.
@@ -59,6 +68,7 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
       setNotes([]);
       setScreenshots([]);
       setError(null);
+      setGated(false);
       setLoading(false);
       return;
     }
@@ -67,16 +77,29 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
       setLoading(true);
       setError(null);
       try {
+        // Plan 08-10 / G-08-4 — branch on the discriminated union via
+        // safeInvoke. Any gate-rejected arm flips `gated=true` so the
+        // consumer renders <EmptyStateCard>. The success arm proceeds
+        // unchanged.
         const [proc, segs, noteRows, shotRows] = await Promise.all([
-          window.api.procedures.get({ id: procedureId }),
-          window.api.procedures.listSegments({ procedureId }),
-          window.api.procedureNotes.list({ procedureId }),
-          window.api.screenshots.list({ procedureId }),
+          safeInvoke(window.api.procedures.get({ id: procedureId })),
+          safeInvoke(window.api.procedures.listSegments({ procedureId })),
+          safeInvoke(window.api.procedureNotes.list({ procedureId })),
+          safeInvoke(window.api.screenshots.list({ procedureId })),
         ]);
-        setProcedure(proc ?? null);
+        if (proc === null || segs === null || noteRows === null || shotRows === null) {
+          setGated(true);
+          setProcedure(null);
+          setSegments([]);
+          setNotes([]);
+          setScreenshots([]);
+          return;
+        }
+        setProcedure(proc);
         setSegments(segs);
         setNotes(noteRows);
         setScreenshots(shotRows);
+        setGated(false);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load procedure');
       } finally {
@@ -145,6 +168,7 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
     screenshots,
     loading,
     error,
+    gated,
     refresh,
     removeScreenshot,
     updateAnnotation,

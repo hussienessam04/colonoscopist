@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import {
   Select,
   SelectContent,
@@ -22,9 +23,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useRoute } from '@/lib/router';
+import { safeInvoke } from '@/lib/ipc-result';
 import { toast } from 'sonner';
 import { patientInput, patientPatchInput } from '@shared/validators';
-import type { Patient } from '@shared/ipc-contract';
 
 type Props = {
   mode: 'create' | 'edit';
@@ -45,6 +46,9 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
   const { navigate } = useRoute();
   const [submitting, setSubmitting] = useState(false);
   const [loaded, setLoaded] = useState(mode === 'create');
+  // Plan 08-10 / G-08-4 — render <EmptyStateCard> instead of crashing
+  // when the IPC gate returns {ok:false}.
+  const [gated, setGated] = useState(false);
 
   const isCreate = mode === 'create';
 
@@ -62,10 +66,14 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
   useEffect(() => {
     if (mode === 'edit' && patientId) {
       void (async () => {
-        const row: Patient | null = await window.api.patients.get(patientId);
-        if (!row) {
-          toast.error('Patient not found');
-          navigate({ name: 'patients' });
+        const row = await safeInvoke(window.api.patients.get(patientId));
+        if (row === null) {
+          // Plan 08-10 / G-08-4 — could be gate rejection (license
+          // invalid/expired) OR a legitimate patient-not-found. Render
+          // the gated empty state in either case; do NOT navigate
+          // away (the LicenseGate modal sits above the empty state).
+          setGated(true);
+          setLoaded(true);
           return;
         }
         editForm.reset({
@@ -84,6 +92,26 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
     return (
       <main className="min-h-screen grid place-items-center bg-slate-50">
         <p className="text-sm text-slate-500">Loading…</p>
+      </main>
+    );
+  }
+
+  if (gated) {
+    return (
+      <main className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-xl flex flex-col gap-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate({ name: 'patients' })}
+            className="self-start"
+          >
+            <ArrowLeft className="size-4 mr-1" />
+            Back to patients
+          </Button>
+          <EmptyStateCard />
+        </div>
       </main>
     );
   }
@@ -226,7 +254,9 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const row: Patient | null = await window.api.patients.get(patientId);
+      // Plan 08-10 / G-08-4 — branch on null even for the secondary
+      // patients.get call so the gate rejection doesn't crash here.
+      const row = await safeInvoke(window.api.patients.get(patientId));
       if (cancelled) return;
       if (row !== null) setExistingMrn(row.mrn);
     })();

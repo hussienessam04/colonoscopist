@@ -12,7 +12,9 @@ import {
 import { FramingGuide } from '@/components/FramingGuide';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import { useRoute } from '@/store/route';
+import { safeInvoke } from '@/lib/ipc-result';
 import type { Procedure } from '@shared/ipc-contract';
 
 function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Element {
@@ -96,6 +98,10 @@ export default function ProcedurePreview(): JSX.Element {
   );
   const [procedureError, setProcedureError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  // Plan 08-10 / G-08-4 — gate-rejected flag. The Continue-to-recording
+  // button returns null from procedures.create when the gate rejects;
+  // render <EmptyStateCard> so the user sees the License path.
+  const [gated, setGated] = useState(false);
 
   const ready = !loading && defaultLoaded;
   const hasSelection = selectedBrowserId !== null;
@@ -117,9 +123,16 @@ export default function ProcedurePreview(): JSX.Element {
     }
     setCreating(true);
     setProcedureError(null);
-    window.api.procedures
-      .create({ patientId })
-      .then((row: Procedure) => {
+    safeInvoke(window.api.procedures.create({ patientId }))
+      .then((row: Procedure | null) => {
+        if (row === null) {
+          // Plan 08-10 / G-08-4 — gate rejected. Keep the user on the
+          // preview page; the EmptyStateCard below guides them through
+          // activating while the LicenseGate modal stays interactable.
+          setCreating(false);
+          setGated(true);
+          return;
+        }
         preview.stop();
         navigate({
           name: 'procedure-room',
@@ -265,6 +278,7 @@ export default function ProcedurePreview(): JSX.Element {
                   {procedureError}
                 </p>
               ) : null}
+              {gated ? <EmptyStateCard /> : null}
               <p className="text-xs text-muted-foreground">
                 {creating
                   ? 'Preparing procedure row…'

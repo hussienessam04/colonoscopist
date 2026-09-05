@@ -220,12 +220,17 @@ describe('PatientProcedures page', () => {
     ).toBeInTheDocument();
   });
 
-  it('reports a "patient not found" toast + returns to patients list when patients.get returns null', async () => {
+  it('renders <EmptyStateCard> (no navigation away) when patients.get returns null — Plan 08-10 G-08-4 graceful degrade', async () => {
     const api = getApi();
     api.patients.get.mockResolvedValue(null);
     render(<PatientProcedures patientId={PATIENT_ID} />);
     await waitFor(() => expect(api.patients.get).toHaveBeenCalledWith(PATIENT_ID));
-    await waitFor(() => expect(getRoute().name).toBe('patients'));
+    // Plan 08-10 / G-08-4 — renderer no longer navigates away on null.
+    // The EmptyStateCard stays visible so the LicenseGate modal can
+    // remain interactable on top. Route stays at the initial value
+    // (the page never called navigate()).
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+    expect(getRoute().name).not.toBe('patients');
   });
 
   it('text search filter: typing + Apply narrows the table to matching procedures', async () => {

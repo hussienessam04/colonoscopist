@@ -44,10 +44,12 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useRoute } from '@/lib/router';
+import { safeInvoke } from '@/lib/ipc-result';
 import { formatProcedureDate } from '@/lib/format';
 import type { Patient, Procedure, ProcedureStatus, Report } from '@shared/ipc-contract';
 
@@ -101,6 +103,10 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
   const [patient, setPatient] = useState<Patient | null>(null);
   const [rows, setRows] = useState<ProcedureWithReport[]>([]);
   const [loading, setLoading] = useState(true);
+  // Plan 08-10 / G-08-4 — gate-rejected flag. When the patients.get or
+  // procedures.list IPC returns {ok:false}, render the empty state
+  // card instead of crashing on undefined destructure below.
+  const [gated, setGated] = useState(false);
 
   // Filter state — pending inputs are committed to "applied" only on Apply.
   const [pendingSearch, setPendingSearch] = useState('');
@@ -118,22 +124,31 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
     void (async () => {
       setLoading(true);
       try {
-        const p: Patient | null = await window.api.patients.get(patientId);
+        // Plan 08-10 / G-08-4 — branch on null (gate-rejection) before
+        // destructuring the success shape.
+        const p = await safeInvoke(window.api.patients.get(patientId));
         if (cancelled) return;
         if (p === null) {
-          toast.error(t('patientProcedures.patientNotFound'));
-          navigate({ name: 'patients' });
+          setGated(true);
+          setLoading(false);
           return;
         }
         setPatient(p);
         // pageSize: 200 — keeps the surface scroll-free for any realistic
         // clinic year; matches the existing patients.list default-ish
         // shape (per plan: "use existing API").
-        const procs = await window.api.procedures.list({
-          patientId,
-          pageSize: 200,
-        });
+        const procs = await safeInvoke(
+          window.api.procedures.list({
+            patientId,
+            pageSize: 200,
+          }),
+        );
         if (cancelled) return;
+        if (procs === null) {
+          setGated(true);
+          setLoading(false);
+          return;
+        }
         // Parallel report lookup per procedure (null is valid — no
         // report exists yet for fresh recordings).
         const reports = await Promise.all(
@@ -148,6 +163,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
             report: reports[idx] ?? null,
           })),
         );
+        setGated(false);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load';
         toast.error(msg);
@@ -263,6 +279,10 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
             </Button>
           </div>
         </header>
+
+        {gated ? (
+          <EmptyStateCard />
+        ) : null}
 
         <Card data-testid="patient-procedures-header">
           <CardContent className="flex items-center gap-4 py-4">

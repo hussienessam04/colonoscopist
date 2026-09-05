@@ -30,6 +30,8 @@ import { Label } from '@/components/ui/label';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import { useAutoSave } from '@/hooks/useAutoSave';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
+import { safeInvoke } from '@/lib/ipc-result';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import type { DoctorProfile, UsedDevice } from '@shared/ipc-contract';
 
 // PNG signature: 89 50 4E 47 0D 0A 1A 0A (8 bytes).
@@ -153,6 +155,18 @@ function AssetUploader({
 export default function ProfileEditor(): JSX.Element {
   const { profile, loading, refresh, setLocal } = useDoctorProfile();
   const { t, i18n } = useTranslation();
+  // Plan 08-10 / G-08-4 — gate-rejected flag. The useDoctorProfile
+  // hook does not branch on the discriminated union (a separate hook
+  // file); the page detects the gate shape directly and renders the
+  // empty-state card.
+  // ponytail: `'ok' in profile && profile.ok === false` matches the
+  // gate contract in src/main/license/gate.ts; a successful doctor
+  // profile never carries an `ok` field so the check is safe.
+  const gated =
+    profile !== null &&
+    typeof profile === 'object' &&
+    'ok' in profile &&
+    (profile as { ok: unknown }).ok === false;
 
   const persist = useCallback(
     async (patch: Partial<DoctorProfile>): Promise<void> => {
@@ -254,16 +268,18 @@ export default function ProfileEditor(): JSX.Element {
 
   const refreshPreviews = useCallback(async (): Promise<void> => {
     try {
+      // Plan 08-10 / G-08-4 — gate may reject. Each null becomes null;
+      // missing preview is the same as no asset uploaded.
       const [hdr, ftr, sig, logo] = await Promise.all([
-        window.api.profile.getAssetDataUrl({ kind: 'header' }),
-        window.api.profile.getAssetDataUrl({ kind: 'footer' }),
-        window.api.profile.getAssetDataUrl({ kind: 'signature' }),
-        window.api.profile.getAssetDataUrl({ kind: 'logo' }),
+        safeInvoke(window.api.profile.getAssetDataUrl({ kind: 'header' })),
+        safeInvoke(window.api.profile.getAssetDataUrl({ kind: 'footer' })),
+        safeInvoke(window.api.profile.getAssetDataUrl({ kind: 'signature' })),
+        safeInvoke(window.api.profile.getAssetDataUrl({ kind: 'logo' })),
       ]);
-      setHeaderPreview(hdr.dataUrl);
-      setFooterPreview(ftr.dataUrl);
-      setSignaturePreview(sig.dataUrl);
-      setLogoPreview(logo.dataUrl);
+      setHeaderPreview(hdr?.dataUrl ?? null);
+      setFooterPreview(ftr?.dataUrl ?? null);
+      setSignaturePreview(sig?.dataUrl ?? null);
+      setLogoPreview(logo?.dataUrl ?? null);
     } catch {
       // best-effort: keep last preview; toast on actual upload errors
     }
@@ -416,6 +432,22 @@ export default function ProfileEditor(): JSX.Element {
           <p className="text-sm text-slate-500">{t('profile.loadingProfile')}</p>
         </div>
       </main>
+    );
+  }
+
+  // Plan 08-10 / G-08-4 — gate rejection. Render <EmptyStateCard> below
+  // the page-level <SettingsLayout> so the LicenseGate modal stays on
+  // top.
+  if (gated) {
+    return (
+      <SettingsLayout
+        title={t('profile.pageTitle')}
+        subtitle={t('profile.pageKicker')}
+        activeTab="profile"
+        backTestId="profile-editor-back"
+      >
+        <EmptyStateCard />
+      </SettingsLayout>
     );
   }
 

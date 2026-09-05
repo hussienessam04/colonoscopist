@@ -51,6 +51,8 @@ import { useAutoSave } from '@/hooks/useAutoSave';
 import { useDoctorProfile } from '@/hooks/useDoctorProfile';
 import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useRoute } from '@/lib/router';
+import { safeInvoke } from '@/lib/ipc-result';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import { useSession } from '@/store/session';
 import type { Report } from '@shared/ipc-contract';
 
@@ -73,8 +75,12 @@ function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | 
     let objectUrlToRevoke: string | null = null;
     (async (): Promise<void> => {
       try {
-        const result = await window.api.reports?.getPdfBlob?.({ id: reportId });
-        if (cancelled || result === undefined || result === null) return;
+        // Plan 08-10 / G-08-4 — gate may reject. safeInvoke returns
+        // null; we treat null as "no preview" (same as a missing file).
+        const result = await safeInvoke(
+          window.api.reports?.getPdfBlob?.({ id: reportId }),
+        );
+        if (cancelled || result === null || result === undefined) return;
         // Wrap the bytes in a Blob → ObjectURL. The renderer owns the
         // URL; revoke on unmount or when the PDF changes.
         const blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: result.mime });
@@ -282,6 +288,10 @@ export default function ReportEditor({
     dob: string;
     gender: string | null;
   } | null>(null);
+  // Plan 08-10 / G-08-4 — gate-rejected flag. When procedures.get or
+  // patients.get returns {ok:false}, render <EmptyStateCard> instead
+  // of crashing on undefined reads.
+  const [gated, setGated] = useState(false);
   useEffect(() => {
     if (!procedureId) {
       setPatient(null);
@@ -294,10 +304,23 @@ export default function ReportEditor({
     if (!procPromise || typeof procPromise.then !== 'function') {
       return;
     }
-    procPromise.then(async (p) => {
-      if (cancelled || p === undefined || p === null) return;
-      const patientRow = await window.api.patients?.get?.(p.patientId);
-      if (cancelled || patientRow === undefined || patientRow === null) return;
+    procPromise.then(async (raw) => {
+      if (cancelled) return;
+      // Plan 08-10 / G-08-4 — branch on gate rejection before reading.
+      const p = await safeInvoke(Promise.resolve(raw));
+      if (cancelled) return;
+      if (p === null) {
+        setGated(true);
+        return;
+      }
+      const patientRow = await safeInvoke(
+        Promise.resolve(await window.api.patients?.get?.(p.patientId)),
+      );
+      if (cancelled) return;
+      if (patientRow === null) {
+        setGated(true);
+        return;
+      }
       setPatient({
         id: patientRow.id,
         fullName: patientRow.fullName,
@@ -305,6 +328,7 @@ export default function ReportEditor({
         dob: patientRow.dob,
         gender: patientRow.gender,
       });
+      setGated(false);
     });
     return () => {
       cancelled = true;
@@ -326,13 +350,21 @@ export default function ReportEditor({
     if (!promise || typeof promise.then !== 'function') {
       return;
     }
-    promise.then((p) => {
-      if (cancelled || p === undefined || p === null) return;
+    promise.then(async (raw) => {
+      if (cancelled) return;
+      // Plan 08-10 / G-08-4 — branch on gate rejection.
+      const p = await safeInvoke(Promise.resolve(raw));
+      if (cancelled) return;
+      if (p === null) {
+        setGated(true);
+        return;
+      }
       setProcedure({
         startedAt: p.startedAt,
         durationSeconds: p.durationSeconds,
         patientId: p.patientId,
       });
+      setGated(false);
     });
     return () => {
       cancelled = true;
@@ -349,9 +381,16 @@ export default function ReportEditor({
     void (async (): Promise<void> => {
       try {
         const [sig, logo] = await Promise.all([
-          window.api.profile?.getAssetDataUrl?.({ kind: 'signature' }),
-          window.api.profile?.getAssetDataUrl?.({ kind: 'logo' }),
+          safeInvoke(
+            window.api.profile?.getAssetDataUrl?.({ kind: 'signature' }),
+          ),
+          safeInvoke(
+            window.api.profile?.getAssetDataUrl?.({ kind: 'logo' }),
+          ),
         ]);
+        // Plan 08-10 / G-08-4 — null from the gate is the same as
+        // "no preview" — leave the field null. The asset preview is
+        // a visual; missing it isn't gating.
         setSignaturePreview(sig?.dataUrl ?? null);
         setLogoPreview(logo?.dataUrl ?? null);
       } catch {
@@ -473,6 +512,8 @@ export default function ReportEditor({
             {loading && report === null ? (
               <p className="text-sm text-slate-500">Loading report…</p>
             ) : null}
+
+            {gated ? <EmptyStateCard /> : null}
 
             {/* Header — mirrors the PDF header (logo + clinic name | signature + doctor + date) */}
             <div className="mb-5 flex items-start justify-between border-b border-slate-200 pb-4">

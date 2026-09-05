@@ -34,11 +34,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import EmptyStateCard from '@/components/EmptyStateCard';
 import PageSizeSelector from '@/components/PageSizeSelector';
 import PatientRow from '@/components/PatientRow';
 import ConfirmDialog from '@/components/ConfirmDialog';
 import { useRoute } from '@/lib/router';
 import { useSession } from '@/store/session';
+import { safeInvoke } from '@/lib/ipc-result';
 import { toast } from 'sonner';
 import type { Patient } from '@shared/ipc-contract';
 
@@ -65,6 +67,10 @@ export default function PatientsList(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [confirmDelete, setConfirmDelete] = useState<Patient | null>(null);
   const [deleting, setDeleting] = useState(false);
+  // Plan 08-10 / G-08-4 — gate-rejected flag. When the IPC returns the
+  // {ok:false, code: 'IPC_LICENSE_*'} shape, we render <EmptyStateCard>
+  // instead of crashing on a missing rows/total destructure.
+  const [gated, setGated] = useState(false);
 
   // Phase 2 — debounce refetch on the search + MRN inputs only.
   useEffect(() => {
@@ -77,16 +83,28 @@ export default function PatientsList(): JSX.Element {
 
   async function refetch(): Promise<void> {
     setLoading(true);
-    try {
-      const res = await window.api.patients.list({
+    const res = await safeInvoke(
+      window.api.patients.list({
         search: search || undefined,
         mrn: mrn || undefined,
         includeDeleted,
         page,
         pageSize,
-      });
+      }),
+    );
+    if (res === null) {
+      // Plan 08-10 / G-08-4 — gate rejected the request. Render the
+      // empty-state card instead of crashing on undefined access below.
+      setRows([]);
+      setTotal(0);
+      setGated(true);
+      setLoading(false);
+      return;
+    }
+    try {
       setRows(res.rows);
       setTotal(res.total);
+      setGated(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load patients';
       toast.error(msg);
@@ -275,6 +293,8 @@ export default function PatientsList(): JSX.Element {
             ) : null}
           </div>
         ) : null}
+
+        {gated ? <EmptyStateCard /> : null}
 
         <Card>
           <CardContent className="p-0">
