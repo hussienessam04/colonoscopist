@@ -1,13 +1,22 @@
-// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 (SCRN-02 extended).
+// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 + Plan 16 (SCRN-02 extended).
 //
 // A doctor's mid-procedure framing often includes scope chrome or
-// adjacent anatomy. This modal lets the user define a free-form polygon
-// over the screenshot (click to add vertices, double-click to finalize,
-// Escape to cancel, Backspace to remove the last vertex) and the modal
-// permanently crops the source JPEG to the polygon's bounding box.
+// adjacent anatomy. This modal lets the user define a crop area over
+// the screenshot in one of three modes and then permanently crops the
+// source JPEG to the selection's bounding box.
+//
+// Modes (Phase 8 / Plan 16, G-08-9):
+//   * Rectangle — mousedown + drag draws a rectangle (the 80% case).
+//   * Free-hand — mousedown + drag samples the cursor path every ~5 px
+//     and treats it as a closed polygon on mouseup.
+//   * Polygon   — click to add vertices (legacy flow). Stays available
+//     for precise manual control.
+//
+// All three modes feed the same polygon→bbox IPC contract; the rendered
+// preview differs but Apply only cares about the final polygon's bbox.
 //
 // ponytail: the displayed image is the <img> itself with an absolutely
-// positioned SVG overlay for the polygon — no canvas for display. A
+// positioned SVG overlay for the selection — no canvas for display. A
 // canvas is created offscreen ONLY on Apply, which is the one place the
 // pixels actually matter. Half the code of a canvas-rendered editor and
 // it inherits the browser's own image scaling.
@@ -17,19 +26,16 @@
 // tainted the canvas on drawImage → "Tainted canvases may not be
 // exported". Now the modal fetches the JPEG bytes off disk via the
 // `screenshots.getBlob` IPC channel, builds a `blob:` URL, and uses that
-// as the <img> src. blob: URLs are same-origin so no canvas taint. The
-// renderer no longer needs the Lightbox-supplied `src` for display; we
-// keep it as an optional fallback for tests/renderers that haven't
-// wired the IPC.
+// as the <img> src. blob: URLs are same-origin so no canvas taint.
 //
-// Polygon vertices are tracked in DISPLAYED coordinates (what the doctor
-// sees) and converted to NATURAL pixels on Apply. Same scaling logic as
-// the rectangle path; cropping at display resolution would throw away
-// detail on a downscaled 1280px capture.
+// Polygon / rectangle / freehand vertices are tracked in DISPLAYED
+// coordinates (what the doctor sees) and converted to NATURAL pixels on
+// Apply. Same scaling logic as the rectangle path; cropping at display
+// resolution would throw away detail on a downscaled 1280px capture.
 //
-// Deviation (documented in SUMMARY.md): the polygon collapses to its
+// Deviation (documented in SUMMARY.md): the selection collapses to its
 // axis-aligned bounding box on BOTH sides (renderer + main). The UI
-// shows the free-form polygon, but the cropped region is the bbox. A
+// shows the free-form shape, but the cropped region is the bbox. A
 // future Plan 1.1 can swap to per-pixel polygon masking via main-side
 // canvas, but v1 keeps the change minimal.
 
@@ -59,8 +65,18 @@ export type ScreenshotCropModalProps = {
 
 const JPEG_QUALITY = 0.9;
 const MIN_POLYGON_VERTICES = 3;
+// ponytail: 5px is the "trace but don't oversample" sweet spot on
+// retina + regular DPI displays. Tune up if SVG render shows visible
+// polyline zig-zag on fast drags; down if we hit 1k+ vertices.
+const FREEHAND_MIN_DELTA_PX = 5;
+// Minimum rectangle side (in display pixels) to commit. Smaller than
+// this is treated as an accidental click and ignored.
+const RECT_MIN_DIM_PX = 10;
 
 type DisplayPoint = { x: number; y: number };
+type Mode = 'rectangle' | 'freehand' | 'polygon';
+
+type DragRect = { start: DisplayPoint; end: DisplayPoint };
 
 // Compute the bounding box of a polygon (axis-aligned). v1 simplification.
 function polygonBBox(points: CropPolygon): { x: number; y: number; width: number; height: number } {
@@ -86,10 +102,26 @@ export function ScreenshotCropModal({
 }: ScreenshotCropModalProps): JSX.Element {
   const { t } = useTranslation();
   const imgRef = useRef<HTMLImageElement | null>(null);
-  // Polygon vertices in DISPLAY coordinates. Empty = no polygon yet.
-  const [points, setPoints] = useState<DisplayPoint[]>([]);
-  // Image src — either a `blob:` URL we created from the IPC fetcher, OR
-  // the Lightbox-provided src as a fallback (kept for backward compat).
+
+  // Phase 8 / Plan 16 (G-08-9) — mode toggle. Default 'rectangle' so a
+  // routine crop is one drag, no clicks. Rectangle mode is by far the
+  // most common clinical case (a doctor crops out the scope chrome or
+  // a region of interest — both are rectangles).
+  const [mode, setMode] = useState<Mode>('rectangle');
+  // The committed selection, in DISPLAY coordinates. Empty = nothing
+  // to apply yet. All three modes write into this same field so the
+  // IPC contract (polygon → bbox) is unchanged.
+  const [finalPolygon, setFinalPolygon] = useState<DisplayPoint[]>([]);
+  // Rectangle mode drag-in-progress: {start, end} set on mousedown, end
+  // updated by mousemove. null outside an active drag. The functional
+  // setter pattern keeps `rect` consistent across close-spaced events
+  // (React 18 batches updates across the same tick — closures of
+  // stale rect state are the default trap we avoid here).
+  const [rect, setRect] = useState<DragRect | null>(null);
+  // Freehand mode drag-in-progress: sample list. Resets on mouseup or
+  // on switch out of freehand.
+  const [freehandPath, setFreehandPath] = useState<DisplayPoint[]>([]);
+
   const [imgSrc, setImgSrc] = useState<string | null>(src ?? null);
   const [applying, setApplying] = useState(false);
   const [imgError, setImgError] = useState<string | null>(null);
@@ -99,7 +131,9 @@ export function ScreenshotCropModal({
   // revoked on close/unmount to free the allocation.
   useEffect(() => {
     if (!open) {
-      setPoints([]);
+      setFinalPolygon([]);
+      setRect(null);
+      setFreehandPath([]);
       setImgError(null);
       // Note: image src is revoked in the cleanup below when the effect
       // re-runs (open=false). Keep state simple.
@@ -134,11 +168,7 @@ export function ScreenshotCropModal({
         }
         // Fall back to the caller-provided src if it exists.
         setImgSrc(src ?? null);
-        setImgError(
-          result.code === 'IPC_SCREENSHOT_NOT_FOUND'
-            ? t('screenshot.cropFailed')
-            : t('screenshot.cropFailed'),
-        );
+        setImgError(t('screenshot.cropFailed'));
       } catch {
         if (cancelled) return;
         setImgSrc(src ?? null);
@@ -152,6 +182,15 @@ export function ScreenshotCropModal({
     };
   }, [open, screenshotId, src, t]);
 
+  // Reset every selection state — used by the mode toggle buttons and
+  // the Clear button. Switching modes mid-selection should never leave a
+  // half-drawn rect visible behind a fresh freehand path.
+  function clearAll(): void {
+    setFinalPolygon([]);
+    setRect(null);
+    setFreehandPath([]);
+  }
+
   // Map a mouse event to DISPLAY pixel coords, clamped to the image's
   // bounding rect (snapped to image bounds per Plan 15 MUST-have).
   function pointFromEvent(e: React.MouseEvent): DisplayPoint | null {
@@ -164,46 +203,120 @@ export function ScreenshotCropModal({
     };
   }
 
-  function handleSurfaceClick(e: React.MouseEvent): void {
+  // Surface drag/click handlers — mode-aware.
+  function handleSurfaceMouseDown(e: React.MouseEvent): void {
     const p = pointFromEvent(e);
     if (!p) return;
-    setPoints((prev) => [...prev, p]);
-  }
-
-  function handleSurfaceDoubleClick(): void {
-    // Double-click finalizes if we already have at least 3 vertices;
-    // otherwise treat as a no-op (mirrors v1 — min 3 to define a shape).
-    if (points.length >= MIN_POLYGON_VERTICES) {
-      // No additional state mutation here — the points are already in
-      // state; Apply uses them. Finalize is implicit (until cleared).
-      return;
+    if (mode === 'rectangle') {
+      setRect({ start: p, end: p });
+    } else if (mode === 'freehand') {
+      setFreehandPath([p]);
+    } else {
+      // Polygon mode — mousedown adds a vertex. We intentionally do
+      // NOT use onClick here because a polygon-mode user might also
+      // drag (intentionally or otherwise) — mousedown is the explicit
+      // "place a point" action; mouseup does nothing in polygon mode.
+      setFinalPolygon((prev) => [...prev, p]);
     }
   }
 
-  function handleClearPolygon(): void {
-    setPoints([]);
+  function handleSurfaceMouseMove(e: React.MouseEvent): void {
+    const p = pointFromEvent(e);
+    if (!p) return;
+    if (mode === 'rectangle') {
+      // Functional setState — see rect/setRect note above.
+      setRect((prev) => (prev ? { start: prev.start, end: p } : null));
+    } else if (mode === 'freehand') {
+      setFreehandPath((prev) => {
+        if (prev.length === 0) return prev;
+        const last = prev[prev.length - 1]!;
+        if (Math.hypot(p.x - last.x, p.y - last.y) >= FREEHAND_MIN_DELTA_PX) {
+          return [...prev, p];
+        }
+        return prev;
+      });
+    }
+    // Polygon mode ignores mousemove.
   }
 
-  function handleRemoveLastVertex(): void {
-    setPoints((prev) => prev.slice(0, -1));
+  function handleSurfaceMouseUp(e: React.MouseEvent): void {
+    if (mode === 'rectangle') {
+      // Read the mouseup point from the event so the commit width/height
+      // matches where the user actually released. React 18 batching
+      // means the last `setRect(end)` from handleSurfaceMouseMove may
+      // not have flushed before this handler runs — relying on state
+      // here would commit a stale bbox. The start point is from the
+      // functional-setter closure which IS the latest committed state.
+      const releasePoint = pointFromEvent(e);
+      setRect((prev) => {
+        if (!prev) return null;
+        const startPoint = prev.start;
+        const endPoint = releasePoint ?? prev.end;
+        const x = Math.min(startPoint.x, endPoint.x);
+        const y = Math.min(startPoint.y, endPoint.y);
+        const w = Math.abs(endPoint.x - startPoint.x);
+        const h = Math.abs(endPoint.y - startPoint.y);
+        if (w >= RECT_MIN_DIM_PX && h >= RECT_MIN_DIM_PX) {
+          // Convert rect to a 4-corner polygon so the IPC contract is
+          // uniform across modes.
+          setFinalPolygon([
+            { x, y },
+            { x: x + w, y },
+            { x: x + w, y: y + h },
+            { x, y: y + h },
+          ]);
+        }
+        return null;
+      });
+      return;
+    }
+    if (mode === 'freehand') {
+      // Append the release point as the final sample so the committed
+      // path always reaches the cursor's release position (otherwise the
+      // path stops at the last 5px-gated sample).
+      const releasePoint = pointFromEvent(e);
+      setFreehandPath((prev) => {
+        let path = prev;
+        if (releasePoint !== null) {
+          path = [...prev, releasePoint];
+        }
+        if (path.length >= MIN_POLYGON_VERTICES) {
+          setFinalPolygon(path);
+        }
+        return [];
+      });
+    }
   }
 
-  // Keyboard: Escape cancels the polygon; Backspace removes the last
-  // vertex. Bound on the wrapping div so the focus must be on the modal
-  // (the Dialog content handles Escape already; we only handle Backspace).
+  // If the cursor leaves the surface mid-drag the natural next event is
+  // a mouseup on something else (the modal overlay, the dialog backdrop).
+  // We don't listen globally for mouseup — but we DO cancel the in-progress
+  // shape on leave, so a partial commit doesn't leak as a preview.
+  function handleSurfaceMouseLeave(): void {
+    if (mode === 'rectangle') {
+      setRect(null);
+    } else if (mode === 'freehand') {
+      setFreehandPath([]);
+    }
+  }
+
+  // Keyboard: Escape clears the selection; Backspace removes the last
+  // vertex. Bound on the wrapping div. Polygon-style backspace also
+  // works on a committed rectangle (drops one corner) — degenerate but
+  // harmless; it still feeds the same IPC pipeline.
   function handleKeyDown(e: React.KeyboardEvent): void {
-    if (e.key === 'Backspace' && points.length > 0) {
+    if (e.key === 'Backspace' && finalPolygon.length > 0) {
       e.preventDefault();
-      handleRemoveLastVertex();
-    } else if (e.key === 'Escape' && points.length > 0) {
+      setFinalPolygon((prev) => prev.slice(0, -1));
+    } else if (e.key === 'Escape' && finalPolygon.length > 0) {
       e.preventDefault();
-      handleClearPolygon();
+      setFinalPolygon([]);
     }
   }
 
   async function handleApply(): Promise<void> {
     const img = imgRef.current;
-    if (!img || points.length < MIN_POLYGON_VERTICES) return;
+    if (!img || finalPolygon.length < MIN_POLYGON_VERTICES) return;
 
     // Displayed → natural pixels. A zero-width rect only happens in a
     // detached/unlaid-out DOM; fall back to 1:1 rather than dividing by 0.
@@ -214,8 +327,8 @@ export function ScreenshotCropModal({
     const naturalWidth = img.naturalWidth || Math.round(displayed.width) || 1;
     const naturalHeight = img.naturalHeight || Math.round(displayed.height) || 1;
 
-    // Convert polygon vertices to natural pixels, then bbox.
-    const naturalPolygon: CropPolygon = points.map((p) => ({
+    // Convert the selection to natural pixels, then bbox.
+    const naturalPolygon: CropPolygon = finalPolygon.map((p) => ({
       x: Math.round(p.x * scaleX),
       y: Math.round(p.y * scaleY),
     }));
@@ -267,7 +380,7 @@ export function ScreenshotCropModal({
       if (result.ok) {
         toast.success(t('screenshot.cropSuccess'));
         onCropped({ ...result.newDimensions, byteSize: result.byteSize });
-        setPoints([]);
+        setFinalPolygon([]);
         onClose();
         return;
       }
@@ -283,8 +396,17 @@ export function ScreenshotCropModal({
     }
   }
 
-  // SVG polygon points attribute: "x,y x,y ..."
-  const pointsAttr = points.map((p) => `${p.x},${p.y}`).join(' ');
+  // SVG geometries (display coords).
+  const rectPreview = rect !== null
+    ? {
+        x: Math.min(rect.start.x, rect.end.x),
+        y: Math.min(rect.start.y, rect.end.y),
+        width: Math.abs(rect.end.x - rect.start.x),
+        height: Math.abs(rect.end.y - rect.start.y),
+      }
+    : null;
+  const finalPolyAttr = finalPolygon.map((p) => `${p.x},${p.y}`).join(' ');
+  const freehandAttr = freehandPath.map((p) => `${p.x},${p.y}`).join(' ');
 
   return (
     <Dialog
@@ -297,9 +419,63 @@ export function ScreenshotCropModal({
         <DialogHeader>
           <DialogTitle>{t('screenshot.cropModalTitle')}</DialogTitle>
           <DialogDescription>
-            {t('screenshot.cropPolygonHint')}
+            {mode === 'polygon'
+              ? t('screenshot.cropPolygonHint')
+              : t('screenshot.cropModeHint')}
           </DialogDescription>
         </DialogHeader>
+
+        {/* Phase 8 / Plan 16 (G-08-9) — mode toggle. Clicking a mode
+            clears any in-progress selection so the user can't carry a
+            half-drawn rect across into a freehand path. */}
+        <div
+          className="flex gap-2 border-b border-border pb-3"
+          data-testid="screenshot-crop-mode-toggle"
+        >
+          <Button
+            variant={mode === 'rectangle' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (mode !== 'rectangle') {
+                clearAll();
+                setMode('rectangle');
+              }
+            }}
+            data-testid="screenshot-crop-mode-rectangle"
+            disabled={applying}
+          >
+            {t('screenshot.cropModeRectangle')}
+          </Button>
+          <Button
+            variant={mode === 'freehand' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (mode !== 'freehand') {
+                clearAll();
+                setMode('freehand');
+              }
+            }}
+            data-testid="screenshot-crop-mode-freehand"
+            disabled={applying}
+          >
+            {t('screenshot.cropModeFreehand')}
+          </Button>
+          <Button
+            variant={mode === 'polygon' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => {
+              if (mode !== 'polygon') {
+                clearAll();
+                setMode('polygon');
+              }
+            }}
+            data-testid="screenshot-crop-mode-polygon"
+            disabled={applying}
+          >
+            {t('screenshot.cropModePolygon')}
+          </Button>
+        </div>
+
         <div className="flex justify-center rounded bg-black">
           {/* ponytail: the SVG overlay is positioned against THIS box, so it
               must hug the image exactly — `w-fit` + `relative` on the
@@ -307,8 +483,10 @@ export function ScreenshotCropModal({
           <div
             className="relative w-fit select-none"
             tabIndex={0}
-            onClick={handleSurfaceClick}
-            onDoubleClick={handleSurfaceDoubleClick}
+            onMouseDown={handleSurfaceMouseDown}
+            onMouseMove={handleSurfaceMouseMove}
+            onMouseUp={handleSurfaceMouseUp}
+            onMouseLeave={handleSurfaceMouseLeave}
             onKeyDown={handleKeyDown}
             data-testid="screenshot-crop-surface"
           >
@@ -340,26 +518,54 @@ export function ScreenshotCropModal({
             />
             {/* SVG overlay — covers the image's bounding box exactly.
                 No canvas; the polygon is a vector <polygon> + <circle> vertex dots.
-                The SVG is pointer-events:none so all clicks land on the surface. */}
-            {points.length > 0 ? (
+                The SVG is pointer-events:none so all drags land on the surface. */}
+            {(rectPreview !== null && rectPreview.width > 0 && rectPreview.height > 0) ||
+            freehandPath.length >= 2 ||
+            finalPolygon.length >= 2 ? (
               <svg
                 className="pointer-events-none absolute inset-0 h-full w-full"
                 data-testid="screenshot-crop-overlay"
               >
-                {points.length >= 2 ? (
-                  // Draw an open polyline for the in-progress polygon.
-                  // When the polygon is closed (>=3 vertices + a recent
-                  // double-click would close it), but v1 keeps it open
-                  // visually until Apply — the bbox crop matches either.
+                {/* Rectangle mode — live drag preview only. The committed
+                    rectangle becomes finalPolygon (4 corners) and renders
+                    via the polyline/vertex paths below. */}
+                {rectPreview !== null && rectPreview.width > 0 && rectPreview.height > 0 ? (
+                  <rect
+                    x={rectPreview.x}
+                    y={rectPreview.y}
+                    width={rectPreview.width}
+                    height={rectPreview.height}
+                    fill="rgba(59,130,246,0.2)"
+                    stroke="rgb(59,130,246)"
+                    strokeWidth={2}
+                    data-testid="screenshot-crop-rect-preview"
+                  />
+                ) : null}
+                {/* Freehand mode — live drag polyline. Closes only on commit
+                    (the render of finalPolygon below shows the closed shape). */}
+                {freehandPath.length >= 2 ? (
                   <polyline
-                    points={pointsAttr}
+                    points={freehandAttr}
+                    fill="none"
+                    stroke="rgb(59,130,246)"
+                    strokeWidth={2}
+                    strokeDasharray="4 2"
+                    data-testid="screenshot-crop-freehand-preview"
+                  />
+                ) : null}
+                {/* Committed selection — rectangle (4 corners), polygon,
+                    or freehand sampled path all render the same way: a
+                    filled polyline + per-vertex dots. */}
+                {finalPolygon.length >= 2 ? (
+                  <polyline
+                    points={finalPolyAttr}
                     fill="rgba(59,130,246,0.2)"
                     stroke="rgb(59,130,246)"
                     strokeWidth={2}
                     data-testid="screenshot-crop-polyline"
                   />
                 ) : null}
-                {points.map((p, idx) => (
+                {finalPolygon.map((p, idx) => (
                   <circle
                     key={idx}
                     cx={p.x}
@@ -384,7 +590,7 @@ export function ScreenshotCropModal({
             ) : null}
           </div>
         </div>
-        {points.length > 0 && points.length < MIN_POLYGON_VERTICES ? (
+        {finalPolygon.length > 0 && finalPolygon.length < MIN_POLYGON_VERTICES ? (
           <p
             className="text-center text-sm text-amber-500"
             data-testid="screenshot-crop-hint-min"
@@ -404,9 +610,9 @@ export function ScreenshotCropModal({
           <Button
             variant="ghost"
             onClick={() => {
-              handleClearPolygon();
+              clearAll();
             }}
-            disabled={applying || points.length === 0}
+            disabled={applying || finalPolygon.length === 0}
             data-testid="screenshot-crop-clear"
           >
             {t('common.clear')}
@@ -415,7 +621,7 @@ export function ScreenshotCropModal({
             onClick={() => {
               void handleApply();
             }}
-            disabled={applying || points.length < MIN_POLYGON_VERTICES}
+            disabled={applying || finalPolygon.length < MIN_POLYGON_VERTICES}
             data-testid="screenshot-crop-apply"
           >
             {applying ? t('screenshot.cropInProgress') : t('screenshot.cropApply')}

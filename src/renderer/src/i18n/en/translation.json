@@ -540,6 +540,10 @@
     "cropInProgress": "Cropping…",
     "cropSelectHint": "Drag to select an area",
     "cropPolygonHint": "Click to add points · Double-click to finish · Esc to cancel · Backspace to remove the last point",
+    "cropModeRectangle": "Rectangle",
+    "cropModeFreehand": "Free-hand",
+    "cropModePolygon": "Polygon",
+    "cropModeHint": "Choose a mode, then drag to select",
     "cropAtLeastThreePoints": "Add at least 3 points to define a shape",
     "cropInvalid": "Selection must be inside the image",
     "cropFailed": "Crop failed"

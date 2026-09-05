@@ -548,6 +548,10 @@
     "cropInProgress": "جارٍ القص…",
     "cropSelectHint": "اسحب لتحديد منطقة",
     "cropPolygonHint": "انقر لإضافة نقاط · انقر مرتين للإنهاء · Esc للإلغاء · Backspace لحذف آخر نقطة",
+    "cropModeRectangle": "مستطيل",
+    "cropModeFreehand": "يدوي حر",
+    "cropModePolygon": "مضلع",
+    "cropModeHint": "اختر نمطاً، ثم اسحب للتحديد",
     "cropAtLeastThreePoints": "أضف 3 نقاط على الأقل لتحديد شكل",
     "cropInvalid": "يجب أن يكون التحديد داخل الصورة",
     "cropFailed": "فشل القص"

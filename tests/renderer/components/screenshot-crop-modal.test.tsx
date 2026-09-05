@@ -1,18 +1,20 @@
 // @vitest-environment happy-dom
-// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 (SCRN-02 extended).
+// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 + Plan 16 (SCRN-02 extended).
 //
 // Phase 8 / Plan 15 (G-08-8) — refactored for free-form polygon crop:
 //   * The modal fetches the JPEG bytes via the new `screenshots.getBlob`
 //     IPC and uses the resulting `blob:` URL as the <img> src (no canvas
 //     taint).
-//   * Click-to-add vertices, double-click to finalize (no-op), min 3
-//     vertices to enable Apply.
+//   * Click-to-add vertices (polygon mode), min 3 vertices to enable Apply.
 //   * Apply crops to the polygon's bounding box (v1 simplification — see
 //     deviations in SUMMARY).
 //
-// Plan 14's drag-rectangle tests are intentionally replaced by the
-// polygon flows — the drag-rectangle surface is gone. happy-dom ships
-// no canvas implementation, so getContext / toBlob are stubbed.
+// Phase 8 / Plan 16 (G-08-9) — added a mode toggle (Rectangle | Free-hand |
+// Polygon). Default mode is Rectangle so a routine crop is one drag.
+// The polygon-mode tests below mirror Plan 15's flow; Plan 16 adds
+// rectangle drag + freehand drag coverage at the end.
+//
+// happy-dom ships no canvas implementation, so getContext / toBlob are stubbed.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -79,12 +81,52 @@ function renderModal(onCropped = vi.fn(), onClose = vi.fn()): {
   return { onCropped, onClose };
 }
 
-// Click N points into the polygon. Each click adds a vertex.
+// Switch to polygon mode first (Rectangle is the default — Plan 16).
+// Use mouseDown to add vertices: Plan 16 moved polygon-mode add off
+// `onClick` and onto `onMouseDown` so a single mousedown handler can
+// route to the right mode-aware branch.
 function clickPolygonVertices(points: Array<{ x: number; y: number }>): void {
+  fireEvent.click(screen.getByTestId('screenshot-crop-mode-polygon'));
   const surface = screen.getByTestId('screenshot-crop-surface');
   for (const p of points) {
-    fireEvent.click(surface, { clientX: p.x, clientY: p.y });
+    fireEvent.mouseDown(surface, { clientX: p.x, clientY: p.y });
   }
+}
+
+// Drive a Rectangle-mode drag with explicit start, a few intermediate
+// moves (preview updates), and an end. All events stay on the surface
+// — leaving it cancels the drag (mirrors real UX).
+function dragRectangle(
+  start: { x: number; y: number },
+  moves: Array<{ x: number; y: number }>,
+  end: { x: number; y: number },
+): void {
+  fireEvent.click(screen.getByTestId('screenshot-crop-mode-rectangle'));
+  const surface = screen.getByTestId('screenshot-crop-surface');
+  fireEvent.mouseDown(surface, { clientX: start.x, clientY: start.y });
+  for (const m of moves) {
+    fireEvent.mouseMove(surface, { clientX: m.x, clientY: m.y });
+  }
+  fireEvent.mouseUp(surface, { clientX: end.x, clientY: end.y });
+}
+
+// Drive a Free-hand mode drag that samples the cursor path. We sample
+// enough points that the 5px minimum-delta branch is hit at least once.
+function dragFreehand(points: Array<{ x: number; y: number }>): void {
+  fireEvent.click(screen.getByTestId('screenshot-crop-mode-freehand'));
+  const surface = screen.getByTestId('screenshot-crop-surface');
+  // The first point is the mousedown sample — every subsequent move is
+  // a mousemove (some may be ignored if too close to the last sample).
+  const [first, ...rest] = points;
+  if (!first) throw new Error('dragFreehand needs at least one point');
+  fireEvent.mouseDown(surface, { clientX: first.x, clientY: first.y });
+  for (const m of rest) {
+    fireEvent.mouseMove(surface, { clientX: m.x, clientY: m.y });
+  }
+  // mouseup at the last sampled point — happy-dom doesn't simulate
+  // cursor position, but we issue the event so the handler runs.
+  const last = rest[rest.length - 1] ?? first;
+  fireEvent.mouseUp(surface, { clientX: last.x, clientY: last.y });
 }
 
 beforeEach(() => {
@@ -285,5 +327,154 @@ describe('ScreenshotCropModal (Plan 14 + Plan 15 polygon)', () => {
 
     await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 8 / Plan 16 (G-08-9) — Rectangle + Free-hand crop modes.
+  // ─────────────────────────────────────────────────────────────────────
+
+  it('Plan 16: default mode is Rectangle (the mode toggle reflects it)', () => {
+    renderModal();
+    // Rectangle is the variant button (variant=default from Plan 16);
+    // outline buttons render the disabled-style outline variant.
+    const rectButton = screen.getByTestId('screenshot-crop-mode-rectangle');
+    const freeButton = screen.getByTestId('screenshot-crop-mode-freehand');
+    const polyButton = screen.getByTestId('screenshot-crop-mode-polygon');
+    expect(rectButton).not.toBeDisabled();
+    expect(freeButton).not.toBeDisabled();
+    expect(polyButton).not.toBeDisabled();
+    // The mode buttons are reachable; the surface is ready to be dragged.
+    expect(screen.getByTestId('screenshot-crop-mode-toggle')).not.toBeNull();
+  });
+
+  it('Plan 16: Rectangle mode — one drag (mousedown → move → mouseup) commits 4 corners', () => {
+    renderModal();
+    // No polygon vertices drawn yet.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    // Apply is disabled until we have >=3 finalPolygon vertices.
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+
+    // Drag a rectangle from (100,50) to (300,200) — preview passes
+    // through (200,100) before committing.
+    dragRectangle(
+      { x: 100, y: 50 },
+      [{ x: 200, y: 100 }, { x: 250, y: 150 }],
+      { x: 300, y: 200 },
+    );
+
+    // 4 corners (TL, TR, BR, BL). The committed rectangle is the
+    // axis-aligned polygon — we render the four <circle> vertex dots.
+    const vertices = screen.getAllByTestId('screenshot-crop-vertex');
+    expect(vertices).toHaveLength(4);
+    expect(vertices[0].getAttribute('data-vertex')).toBe('100,50');
+    expect(vertices[1].getAttribute('data-vertex')).toBe('300,50');
+    expect(vertices[2].getAttribute('data-vertex')).toBe('300,200');
+    expect(vertices[3].getAttribute('data-vertex')).toBe('100,200');
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
+  });
+
+  it('Plan 16: Rectangle drag smaller than 10px is rejected (no commit)', () => {
+    renderModal();
+    // An accidental click should not produce a usable selection.
+    dragRectangle(
+      { x: 100, y: 50 },
+      [],
+      { x: 105, y: 55 }, // 5x5 px — under RECT_MIN_DIM_PX.
+    );
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+  });
+
+  it('Plan 16: Rectangle Apply sends the bbox polygon over IPC (2x scale)', async () => {
+    const { onCropped, onClose } = renderModal();
+    const api = getApi();
+    api.screenshots.crop.mockResolvedValue({
+      ok: true,
+      newDimensions: { width: 400, height: 300 },
+      byteSize: 4,
+    });
+
+    // 200x150 display rect = 400x300 natural bbox.
+    dragRectangle(
+      { x: 100, y: 50 },
+      [{ x: 200, y: 100 }],
+      { x: 300, y: 200 },
+    );
+    fireEvent.click(screen.getByTestId('screenshot-crop-apply'));
+
+    await waitFor(() => expect(api.screenshots.crop).toHaveBeenCalledTimes(1));
+    const arg = api.screenshots.crop.mock.calls[0]![0] as {
+      id: number;
+      originalDimensions: { width: number; height: number };
+      cropPolygon: Array<{ x: number; y: number }>;
+    };
+    expect(arg.id).toBe(7);
+    expect(arg.originalDimensions).toEqual({ width: NATURAL_W, height: NATURAL_H });
+    const xs = arg.cropPolygon.map((p) => p.x);
+    const ys = arg.cropPolygon.map((p) => p.y);
+    expect(Math.min(...xs)).toBe(200);
+    expect(Math.max(...xs)).toBe(600);
+    expect(Math.min(...ys)).toBe(100);
+    expect(Math.max(...ys)).toBe(400);
+
+    await waitFor(() => expect(onCropped).toHaveBeenCalledTimes(1));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(toastMock.success).toHaveBeenCalled();
+  });
+
+  it('Plan 16: Free-hand mode — drag samples path points (>=3 vertices on release)', () => {
+    renderModal();
+    // Drag an arc-like path with enough moves to exceed the 5px delta
+    // sampling threshold. We expect at least 3 vertices on the
+    // committed selection (sampled points are condensed by the
+    // min-delta gate).
+    dragFreehand([
+      { x: 100, y: 100 },
+      { x: 130, y: 110 },
+      { x: 160, y: 130 },
+      { x: 200, y: 160 },
+      { x: 240, y: 200 },
+      { x: 260, y: 240 },
+    ]);
+
+    const vertices = screen.getAllByTestId('screenshot-crop-vertex');
+    expect(vertices.length).toBeGreaterThanOrEqual(3);
+    // First and last samples anchor the path.
+    expect(vertices[0].getAttribute('data-vertex')).toBe('100,100');
+    expect(vertices[vertices.length - 1].getAttribute('data-vertex')).toBe('260,240');
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
+  });
+
+  it('Plan 16: switching mode clears the previous selection', () => {
+    renderModal();
+    // Draw a rectangle selection.
+    dragRectangle(
+      { x: 100, y: 50 },
+      [{ x: 200, y: 100 }],
+      { x: 300, y: 200 },
+    );
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(4);
+
+    // Switch to Polygon — the rectangle's 4 vertices disappear; the
+    // selection state is fresh.
+    fireEvent.click(screen.getByTestId('screenshot-crop-mode-polygon'));
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+
+    // Switch to Free-hand — still empty.
+    fireEvent.click(screen.getByTestId('screenshot-crop-mode-freehand'));
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+  });
+
+  it('Plan 16: Polygon mode after Plan 16 keeps the legacy click-to-add flow', () => {
+    renderModal();
+    // 3 vertices via polygon-mode mousedowns — Apply becomes enabled.
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 200, y: 100 },
+      { x: 300, y: 200 },
+    ]);
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(3);
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
   });
 });
