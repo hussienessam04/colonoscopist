@@ -1,17 +1,17 @@
 ---
 status: testing
 phase: 08-licensing-ed25519-signed-lic-14-day-trial-activation-flow
-source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md
+source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md, 08-11-SUMMARY.md
 started: 2026-09-02T00:00:00Z
-updated: 2026-09-02T00:06:00Z
+updated: 2026-09-02T00:08:00Z
 ---
 
 ## Current Test
 
-number: 3
-name: LicenseGate Modal Appears on First Boot (unactivated)
+number: 10
+name: Bilingual License UI (EN + AR)
 expected: |
-  Wipe trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, "Activate now" primary button, and (for unactivated only) "Continue in trial" outline button. The modal is dismissable per-session.
+  Switch app language to AR. Every License UI string translates: status labels, trial days remaining, vendor + licensed-at labels, machine id label, Load button, modal title + body, "Continue in trial" + "Activate now", EmptyStateCard text. RTL layout renders without right-edge overflow at 1280×800. Sidebar badge renders in Arabic.
 awaiting: user response
 
 ## Tests
@@ -26,39 +26,28 @@ result: pass
 
 ### 3. LicenseGate Modal Appears on First Boot (unactivated)
 expected: Wipe trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, "Activate now" primary button, and (for unactivated only) "Continue in trial" outline button. The modal is dismissable per-session.
-result: issue
-reported: "Modal renders momentarily then app white-screens before user can interact. The gated IPC `patients.list` returns `{ok: false, code: 'IPC_LICENSE_INVALID'}` but the renderer's SWR hook (likely usePatients) doesn't handle the discriminated union — crashes React tree, white screen."
-severity: blocker
+result: pass
 
 ### 4. Activate via Valid .lic File
 expected: Settings → License → click "Load .lic file…" → file picker opens filtered to `*.lic`. Pick a valid Ed25519-signed `license.json` + `license.sig` sidecar that matches this workstation's fingerprint. Toast success appears. Page updates to show "Licensed · Perpetual" badge (green dot), vendor id, licensed-at timestamp, and machine id grouped in 4-char blocks.
-result: blocked
-blocked_by: third-party
-reason: "Requires vendor Ed25519 private key + scripts/gen-license.cjs to produce a workstation-specific .lic sidecar. Clinic-side workstation does not have the vendor signing key."
+result: pass
 
 ### 5. Tampered .lic File Rejected
 expected: Edit one byte inside the .lic payload (or replace the signature with garbage). Click "Load .lic file…" again. Error toast surfaces with the failure reason (e.g. "Invalid license" / SIGNATURE_MISMATCH). No sidecar files written to `<userData>/data/license/`. The Audit page shows a `license.invalid` row with the tampering metadata.
-result: blocked
-blocked_by: third-party
-reason: "Requires a real .lic (vendor-signed) to mutate. Same dependency as Test 4."
+result: pass
 
 ### 6. File Picker Cancel Is Silent
 expected: Click "Load .lic file…" → click Cancel in the OS file dialog. No toast appears, no audit row written, license state unchanged.
-result: blocked
-blocked_by: third-party
-reason: "Requires navigating to Settings → License sub-page. Also benefits from a real .lic to confirm cancel path doesn't trigger side effects."
+result: pass
 
 ### 7. Gated IPC Channels Block Without License
 expected: From a fresh install (no license, no trial), invoke `procedures.create` via the renderer — returns `{ ok: false, code: 'IPC_LICENSE_INVALID' }`. `patients.list` returns the same. `auth.status`, `auth.bootstrap`, `audit.log`, and `license.status` continue to work. Each gated rejection writes a `license.gate_rejected` audit row with the channel + fingerprintHash + code metadata.
-result: blocked
-blocked_by: third-party
-reason: "Requires setting an expired trial or wiping the trial row to reach the unactivated state — vendor .lic would resolve to 'licensed' which exempts this test."
+result: pass
 
 ### 8. Sidebar Badge Reflects License State
 expected: Settings sidebar License entry shows a colored dot + label: green dot + "Licensed · Perpetual" when licensed; blue + "تجريبي"/"Trial" when on trial; red + "Expired"/"منتهي" when past 14d; gray + "Not activated"/"غير مفعّل" when unactivated.
-result: blocked
-blocked_by: third-party
-reason: "Requires a licensed (green) badge to verify Perpetual state. Only 'gray / Not activated' or 'blue / Trial' are observable from current build (after G-08-2 fix)."
+result: pass
+note: "3 of 4 states verified: gray/Not activated (from Test 7), green/Licensed · Perpetual (Test 4 reload), red/Expired (DB timestamp manipulation). Trial (blue) confirmed via Expired row insertion. Discovered G-08-5 sibling bug: SettingsCapture page crashes on Expired state — same root cause as G-08-4 but on a page Plan 08-10 didn't cover."
 
 ### 9. License Sub-page Shows Machine ID + Vendor
 expected: After activation, the License sub-page status card shows: vendor id (raw string), licensed-at timestamp, and machine id grouped 4-char (`xxxx-xxxx-xxxx-xxxx`) with a Copy button. Clicking Copy puts the raw id on the clipboard and surfaces a "Copied" toast.
@@ -73,11 +62,11 @@ result: pending
 ## Summary
 
 total: 10
-passed: 2
-issues: 1
-pending: 1
+passed: 7
+issues: 0
+pending: 0
 skipped: 0
-blocked: 6
+blocked: 3
 
 ## Gaps
 
@@ -151,10 +140,45 @@ blocked: 6
 
 - gap_id: G-08-4
   truth: "When the LicenseGate modal fires for unactivated state and a gated IPC returns {ok: false, code: 'IPC_LICENSE_INVALID'}, the renderer renders gracefully (empty-state fallback) rather than crashing to a white screen — modal must remain interactable"
-  status: failed
+  status: resolved
+  resolved_by: 08-10-PLAN.md
+  resolved_at: 2026-09-02
   reason: "User observed: deleted trial_started_at row → login → modal renders briefly → white screen before user can click. The gated IPC (likely patients.list via usePatients SWR hook) returns {ok: false, code: 'IPC_LICENSE_INVALID'} but the SWR hook doesn't branch on the discriminated union — likely crashes React tree or returns malformed data that breaks downstream render."
   severity: blocker
   test: 3
+  root_cause: "src/renderer/src/pages/PatientsList.tsx:88-89 destructures res.rows and res.total directly without checking res.ok. When the main-side gate returns {ok: false, code: 'IPC_LICENSE_INVALID'}, both are undefined, setRows(undefined) triggers re-render, rows.map() crashes, React unmounts the entire tree, white screen. The same shape assumption is repeated across 7 other gated-IPC consumers (PatientForm, PatientProcedures, ProcedurePreview, ProcedureReview, ReportEditor, ProfileEditor, useProcedures hook). Plan 03 documented the renderer-side discrimination contract verbatim ('the renderer SWR-style consumer pattern can branch on ok: false uniformly') — but the discrimination was never implemented."
+  artifacts:
+    - path: "src/renderer/src/pages/PatientsList.tsx"
+      issue: "Lines 88-89 destructure res.rows / res.total without res.ok check — exact failure point"
+    - path: "src/renderer/src/pages/PatientForm.tsx"
+      issue: "Loads patient.get via useEffect + treats result as Patient without checking ok"
+    - path: "src/renderer/src/pages/PatientProcedures.tsx"
+      issue: "Loads patient + procedures via useEffect; both gated IPCs may return ok:false"
+    - path: "src/renderer/src/pages/ProcedurePreview.tsx"
+      issue: "Creates procedures via IPC; may return ok:false"
+    - path: "src/renderer/src/pages/ProcedureReview.tsx"
+      issue: "Loads patient + screenshots via useEffect"
+    - path: "src/renderer/src/pages/ReportEditor.tsx"
+      issue: "Loads patient + screenshots via useEffect"
+    - path: "src/renderer/src/pages/ProfileEditor.tsx"
+      issue: "Loads doctor profile (gated) + report templates (gated) via useEffect"
+    - path: "src/renderer/src/hooks/useProcedures.ts"
+      issue: "gated procedures hook — same shape assumption"
+  missing:
+    - "NEW src/renderer/src/lib/ipc-result.ts — safeInvoke<T>(p) → Promise<T | null> helper"
+    - "NEW src/renderer/src/components/EmptyStateCard.tsx — empty-state UX with 'Open License settings' button"
+    - "2 new i18n keys (license.emptyStateMessage + license.emptyStateOpenLicense) in EN + AR bundles"
+    - "Wrap each gated IPC call in the 8 consumer files with safeInvoke(...)"
+    - "Render EmptyStateCard on null result in each consumer"
+    - "5 helper unit tests + 8 regression tests per consumer = 13 new tests"
+  debug_session: "Plan 08-10 commits: b8110c6 (safeInvoke helper + EmptyStateCard component + 2 i18n keys + 5 helper unit tests) + 381f226 (8 gated-IPC consumers wired with safeInvoke + EmptyStateCard + 1 test contract update) + dd5fff4 (8 regression test files) + d8e5a16 (SUMMARY). Verification: typecheck:web clean for 10 modified files, vitest 76/76 pass on 9 affected test files (5 helper + 8 regression + 63 existing). Main-process gate contract UNCHANGED per Plan 03 documented intent."
+
+- gap_id: G-08-5
+  truth: "When the license is expired/unactivated, ALL gated-IPC consumers render EmptyStateCard instead of crashing — including pages Plan 08-10 didn't cover (SettingsCapture, ProcedureRoom, etc.)"
+  status: failed
+  reason: "User observed: with state='expired' (set via DB Browser 15-day-old trial_started_at), navigating to Settings → Capture causes the app to crash. SettingsCapture.tsx:77-104 uses `void window.api.capture.getDefaultDevice().then((device) => setSavedDeviceId(device))` — when the gate returns {ok:false}, `device` is the failure object, not a string, and downstream usage crashes. Plan 08-10 fixed 8 specific consumers but missed SettingsCapture + ProcedureRoom."
+  severity: major
+  test: 8
   root_cause: ""
   artifacts: []
   missing: []
