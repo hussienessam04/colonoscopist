@@ -245,9 +245,13 @@ export function mockApi(): MockApi {
       // Plan 15 (G-08-8) — default getBlob resolves to a tiny mock JPEG
       // so the ScreenshotCropModal can boot without per-test seeding
       // (tests that need different behavior override per-test).
+      //
+      // Plan 19 (G-08-12) — `bytes` is now an ArrayBuffer (was Uint8Array).
+      // The main-side handler returns a fresh ArrayBuffer (no Buffer view);
+      // the mock mirrors that contract.
       getBlob: vi.fn().mockResolvedValue({
         ok: true,
-        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x01, 0x02]),
+        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x01, 0x02]).buffer,
         mimeType: 'image/jpeg',
       }),
     },

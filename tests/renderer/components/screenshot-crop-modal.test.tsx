@@ -702,9 +702,10 @@ describe('ScreenshotCropModal (Plan 14 + Plan 15 polygon)', () => {
     api.screenshots.getBlob
       .mockResolvedValueOnce({ ok: false, code: 'IPC_SCREENSHOT_NOT_FOUND' })
       // Second call resolves successfully — proves Retry re-runs the effect.
+      // Plan 19 (G-08-12) — bytes is now an ArrayBuffer (was Uint8Array).
       .mockResolvedValueOnce({
         ok: true,
-        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x03, 0x04]),
+        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x03, 0x04]).buffer,
         mimeType: 'image/jpeg',
       });
     renderModal();
@@ -776,5 +777,44 @@ describe('ScreenshotCropModal (Plan 14 + Plan 15 polygon)', () => {
     expect(
       screen.getByTestId('screenshot-crop-img-error').textContent,
     ).toContain('IPC channel closed');
+  });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 8 / Plan 19 (G-08-12) — ArrayBuffer round-trip.
+  //
+  // The "browser rejected blob" symptom came from the renderer receiving
+  // a Buffer-backed Uint8Array view that didn't survive IPC cleanly.
+  // The fix ships a fresh ArrayBuffer from main. These tests verify the
+  // renderer accepts the new ArrayBuffer contract (was Uint8Array) and
+  // that empty-bytes still surfaces the diagnostic error path
+  // (zero-length BlobPart is a different failure mode, fired from
+  // <img onError> rather than the IPC layer).
+  // ─────────────────────────────────────────────────────────────────────
+
+  it('Plan 19 (G-08-12): empty-bytes diagnostic surfaces "browser rejected blob" via <img onError>', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockResolvedValue({
+      ok: true,
+      bytes: new ArrayBuffer(0),
+      mimeType: 'image/jpeg',
+    });
+    renderModal();
+
+    // The fetch lands and the modal sets a blob: URL on the <img>.
+    await waitFor(() => expect(api.screenshots.getBlob).toHaveBeenCalledTimes(1));
+    const img = screen.getByTestId('screenshot-crop-img') as HTMLImageElement;
+    await waitFor(() => expect(img.src.startsWith('blob:')).toBe(true));
+
+    // The browser fires onError when the src is a blob: URL whose
+    // bytes are not a valid image. happy-dom doesn't actually fetch,
+    // so we trigger the handler directly to verify the wiring.
+    fireEvent.error(img);
+
+    await waitFor(() =>
+      expect(screen.getByTestId('crop-modal-error')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByTestId('screenshot-crop-img-error').textContent,
+    ).toContain('browser rejected blob');
   });
 });

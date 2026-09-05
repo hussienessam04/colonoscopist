@@ -47,11 +47,13 @@ describe('ScreenshotLightbox', () => {
   // `blob:` URL fetched via `screenshots.getBlob` (NOT the MediaServer
   // route). The previous Plan 14 expectation (a `/media/...` src) is
   // dead — see the file header for why we switched.
+  //
+  // Plan 19 (G-08-12) — bytes is now an ArrayBuffer (was Uint8Array).
   it('renders the <img> with a blob: URL fetched via screenshots.getBlob — G-08-10', async () => {
     const api = getApi();
     api.screenshots.getBlob.mockResolvedValue({
       ok: true,
-      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x99, 0x99]),
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x99, 0x99]).buffer,
       mimeType: 'image/jpeg',
     });
     render(
@@ -92,7 +94,7 @@ describe('ScreenshotLightbox', () => {
     const api = getApi();
     api.screenshots.getBlob.mockResolvedValue({
       ok: true,
-      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
       mimeType: 'image/jpeg',
     });
     render(
@@ -118,7 +120,7 @@ describe('ScreenshotLightbox', () => {
     const api = getApi();
     api.screenshots.getBlob.mockResolvedValue({
       ok: true,
-      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]).buffer,
       mimeType: 'image/jpeg',
     });
     render(
