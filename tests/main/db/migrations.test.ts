@@ -80,8 +80,10 @@ describe('db migrations', () => {
     // used_devices for Profile). Quick task 20260812-redesign-report
     // added migration 0010 (procedure_type + 8 box columns + templates).
     // Phase 8 / Plan 01 added migration 0011 (settings.trial_started_at).
-    // Total now = 9.
-    expect(migrations).toHaveLength(9);
+    // Phase 8 / Plan 15 (G-08-8) added migration 0012 (revert the
+    // redesign drop columns so the existing reports-repo paths work).
+    // Total now = 10.
+    expect(migrations).toHaveLength(10);
     expect(migrations[0].id).toBe(1);
 
     // Phase 7 / Plan 07-01 — verify migration 0007 added the language
@@ -118,14 +120,15 @@ describe('db migrations', () => {
     // First open
     const db1 = getDb();
     // Phase 8 / Plan 01 added migration 0011 (settings.trial_started_at).
-    // Total now = 9.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    // Phase 8 / Plan 15 (G-08-8) added migration 0012 (revert redesign
+    // drop columns). Total now = 10.
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
     closeDb();
 
     // Second open on the same file
     const db2 = getDb();
     const count = (db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c;
-    expect(count).toBe(9);
+    expect(count).toBe(10);
 
     // Sanity: same tables still present.
     const tables = (db2.prepare(
@@ -138,9 +141,9 @@ describe('db migrations', () => {
     // a second time (which would otherwise throw `duplicate column`).
     closeDb();
 
-    // Third open — confirm migration count stays at 9 (idempotency).
+    // Third open — confirm migration count stays at 10 (idempotency).
     const db3 = getDb();
-    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    expect((db3.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
     closeDb();
   });
 });

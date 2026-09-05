@@ -85,6 +85,14 @@ type MockApi = {
     updateAnnotation: ReturnType<typeof vi.fn>;
     // Phase 8 / Plan 14 — permanent crop (SCRN-02 extended).
     crop: ReturnType<typeof vi.fn>;
+    // Phase 8 / Plan 15 (G-08-8) — read JPEG bytes off disk so the
+    // renderer can build a `blob:` URL (avoids canvas-taint on crop).
+    getBlob: ReturnType<typeof vi.fn>;
+  };
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Replaces
+  // navigator.clipboard.writeText for the License page machine-id copy.
+  clipboard: {
+    copyText: ReturnType<typeof vi.fn>;
   };
   // Phase 6 / Plan 02 — Profile + Reports namespaces. Plan 06-01 wired
   // the IPC contract; the renderer pages (ProfileEditor, ReportEditor,
@@ -234,6 +242,19 @@ export function mockApi(): MockApi {
         newDimensions: { width: 10, height: 10 },
         byteSize: 4,
       }),
+      // Plan 15 (G-08-8) — default getBlob resolves to a tiny mock JPEG
+      // so the ScreenshotCropModal can boot without per-test seeding
+      // (tests that need different behavior override per-test).
+      getBlob: vi.fn().mockResolvedValue({
+        ok: true,
+        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x01, 0x02]),
+        mimeType: 'image/jpeg',
+      }),
+    },
+    // Plan 15 (G-08-8) — clipboard defaults to a no-op {ok:true} so
+    // the License page can render without crashing on the Copy button.
+    clipboard: {
+      copyText: vi.fn().mockResolvedValue({ ok: true as const }),
     },
     // Phase 6 / Plan 02 — defaults that resolve to safe empty values
     // so any page that mounts the ProfileEditor / ReportEditor on

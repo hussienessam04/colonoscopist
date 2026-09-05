@@ -1,8 +1,11 @@
-// cropScreenshot unit tests — Phase 8 / Plan 14 (SCRN-02 extended).
+// cropScreenshot unit tests — Phase 8 / Plan 14 + Plan 15 (SCRN-02 extended).
 //
-// Three cases per the plan: happy path (file overwritten + audit row),
-// out-of-bounds crop rect (IPC_INVALID_CROP), unknown id
-// (IPC_SCREENSHOT_NOT_FOUND).
+// Phase 8 / Plan 15 (G-08-8) — extended with polygon-crop coverage:
+//   * happy path with cropRect (legacy rectangle, backward compat)
+//   * happy path with cropPolygon (free-form, min 3 vertices — collapses
+//     to bbox on the main side, v1 deviation)
+//   * out-of-bounds crop rect (IPC_INVALID_CROP)
+//   * unknown id (IPC_SCREENSHOT_NOT_FOUND)
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -81,7 +84,7 @@ async function seedScreenshot(): Promise<{ id: number; userId: string; absPath: 
 }
 
 describe('cropScreenshot', () => {
-  it('overwrites the source JPEG and writes a screenshot.cropped audit row', async () => {
+  it('overwrites the source JPEG and writes a screenshot.cropped audit row (cropRect, legacy rectangle)', async () => {
     const { id, userId, absPath } = await seedScreenshot();
     const { cropScreenshot } = await import('../../../src/main/screenshots/crop');
 
@@ -89,7 +92,7 @@ describe('cropScreenshot', () => {
     const result = cropScreenshot(
       {
         id,
-        jpegBase64: croppedBytes.toString('base64'),
+        croppedBase64: croppedBytes.toString('base64'),
         originalDimensions: { width: 1280, height: 720 },
         cropRect: { x: 100, y: 50, width: 400, height: 300 },
       },
@@ -115,6 +118,51 @@ describe('cropScreenshot', () => {
     expect(metadata.newHeight).toBe(300);
     expect(metadata.byteSize).toBe(croppedBytes.byteLength);
     expect(metadata.cropRect).toEqual({ x: 100, y: 50, width: 400, height: 300 });
+    // Plan 15 (G-08-8) — audit row tags the shape.
+    expect(metadata.viaPolygon).toBe(false);
+    expect(metadata.polygonVertices).toBe(0);
+  });
+
+  it('Plan 15 (G-08-8): cropPolygon with 4 vertices collapses to the bbox on main + writes the cropped file + tags audit row', async () => {
+    const { id, userId, absPath } = await seedScreenshot();
+    const { cropScreenshot } = await import('../../../src/main/screenshots/crop');
+
+    const croppedBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x01, 0x02]);
+    // A diamond/trapezoid whose bbox is x=[100..500], y=[50..350] =>
+    // bbox = (100, 50, 400, 300). Same shape as the legacy rectangle
+    // test for comparison's sake.
+    const polygon = [
+      { x: 300, y: 50 }, // top
+      { x: 500, y: 200 }, // right
+      { x: 300, y: 350 }, // bottom
+      { x: 100, y: 200 }, // left
+    ];
+    const result = cropScreenshot(
+      {
+        id,
+        croppedBase64: croppedBytes.toString('base64'),
+        originalDimensions: { width: 1280, height: 720 },
+        cropPolygon: polygon,
+      },
+      userId,
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.newDimensions).toEqual({ width: 400, height: 300 });
+    expect(result.byteSize).toBe(croppedBytes.byteLength);
+
+    expect(readFileSync(absPath)).toEqual(croppedBytes);
+
+    const { auditRepo } = await import('../../../src/main/db/audit');
+    const { rows } = auditRepo.list({ action: 'screenshot.cropped' });
+    expect(rows).toHaveLength(1);
+    const metadata = JSON.parse(rows[0]!.metadata ?? '{}') as Record<string, unknown>;
+    // The audit row carries the bbox (the v1 collapsed shape).
+    expect(metadata.cropRect).toEqual({ x: 100, y: 50, width: 400, height: 300 });
+    // Plan 15 (G-08-8) — viaPolygon tag + vertex count for the trail.
+    expect(metadata.viaPolygon).toBe(true);
+    expect(metadata.polygonVertices).toBe(4);
   });
 
   it('rejects a crop rect that falls outside the original dimensions', async () => {
@@ -124,7 +172,7 @@ describe('cropScreenshot', () => {
     const result = cropScreenshot(
       {
         id,
-        jpegBase64: Buffer.from([0xff, 0xd8]).toString('base64'),
+        croppedBase64: Buffer.from([0xff, 0xd8]).toString('base64'),
         originalDimensions: { width: 100, height: 100 },
         cropRect: { x: 90, y: 10, width: 50, height: 10 },
       },
@@ -136,6 +184,29 @@ describe('cropScreenshot', () => {
     expect(readFileSync(absPath).toString()).toBe('ORIGINAL-BYTES');
   });
 
+  it('Plan 15 (G-08-8): a polygon whose bbox spills outside originalDimensions is rejected with IPC_INVALID_CROP', async () => {
+    const { id, userId, absPath } = await seedScreenshot();
+    const { cropScreenshot } = await import('../../../src/main/screenshots/crop');
+
+    const result = cropScreenshot(
+      {
+        id,
+        croppedBase64: Buffer.from([0xff, 0xd8]).toString('base64'),
+        originalDimensions: { width: 100, height: 100 },
+        // Bbox = (90, 10, 50, 10) -> x + width = 140 > 100 = width
+        cropPolygon: [
+          { x: 90, y: 10 },
+          { x: 140, y: 10 },
+          { x: 100, y: 20 },
+        ],
+      },
+      userId,
+    );
+
+    expect(result).toEqual({ ok: false, code: 'IPC_INVALID_CROP' });
+    expect(readFileSync(absPath).toString()).toBe('ORIGINAL-BYTES');
+  });
+
   it('returns IPC_SCREENSHOT_NOT_FOUND for an unknown id', async () => {
     const { userId } = await seedScreenshot();
     const { cropScreenshot } = await import('../../../src/main/screenshots/crop');
@@ -143,7 +214,7 @@ describe('cropScreenshot', () => {
     const result = cropScreenshot(
       {
         id: 99_999,
-        jpegBase64: Buffer.from([0xff, 0xd8]).toString('base64'),
+        croppedBase64: Buffer.from([0xff, 0xd8]).toString('base64'),
         originalDimensions: { width: 100, height: 100 },
         cropRect: { x: 0, y: 0, width: 10, height: 10 },
       },

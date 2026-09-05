@@ -195,12 +195,13 @@ describe('0008_auto_mrn migration', () => {
     const { getDb, closeDb } = await import('../../../../src/main/db');
 
     const db1 = getDb();
-    // Migration roster: 0001 + 0002 + 0003 + 0004 + 0007 + 0008 + 0009 + 0010 + 0011 = 9 entries.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    // Migration roster: 0001 + 0002 + 0003 + 0004 + 0007 + 0008 + 0009 + 0010 + 0011 + 0012 = 10 entries.
+    // (0012 = revert the redesign drop columns — Phase 8 / Plan 15.)
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
 
     closeDb();
   });

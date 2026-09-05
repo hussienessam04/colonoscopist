@@ -105,12 +105,13 @@ describe('0002_procedures migration', () => {
     // added migration 0008 (auto-MRN). Quick task 20260812-redesign-report
     // added migration 0010 (procedure_type + 8 box columns + templates).
     // Phase 8 / Plan 01 added migration 0011 (settings.trial_started_at).
-    // Total now = 9.
-    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    // Phase 8 / Plan 15 (G-08-8) added migration 0012 (revert the redesign
+    // drop columns). Total now = 10.
+    expect((db1.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
     closeDb();
 
     const db2 = getDb();
-    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(9);
+    expect((db2.prepare(`SELECT COUNT(*) AS c FROM _migrations`).get() as { c: number }).c).toBe(10);
 
     closeDb();
   });

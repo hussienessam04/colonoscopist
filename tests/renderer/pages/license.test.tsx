@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
-// License sub-page tests — Phase 8 / Plan 08-06 (LIC-03 + I18N-03).
+// License sub-page tests — Phase 8 / Plan 08-06 (LIC-03 + I18N-03)
+// + Plan 15 (G-08-8) — machine-id copy uses main-process clipboard IPC.
 //
 // Per the plan <behavior> block: 9 cases cover the License sub-page
 // surface (Plan 05 shipped the page; this plan guards the surface):
@@ -18,8 +19,11 @@
 //   7. success (IPC returns {ok:true, vendorId, licensedAt}) →
 //      toast.success + useLicenseStatus().refresh() is called (we
 //      assert the IPC.status() was called again post-activation).
-//   8. machine-id copy button → navigator.clipboard.writeText called
-//      with the raw hex (NOT the formatted grouped blocks).
+//   8. machine-id copy button → window.api.clipboard.copyText called
+//      with the raw hex (NOT the formatted grouped blocks). Plan 15
+//      (G-08-8): the main-process clipboard IPC replaces the
+//      `navigator.clipboard.writeText` path that failed in Electron
+//      sandbox for the machine-id copy.
 //   9. sidebar entry `settings-hub-license` navigates to
 //      {name: 'license'} route.
 
@@ -53,22 +57,14 @@ const toastMock = vi.hoisted(() =>
 );
 vi.mock('sonner', () => ({ toast: toastMock }));
 
-// Hoisted clipboard mock so handleCopyMachineId can call
-// navigator.clipboard.writeText without hitting the browser permission
-// surface (happy-dom does not implement it).
-const clipboardMock = vi.hoisted(() => ({
-  writeText: vi.fn().mockResolvedValue(undefined),
+// Hoisted clipboard IPC mock — Plan 15 (G-08-8) routes the machine-id
+// copy through `window.api.clipboard.copyText` (main-process Electron
+// clipboard). The mock owns this channel; we don't need the old
+// `navigator.clipboard.writeText` stub — happy-dom never crashed on
+// the IPC mock the way it crashed on `navigator.clipboard` permissions.
+const clipboardIpcMock = vi.hoisted(() => ({
+  copyText: vi.fn().mockResolvedValue({ ok: true as const }),
 }));
-// ponytail: replace the entire navigator object each test via
-// defineProperty. happy-dom restores the navigator between tests, so a
-// module-load-time stub gets wiped; this is per-test re-stubbed.
-function installClipboardMock(): void {
-  Object.defineProperty(globalThis.navigator, 'clipboard', {
-    value: clipboardMock,
-    writable: true,
-    configurable: true,
-  });
-}
 
 function setSession(): void {
   const api = getApi();
@@ -80,6 +76,9 @@ function setSession(): void {
     isFirstAdmin: true,
   });
   api.auth.usersList.mockResolvedValue([ADMIN_USER]);
+  // Plan 15 — wire the IPC clipboard mock into the test's per-test api
+  // so handleCopyMachineId can hit it.
+  api.clipboard.copyText = clipboardIpcMock.copyText as unknown as ReturnType<typeof vi.fn>;
 }
 
 function licenseStatusFor(state: LicenseStatus['state']): LicenseStatus {
@@ -99,10 +98,7 @@ beforeEach(() => {
   setRoute({ name: 'license' });
   toastMock.success.mockClear();
   toastMock.error.mockClear();
-  clipboardMock.writeText.mockClear();
-  // Re-install the clipboard mock per test — happy-dom strips it
-  // between tests because the navigator surface is re-initialized.
-  installClipboardMock();
+  clipboardIpcMock.copyText.mockClear();
 });
 
 async function renderPage(status: LicenseStatus): Promise<void> {
@@ -229,7 +225,7 @@ describe('License sub-page (LIC-03 + I18N-03)', () => {
     );
   });
 
-  it('machine-id copy button → navigator.clipboard.writeText called with the RAW hex (NOT grouped blocks)', async () => {
+  it('Plan 15 (G-08-8): machine-id copy button → window.api.clipboard.copyText called with the RAW hex (NOT grouped blocks)', async () => {
     await renderPage(licenseStatusFor('unactivated'));
     // Wait for the status card to mount (proves the hook has resolved +
     // the Card is in the DOM).
@@ -237,25 +233,23 @@ describe('License sub-page (LIC-03 + I18N-03)', () => {
     expect(card).toBeInTheDocument();
     const copyButton = await screen.findByTestId('license-copy-machine-id');
     expect(copyButton).toBeInTheDocument();
-    // Sanity: confirm the mock survived happy-dom's navigator surface.
-    expect(typeof navigator.clipboard).toBe('object');
-    expect(typeof navigator.clipboard.writeText).toBe('function');
     // Use fireEvent instead of userEvent — userEvent.click() sometimes
     // bubbles the click through the disabled parent (Button) when the
     // Card uses async state updates. fireEvent dispatches a click event
     // directly on the target.
     const { fireEvent } = await import('@testing-library/react');
     fireEvent.click(copyButton);
-    // The handler is async; flush microtasks so the clipboard write
-    // resolves before we assert.
-    await waitFor(() => expect(clipboardMock.writeText).toHaveBeenCalledTimes(1), {
+    // The handler is async; flush microtasks so the IPC promise resolves
+    // before we assert.
+    await waitFor(() => expect(clipboardIpcMock.copyText).toHaveBeenCalledTimes(1), {
       timeout: 5000,
     });
     // The card displays the machine id formatted as 4-char grouped blocks
     // (e.g. "aaaa-aaaa-..."), but the clipboard copy writes the raw hex
     // — vendor tooling prefers the raw form for paste-into-email.
-    expect(clipboardMock.writeText).toHaveBeenCalledWith('a'.repeat(64));
-    expect(clipboardMock.writeText.mock.calls[0]?.[0]).not.toContain('-');
+    expect(clipboardIpcMock.copyText).toHaveBeenCalledWith({ text: 'a'.repeat(64) });
+    const firstCallText = (clipboardIpcMock.copyText.mock.calls[0]?.[0] as { text: string }).text;
+    expect(firstCallText).not.toContain('-');
     await waitFor(() =>
       expect(toastMock.success).toHaveBeenCalledWith(
         expect.stringMatching(/machine id copied/i),

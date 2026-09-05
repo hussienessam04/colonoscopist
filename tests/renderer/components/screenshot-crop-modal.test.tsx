@@ -1,10 +1,18 @@
 // @vitest-environment happy-dom
-// ScreenshotCropModal — Phase 8 / Plan 14 (SCRN-02 extended).
+// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 (SCRN-02 extended).
 //
-// Three cases per the plan: drag updates the selection rect, Apply
-// invokes screenshots.crop with the natural-pixel rect, Cancel makes no
-// IPC call. happy-dom ships no canvas implementation, so getContext /
-// toBlob are stubbed the same way capture-screenshot.test.ts does.
+// Phase 8 / Plan 15 (G-08-8) — refactored for free-form polygon crop:
+//   * The modal fetches the JPEG bytes via the new `screenshots.getBlob`
+//     IPC and uses the resulting `blob:` URL as the <img> src (no canvas
+//     taint).
+//   * Click-to-add vertices, double-click to finalize (no-op), min 3
+//     vertices to enable Apply.
+//   * Apply crops to the polygon's bounding box (v1 simplification — see
+//     deviations in SUMMARY).
+//
+// Plan 14's drag-rectangle tests are intentionally replaced by the
+// polygon flows — the drag-rectangle surface is gone. happy-dom ships
+// no canvas implementation, so getContext / toBlob are stubbed.
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
@@ -63,7 +71,6 @@ function renderModal(onCropped = vi.fn(), onClose = vi.fn()): {
     <ScreenshotCropModal
       open
       screenshotId={7}
-      src="http://127.0.0.1:51731/media/p1/proc1/screenshots/5000.jpg"
       onClose={onClose}
       onCropped={onCropped}
     />,
@@ -72,11 +79,12 @@ function renderModal(onCropped = vi.fn(), onClose = vi.fn()): {
   return { onCropped, onClose };
 }
 
-function drag(from: { x: number; y: number }, to: { x: number; y: number }): void {
+// Click N points into the polygon. Each click adds a vertex.
+function clickPolygonVertices(points: Array<{ x: number; y: number }>): void {
   const surface = screen.getByTestId('screenshot-crop-surface');
-  fireEvent.mouseDown(surface, { clientX: from.x, clientY: from.y });
-  fireEvent.mouseMove(surface, { clientX: to.x, clientY: to.y });
-  fireEvent.mouseUp(surface, { clientX: to.x, clientY: to.y });
+  for (const p of points) {
+    fireEvent.click(surface, { clientX: p.x, clientY: p.y });
+  }
 }
 
 beforeEach(() => {
@@ -85,17 +93,123 @@ beforeEach(() => {
   stubCanvas();
 });
 
-describe('ScreenshotCropModal', () => {
-  it('dragging over the image produces a selection rectangle', () => {
+describe('ScreenshotCropModal (Plan 14 + Plan 15 polygon)', () => {
+  it('Plan 15: fetches the JPEG bytes via screenshots.getBlob and renders an <img> with a blob: URL', async () => {
     renderModal();
-    expect(screen.queryByTestId('screenshot-crop-selection')).toBeNull();
-    drag({ x: 100, y: 50 }, { x: 300, y: 200 });
-    const sel = screen.getByTestId('screenshot-crop-selection');
-    // Selection is in DISPLAYED coordinates at this point.
-    expect(sel.getAttribute('data-rect')).toBe('100,50,200,150');
+    const api = getApi();
+    // The api default mock resolves getBlob with a tiny JPEG; the modal
+    // calls it on mount and the effect creates a blob: URL it sets on
+    // the <img>. happy-dom does not actually fetch the URL — the <img>
+    // stays rendered with whatever src the React tree assigned.
+    await waitFor(() => expect(api.screenshots.getBlob).toHaveBeenCalledWith({ id: 7 }));
+    const img = screen.getByTestId('screenshot-crop-img') as HTMLImageElement;
+    expect(img.src.startsWith('blob:')).toBe(true);
   });
 
-  it('Apply sends the natural-pixel crop rect over screenshots.crop', async () => {
+  it('Plan 15: clicking on the surface appends a vertex to the SVG overlay', () => {
+    renderModal();
+    // No vertices yet.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    // Click 4 vertices forming a polygon.
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
+    const vertices = screen.getAllByTestId('screenshot-crop-vertex');
+    expect(vertices).toHaveLength(4);
+    expect(vertices[0].getAttribute('data-vertex')).toBe('100,50');
+    expect(vertices[3].getAttribute('data-vertex')).toBe('100,200');
+  });
+
+  it('Plan 15: Apply is disabled with 0 vertices and with 2 vertices; enabled at >=3', () => {
+    renderModal();
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+    clickPolygonVertices([{ x: 100, y: 50 }]);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+    clickPolygonVertices([{ x: 200, y: 100 }]);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+    clickPolygonVertices([{ x: 300, y: 200 }]);
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
+  });
+
+  it('Plan 15: vertex state clears via the Clear button', () => {
+    renderModal();
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('screenshot-crop-clear'));
+    // ponytail: use queryAllByTestId — getAllByTestId throws on 0 matches.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+  });
+
+  it('Plan 15: Backspace removes the last vertex; Escape clears all', () => {
+    renderModal();
+    const surface = screen.getByTestId('screenshot-crop-surface');
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 200, y: 100 },
+      { x: 300, y: 200 },
+      { x: 400, y: 300 },
+    ]);
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(4);
+    fireEvent.keyDown(surface, { key: 'Backspace' });
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(3);
+    fireEvent.keyDown(surface, { key: 'Escape' });
+    // ponytail: use queryAllByTestId — getAllByTestId throws on 0 matches.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+  });
+
+  it('Plan 15: shows the "min 3 points" hint until the third vertex lands', () => {
+    renderModal();
+    expect(screen.queryByTestId('screenshot-crop-hint-min')).toBeNull();
+    clickPolygonVertices([{ x: 100, y: 50 }]);
+    expect(screen.getByTestId('screenshot-crop-hint-min')).not.toBeNull();
+    clickPolygonVertices([{ x: 200, y: 100 }]);
+    expect(screen.getByTestId('screenshot-crop-hint-min')).not.toBeNull();
+    clickPolygonVertices([{ x: 300, y: 200 }]);
+    expect(screen.queryByTestId('screenshot-crop-hint-min')).toBeNull();
+  });
+
+  it('Plan 15: clicking Clear empties the polygon and disables Apply', () => {
+    renderModal();
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
+    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
+    fireEvent.click(screen.getByTestId('screenshot-crop-clear'));
+    // ponytail: use queryAllByTestId — getAllByTestId throws on 0 matches.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
+  });
+
+  it('Plan 15: Backspace removes the last vertex; Escape clears all', () => {
+    renderModal();
+    const surface = screen.getByTestId('screenshot-crop-surface');
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 200, y: 100 },
+      { x: 300, y: 200 },
+      { x: 400, y: 300 },
+    ]);
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(4);
+    fireEvent.keyDown(surface, { key: 'Backspace' });
+    expect(screen.getAllByTestId('screenshot-crop-vertex')).toHaveLength(3);
+    fireEvent.keyDown(surface, { key: 'Escape' });
+    // ponytail: use queryAllByTestId — getAllByTestId throws on 0 matches.
+    expect(screen.queryAllByTestId('screenshot-crop-vertex')).toHaveLength(0);
+  });
+
+  it('Plan 15: Apply sends the polygon (natural pixels) over screenshots.crop + closes + toasts success', async () => {
     const { onCropped, onClose } = renderModal();
     const api = getApi();
     api.screenshots.crop.mockResolvedValue({
@@ -104,21 +218,39 @@ describe('ScreenshotCropModal', () => {
       byteSize: 4,
     });
 
-    drag({ x: 100, y: 50 }, { x: 300, y: 200 });
+    // 4-point polygon: bbox in display coords = (100,50) ... (300,200) = 200x150.
+    // At 2x display->natural scale: bbox = (200,100) ... 400x300.
+    // The polygon collapses to the bbox on the renderer side BEFORE the
+    // IPC, so the main side receives only the bbox-shaped polygon
+    // (or, equivalently, the renderer could send just the bbox rect;
+    // we send a polygon because the contract is preferred).
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 300, y: 50 },
+      { x: 300, y: 200 },
+      { x: 100, y: 200 },
+    ]);
     fireEvent.click(screen.getByTestId('screenshot-crop-apply'));
 
     await waitFor(() => expect(api.screenshots.crop).toHaveBeenCalledTimes(1));
     const arg = api.screenshots.crop.mock.calls[0]![0] as {
       id: number;
-      jpegBase64: string;
+      croppedBase64: string;
       originalDimensions: { width: number; height: number };
-      cropRect: { x: number; y: number; width: number; height: number };
+      cropPolygon?: Array<{ x: number; y: number }>;
+      cropRect?: { x: number; y: number; width: number; height: number };
     };
     expect(arg.id).toBe(7);
     expect(arg.originalDimensions).toEqual({ width: NATURAL_W, height: NATURAL_H });
-    // Displayed 100,50 200x150 at a 2x scale -> 200,100 400x300 natural.
-    expect(arg.cropRect).toEqual({ x: 200, y: 100, width: 400, height: 300 });
-    expect(arg.jpegBase64.length).toBeGreaterThan(0);
+    expect(arg.croppedBase64.length).toBeGreaterThan(0);
+    // Bbox in natural pixels = (200,100) 400x300.
+    expect(arg.cropPolygon).toBeDefined();
+    const xs = arg.cropPolygon!.map((p) => p.x);
+    const ys = arg.cropPolygon!.map((p) => p.y);
+    expect(Math.min(...xs)).toBe(200);
+    expect(Math.max(...xs)).toBe(600);
+    expect(Math.min(...ys)).toBe(100);
+    expect(Math.max(...ys)).toBe(400);
 
     await waitFor(() => expect(onCropped).toHaveBeenCalledTimes(1));
     expect(onCropped).toHaveBeenCalledWith({ width: 400, height: 300, byteSize: 4 });
@@ -126,28 +258,29 @@ describe('ScreenshotCropModal', () => {
     expect(toastMock.success).toHaveBeenCalled();
   });
 
-  it('Cancel closes without any IPC call', () => {
+  it('Plan 15: Cancel closes without any IPC call', () => {
     const { onClose } = renderModal();
     const api = getApi();
-    drag({ x: 100, y: 50 }, { x: 300, y: 200 });
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 200, y: 100 },
+      { x: 300, y: 200 },
+    ]);
     fireEvent.click(screen.getByTestId('screenshot-crop-cancel'));
     expect(api.screenshots.crop).not.toHaveBeenCalled();
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  it('Apply is disabled until a selection exists', () => {
-    renderModal();
-    expect(screen.getByTestId('screenshot-crop-apply')).toBeDisabled();
-    drag({ x: 100, y: 50 }, { x: 300, y: 200 });
-    expect(screen.getByTestId('screenshot-crop-apply')).not.toBeDisabled();
-  });
-
-  it('an IPC_INVALID_CROP result surfaces an error toast and leaves the modal open', async () => {
+  it('Plan 15: an IPC_INVALID_CROP result surfaces an error toast and leaves the modal open', async () => {
     const { onClose } = renderModal();
     const api = getApi();
     api.screenshots.crop.mockResolvedValue({ ok: false, code: 'IPC_INVALID_CROP' });
 
-    drag({ x: 100, y: 50 }, { x: 300, y: 200 });
+    clickPolygonVertices([
+      { x: 100, y: 50 },
+      { x: 200, y: 100 },
+      { x: 300, y: 200 },
+    ]);
     fireEvent.click(screen.getByTestId('screenshot-crop-apply'));
 
     await waitFor(() => expect(toastMock.error).toHaveBeenCalledTimes(1));
