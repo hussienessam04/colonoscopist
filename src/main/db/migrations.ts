@@ -24,6 +24,12 @@ import reportProcedureTypeAndTemplatesSql from './migrations/0010_report_procedu
 // Phase 8 / Plan 01 — trial_started_at column on settings (LIC-01).
 // One ALTER TABLE; the wizard write lands in Plan 02.
 import trialStartedAtSql from './migrations/0011_settings_trial_started_at.sql?raw';
+// Phase 8 / Plan 15 (G-08-8) — restore the 4 columns that migration 0010
+// (the untracked `redesign-report-procedure-type` overlay) dropped from
+// the user's DB. The new procedure-type-specific boxes coexist with these
+// classic columns; the reports-repo insert + update paths assume the
+// classic columns exist, so a DB that ran 0010 needs this restore.
+import revertReportRedesignDropColumnsSql from './migrations/0012_revert_report_redesign_drop_columns.sql?raw';
 
 type Migration = {
   id: number;
@@ -51,6 +57,9 @@ const MIGRATIONS: Migration[] = [
   // The wizardBootstrap transaction (Plan 02) writes the row on first
   // successful run; status.ts reads it on every boot.
   { id: 11, name: 'settings_trial_started_at', up: trialStartedAtSql },
+  // Phase 8 / Plan 15 (G-08-8) — restore findings / diagnosis /
+  // recommendations / procedure_details after migration 0010 dropped them.
+  { id: 12, name: 'revert_report_redesign_drop_columns', up: revertReportRedesignDropColumnsSql },
 ];
 
 function loadMigrations(): typeof MIGRATIONS {

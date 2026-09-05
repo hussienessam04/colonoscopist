@@ -60,6 +60,14 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // routine clinical action on existing data, not new capture. The
   // gated SCREENSHOTS_ADD still blocks new captures when unlicensed.
   IPC.SCREENSHOTS_CROP,
+  // Phase 8 / Plan 15 (G-08-8) — reading an already-captured screenshot's
+  // bytes (so the renderer can build a blob: URL for the crop modal).
+  // Same rationale as SCREENSHOTS_CROP: routine read on existing data.
+  IPC.SCREENSHOTS_GET_BLOB,
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Routine
+  // action; happens whenever the doctor copies the machine id. Not
+  // gating this would block a normal workflow for an expired license.
+  IPC.CLIPBOARD_COPY_TEXT,
 ]);
 
 export type LicenseGateError =

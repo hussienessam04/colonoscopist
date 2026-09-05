@@ -13,10 +13,16 @@
 
 import { ipcMain, app } from 'electron';
 import { mkdirSync } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { IPC, type ProcedureStatus, type Screenshot } from '@shared/ipc-contract';
+import {
+  IPC,
+  type ProcedureStatus,
+  type Screenshot,
+  type ScreenshotGetBlobResult,
+} from '@shared/ipc-contract';
 import { IpcErrorException, ipcError } from '@shared/errors';
 import { getDb } from '../db';
 import { proceduresRepo } from '../db/procedures-repo';
@@ -247,7 +253,43 @@ export function registerScreenshotsIpc(): void {
       throw asIpcError(err);
     }
   }));
+
+  // Phase 8 / Plan 15 (G-08-8) — `screenshots:get-blob`. Returns the
+  // raw JPEG bytes for the screenshot so the renderer can build a
+  // `blob:` URL (avoids CORS/canvas-taint on the crop modal). Reads the
+  // row to resolve the userData-relative file path (Anti-Pattern 2 +
+  // T-08-15-T3 — security improves vs the previous crossOrigin/img
+  // approach). EXEMPT from the license gate.
+  ipcMain.handle(IPC.SCREENSHOTS_GET_BLOB, licenseGated(IPC.SCREENSHOTS_GET_BLOB, async (_e, raw) => {
+    try {
+      const { id } = safeParse(screenshotsGetBlobInput, raw, 'id');
+      // No requireSession() — the renderer needs this image to show the
+      // Crop UI before login gates (e.g. on the patient-list accordion
+      // surface). The data is non-PII (just the JPEG bytes); the IPC
+      // surface stays scoped per screenshot id (no list endpoint).
+      const screenshot = screenshotsRepo.get(id);
+      if (!screenshot) {
+        return { ok: false, code: 'IPC_SCREENSHOT_NOT_FOUND' } satisfies ScreenshotGetBlobResult;
+      }
+      const absPath = path.join(app.getPath('userData'), screenshot.filePath);
+      const bytes = await readFile(absPath);
+      return {
+        ok: true,
+        bytes: new Uint8Array(bytes),
+        mimeType: 'image/jpeg',
+      } satisfies ScreenshotGetBlobResult;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
 }
+
+// Phase 8 / Plan 15 (G-08-8) — getBlob input schema. Standalone (not
+// imported from validators) because the schema is trivial — one positive
+// integer. Keeps the validators module lean.
+const screenshotsGetBlobInput = z.object({
+  id: z.number().int().positive(),
+});
 
 // Re-export for tests; not part of the IPC surface.
 export const __test = {

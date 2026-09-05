@@ -237,25 +237,41 @@ export const screenshotsUpdateAnnotationInput = z.object({
 
 // Phase 8 / Plan 14 — crop input. Same 8 MB base64 cap as `add` (the
 // cropped image is always a subset of an already-capped original, so the
-// cap is belt-and-braces). Bounds of `cropRect` vs `originalDimensions`
-// are checked in the handler, not here — zod cannot express the
-// cross-field comparison without a refine that hides which side failed.
+// cap is belt-and-braces). Bounds of `cropRect`/`cropPolygon` vs
+// `originalDimensions` are checked in the handler, not here — zod cannot
+// express the cross-field comparison without a refine that hides which
+// side failed. Phase 8 / Plan 15 (G-08-8): accept either a polygon of
+// {x,y} vertices (min 3 — refined below) OR the legacy rectangle. The
+// handler collapses a polygon to its bounding box for v1.
+export const cropVertex = z.object({
+  x: z.number().int().nonnegative(),
+  y: z.number().int().nonnegative(),
+});
 export const screenshotCropInput = z
   .object({
     id: z.number().int().positive(),
-    jpegBase64: z.string().min(1).max(8_000_000),
+    croppedBase64: z.string().min(1).max(8_000_000),
     originalDimensions: z.object({
       width: z.number().int().positive(),
       height: z.number().int().positive(),
     }),
-    cropRect: z.object({
-      x: z.number().int().nonnegative(),
-      y: z.number().int().nonnegative(),
-      width: z.number().int().positive(),
-      height: z.number().int().positive(),
-    }),
+    // Min 3 vertices for a polygon; rect is left permissive so legacy
+    // callers don't need to migrate.
+    cropPolygon: z.array(cropVertex).min(3).optional(),
+    cropRect: z
+      .object({
+        x: z.number().int().nonnegative(),
+        y: z.number().int().nonnegative(),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+      })
+      .optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    (d) => d.cropPolygon !== undefined || d.cropRect !== undefined,
+    { message: 'cropPolygon or cropRect is required', path: ['cropPolygon'] },
+  );
 
 export const proceduresTrimInput = z
   .object({

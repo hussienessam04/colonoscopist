@@ -12,8 +12,9 @@
 // `licenseGated` wrapper is still applied for grep-gate consistency —
 // the EXEMPT branch returns the handler unchanged (see gate.ts).
 
-import { dialog, ipcMain } from 'electron';
+import { dialog, ipcMain, clipboard } from 'electron';
 import { ZodError } from 'zod';
+import { z } from 'zod';
 import { IPC } from '@shared/ipc-contract';
 import { licenseActivateInput } from '@shared/validators';
 import { IpcErrorException, ipcError } from '@shared/errors';
@@ -99,7 +100,38 @@ export function registerLicenseIpc(): void {
       }
     }),
   );
+
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Avoids
+  // `navigator.clipboard.writeText` which fails in the sandboxed
+  // renderer (the machine-id copy button on the License page surfaced
+  // this in Phase 8 UAT). Uses Electron's canonical `clipboard.writeText`
+  // API — same code path Windows uses for the OS clipboard.
+  //
+  // No `requireSession()` — a doctor without a session may still want to
+  // copy the machine id (the license sub-page is reachable during the
+  // first-launch wizard too). EXEMPT from the gate (added by Plan 15).
+  ipcMain.handle(IPC.CLIPBOARD_COPY_TEXT, licenseGated(IPC.CLIPBOARD_COPY_TEXT, (_e, raw) => {
+    try {
+      const { text } = clipboardCopyTextInput.parse(raw);
+      // Electron's clipboard.writeText is sync on the main process and
+      // does not require a focused window — works from any handler
+      // invocation, including background timers. Returns void.
+      clipboard.writeText(text);
+      return { ok: true as const };
+    } catch (err) {
+      if (err instanceof ZodError) {
+        throw new IpcErrorException(ipcError('IPC_VALIDATION', err.message));
+      }
+      throw asIpcError(err);
+    }
+  }));
 }
+
+// Phase 8 / Plan 15 (G-08-8) — clipboard copy input. 10 KB cap is
+// belt-and-braces — the current consumer (machine id) is 64 chars.
+const clipboardCopyTextInput = z.object({
+  text: z.string().min(1).max(10_000),
+});
 
 function asIpcError(err: unknown): Error {
   if (err instanceof IpcErrorException) {

@@ -130,13 +130,22 @@ export default function License(): JSX.Element {
 
   async function handleCopyMachineId(): Promise<void> {
     if (!status) return;
+    // Plan 15 (G-08-8) — use the main-process clipboard IPC instead of
+    // navigator.clipboard.writeText (which fails in the Electron sandbox
+    // for some contexts). The new channel resolves to Electron's
+    // `clipboard.writeText` which works regardless of focus / permission.
+    // The local try/catch stays as a belt-and-braces fallback — if the
+    // IPC channel itself throws (unlikely), the user gets the same soft
+    // warning as before instead of a crash.
     try {
-      await navigator.clipboard.writeText(status.machineId);
+      await window.api.clipboard?.copyText?.({ text: status.machineId });
       toast.success(t('license.machineIdCopied'));
     } catch {
-      // ponytail: clipboard access can be denied (browser permissions).
-      // The doctor can still read the machine id from the card —
-      // surface a soft warning instead of crashing.
+      // ponytail: clipboard access can be denied at the IPC layer (rare;
+      // main-process clipboard is the canonical Electron API and only
+      // fails on a runtime/permission blast radius). The doctor can
+      // still read the machine id from the card — surface a soft
+      // warning instead of crashing.
       toast.error(t('license.machineIdCopyFailed'));
     }
   }

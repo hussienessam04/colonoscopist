@@ -97,6 +97,15 @@ const api: IpcContract = {
       ipcRenderer.invoke(IPC.SCREENSHOTS_UPDATE_ANNOTATION, input),
     // Phase 8 / Plan 14 — permanent crop; overwrites the source JPEG.
     crop: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_CROP, input),
+    // Phase 8 / Plan 15 (G-08-8) — read JPEG bytes off disk so the
+    // renderer can build a `blob:` URL (avoids canvas-taint on crop).
+    getBlob: (input) => ipcRenderer.invoke(IPC.SCREENSHOTS_GET_BLOB, input),
+  },
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Replaces
+  // `navigator.clipboard.writeText` for the License page machine-id
+  // copy button (and any future clipboard use).
+  clipboard: {
+    copyText: (input) => ipcRenderer.invoke(IPC.CLIPBOARD_COPY_TEXT, input),
   },
   // Phase 6 / Plan 01 — Doctor profile IPC. `get` reads the row keyed by
   // the active session; `update` writes the bilingual name/clinic/contact

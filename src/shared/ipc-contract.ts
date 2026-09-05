@@ -69,6 +69,17 @@ export const IPC = {
   // on a canvas and ships the cropped JPEG bytes; main validates the rect
   // against the original dimensions and overwrites the source file.
   SCREENSHOTS_CROP: 'screenshots:crop',
+  // Phase 8 / Plan 15 (G-08-8) — return raw screenshot JPEG bytes so the
+  // renderer can build a `blob:` URL and bypass CORS/canvas-taint on the
+  // crop modal. Reads the row, resolves the userData-relative path to an
+  // absolute path (Anti-Pattern 2), reads the file once, returns the
+  // bytes + MIME type. EXEMPT from the license gate (read-only on
+  // already-captured data).
+  SCREENSHOTS_GET_BLOB: 'screenshots:get-blob',
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Avoids
+  // `navigator.clipboard.writeText` which is unreliable in the sandboxed
+  // renderer. Returns {ok:true}. EXEMPT (routine copy action).
+  CLIPBOARD_COPY_TEXT: 'clipboard:copy-text',
   PROCEDURES_TRIM: 'procedures:trim',
   PROCEDURES_RESTORE: 'procedures:restore',
   // Phase 5 / Plan 02 — pause markers from procedure_segments. Renderer
@@ -340,25 +351,40 @@ export type Screenshot = {
   createdAt: number;
 };
 
-// Phase 8 / Plan 14 — screenshot crop (SCRN-02 extended). The renderer
-// crops on a canvas and sends the encoded JPEG bytes; `cropRect` +
-// `originalDimensions` are carried for main-side bounds validation and
-// the `screenshot.cropped` audit row. `croppedBytes` rides the channel
-// as base64 for the same reason `screenshots.add` does — structured
-// clone of a large Uint8Array across contextBridge is lossy in some
-// Electron versions, base64 is the shape already proven in Phase 5.
+// Phase 8 / Plan 14 + Plan 15 — screenshot crop (SCRN-02 extended). The
+// renderer crops on a canvas and sends the encoded JPEG bytes;
+// `originalDimensions` is carried for main-side bounds validation and
+// the `screenshot.cropped` audit row. The crop shape is EITHER a polygon
+// (Plan 15 — free-form, min 3 vertices) OR a legacy bounding rectangle
+// (Plan 14 — backward compat). One of the two MUST be supplied; the
+// handler rejects calls with neither. The handler collapses the polygon
+// to its bounding box for v1 (documented deviation — see SUMMARY.md).
+//
+// `croppedBase64` rides the channel as base64 for the same reason
+// `screenshots.add` does — structured clone of a large Uint8Array across
+// contextBridge is lossy in some Electron versions, base64 is the shape
+// already proven in Phase 5.
 export type CropRect = { x: number; y: number; width: number; height: number };
+export type CropPolygon = { x: number; y: number }[];
 
 export type ScreenshotCropInput = {
   id: number;
-  jpegBase64: string;
+  croppedBase64: string;
   originalDimensions: { width: number; height: number };
-  cropRect: CropRect;
+  cropPolygon?: CropPolygon;
+  cropRect?: CropRect;
 };
 
 export type ScreenshotCropResult =
   | { ok: true; newDimensions: { width: number; height: number }; byteSize: number }
   | { ok: false; code: 'IPC_SCREENSHOT_NOT_FOUND' | 'IPC_INVALID_CROP' | string };
+
+// Phase 8 / Plan 15 (G-08-8) — screenshots:get-blob result. `bytes` is a
+// Uint8Array of the raw JPEG; `mimeType` is the file's MIME (always
+// `image/jpeg` for v1 — the add path always writes JPEGs).
+export type ScreenshotGetBlobResult =
+  | { ok: true; bytes: Uint8Array; mimeType: string }
+  | { ok: false; code: 'IPC_SCREENSHOT_NOT_FOUND' | string };
 
 // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per CONTEXT.md D-02 the
 // bilingual EN+AR fields are parallel nullable columns; AR columns are
@@ -664,6 +690,15 @@ export interface IpcContract {
     updateAnnotation: (input: { id: number; annotation: string | null }) => Promise<Screenshot>;
     // Phase 8 / Plan 14 — permanent crop. Overwrites the source JPEG.
     crop: (input: ScreenshotCropInput) => Promise<ScreenshotCropResult>;
+    // Phase 8 / Plan 15 (G-08-8) — read the JPEG bytes off disk so the
+    // renderer can build a `blob:` URL (avoids canvas-taint on crop).
+    getBlob: (input: { id: number }) => Promise<ScreenshotGetBlobResult>;
+  };
+  // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Replaces
+  // the unreliable navigator.clipboard.writeText for the License page
+  // machine-id copy button (and any future clipboard use).
+  clipboard: {
+    copyText: (input: { text: string }) => Promise<{ ok: true }>;
   };
   // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per Phase 2 BLOCKER 4
   // + D-07, the renderer never sends a `userId` or `doctorId` field — main
