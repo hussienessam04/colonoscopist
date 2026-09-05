@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 14
+current_plan: 15
 status: testing
-stopped_at: Phase 08 Plans 13-14 shipped (UI fixes + Screenshot Crop feature)
+stopped_at: Phase 08 Plan 15 shipped (4 user-reported fixes: polygon crop + canvas taint + reports column restore + clipboard IPC)
 paused_at: —
-last_updated: "2026-09-02T00:13:00Z"
+last_updated: "2026-09-02T00:14:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plans 13 (UI audit fixes - 3 blockers + 9 warnings) + 14 (Screenshot Crop feature) shipped end-to-end; 105/105 tests pass on affected suites
+last_activity_desc: Phase 08 Plan 15 (G-08-8 — 4 fixes: polygon crop UI + blob-URL image fetch + migration 0012 reports column restore + Electron clipboard IPC) shipped; 28+ tests pass on affected suites
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 55
-  completed_plans: 55
+  total_plans: 56
+  completed_plans: 56
 ---
 
 **Current Plan:** 1
