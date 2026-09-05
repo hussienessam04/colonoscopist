@@ -14,6 +14,8 @@ import {
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { SettingsLayout } from '@/components/SettingsLayout';
+import EmptyStateCard from '@/components/EmptyStateCard';
+import { safeInvoke } from '@/lib/ipc-result';
 import { qualityPresetSchema } from '@shared/validators';
 import { toast } from 'sonner';
 import type { QualityPreset } from '@shared/ipc-contract';
@@ -66,6 +68,12 @@ export default function SettingsCapture(): JSX.Element {
   const [saving, setSaving] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [noSavedDevice, setNoSavedDevice] = useState(false);
+  // Plan 08-11 / G-08-5 — mirror Plan 08-10 (G-08-4) gated-IPC pattern. When
+  // the main-process license gate returns {ok:false}, safeInvoke yields
+  // null and we render <EmptyStateCard> instead of feeding the gate object
+  // into setSavedDeviceId (which used to crash downstream pickBrowserId /
+  // hydration in the expired/unactivated state).
+  const [gated, setGated] = useState(false);
 
   // Hydrate from main: saved default device. The dshow list is always
   // available; the browser list may be empty until the user grants the
@@ -74,34 +82,39 @@ export default function SettingsCapture(): JSX.Element {
   useEffect(() => {
     if (bridgeLoading || hydrated) return;
     let cancelled = false;
-    void window.api.capture
-      .getDefaultDevice()
-      .then((device) => {
-        if (cancelled) return;
-        setSavedDeviceId(device);
-        if (!device) {
-          setNoSavedDevice(true);
-          setHydrated(true);
-          return;
-        }
-        const browserId = pickBrowserId(device);
-        if (browserId) {
-          setSelectedBrowserId(browserId);
-          void window.api.capture.getPreset({ deviceId: device }).then((preset) => {
-            if (cancelled) return;
-            setForm(fromPreset(preset));
-            setHydrated(true);
-          });
-        } else {
-          setNoSavedDevice(true);
-          setHydrated(true);
-        }
-      })
-      .catch(() => {
-        if (cancelled) return;
+    void (async (): Promise<void> => {
+      const device = await safeInvoke(window.api.capture.getDefaultDevice());
+      if (cancelled) return;
+      if (device === null) {
+        // Plan 08-11 / G-08-5 — gate rejected the read. Treat as "no
+        // device" rather than feeding the {ok:false} object into state.
+        // EmptyStateCard surfaces the license path; the no-device hint
+        // stays rendered for the legitimate empty case.
+        setSavedDeviceId(null);
+        setNoSavedDevice(true);
+        setGated(true);
+        setHydrated(true);
+        return;
+      }
+      setSavedDeviceId(device);
+      const browserId = pickBrowserId(device);
+      if (!browserId) {
         setNoSavedDevice(true);
         setHydrated(true);
-      });
+        return;
+      }
+      setSelectedBrowserId(browserId);
+      const preset = await safeInvoke(
+        window.api.capture.getPreset({ deviceId: device }),
+      );
+      if (cancelled) return;
+      setForm(fromPreset(preset));
+      setHydrated(true);
+    })().catch(() => {
+      if (cancelled) return;
+      setNoSavedDevice(true);
+      setHydrated(true);
+    });
     return () => {
       cancelled = true;
     };
@@ -117,10 +130,15 @@ export default function SettingsCapture(): JSX.Element {
     setHydrated(false);
     const name = lookup(browserId);
     if (name) {
-      void window.api.capture.getPreset({ deviceId: name }).then((preset) => {
-        setForm(fromPreset(preset));
-        setHydrated(true);
-      });
+      // Plan 08-11 / G-08-5 — wrap preset fetch through safeInvoke; null
+      // (gate rejection) flows through fromPreset → defaultForm() which
+      // already handles nullish input.
+      void safeInvoke(window.api.capture.getPreset({ deviceId: name })).then(
+        (preset) => {
+          setForm(fromPreset(preset));
+          setHydrated(true);
+        },
+      );
     } else {
       setForm(defaultForm());
       setHydrated(true);
@@ -157,8 +175,27 @@ export default function SettingsCapture(): JSX.Element {
     try {
       const preset = toQualityPreset(form);
       qualityPresetSchema.parse(preset);
-      await window.api.capture.setDefaultDevice({ deviceId: selectedCanonical });
-      await window.api.capture.setPreset({ deviceId: selectedCanonical, preset });
+      // Plan 08-11 / G-08-5 — wrap persistence calls through safeInvoke so
+      // the gate's {ok:false} surfaces as a clear toast instead of a
+      // white-screen crash on Save.
+      const savedDevice = await safeInvoke(
+        window.api.capture.setDefaultDevice({ deviceId: selectedCanonical }),
+      );
+      if (savedDevice === null) {
+        toast.error(
+          'License required to save capture settings. Activate your license first.',
+        );
+        return;
+      }
+      const savedPreset = await safeInvoke(
+        window.api.capture.setPreset({ deviceId: selectedCanonical, preset }),
+      );
+      if (savedPreset === null) {
+        toast.error(
+          'License required to save capture settings. Activate your license first.',
+        );
+        return;
+      }
       toast.success('Capture settings saved.');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to save capture settings.';
@@ -239,6 +276,8 @@ export default function SettingsCapture(): JSX.Element {
               No device saved yet. Pick one to enable Save.
             </p>
           ) : null}
+
+          {gated ? <EmptyStateCard /> : null}
 
           <fieldset className="flex flex-col gap-2">
             <legend className="text-sm font-medium">Quality preset</legend>

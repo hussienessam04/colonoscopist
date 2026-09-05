@@ -16,6 +16,7 @@ import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { screenshotToastStore } from '@/store/screenshot-toast';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { safeInvoke } from '@/lib/ipc-result';
 import type { QualityPreset, Screenshot } from '@shared/ipc-contract';
 
 export default function ProcedureRoom(): JSX.Element {
@@ -51,8 +52,11 @@ export default function ProcedureRoom(): JSX.Element {
 
   useEffect(() => {
     let cancelled = false;
-    void window.api.capture
-      .getDefaultDevice()
+    // Plan 08-11 / G-08-5 — wrap through safeInvoke so a gate-rejected
+    // {ok:false} surfaces as null (no-device state) instead of feeding the
+    // gate object into setSavedDevice. The existing no-device overlay
+    // (lines 365-378) renders naturally when savedDevice stays null.
+    void safeInvoke(window.api.capture.getDefaultDevice())
       .then((device) => {
         if (!cancelled) setSavedDevice(device);
       })
@@ -83,8 +87,9 @@ export default function ProcedureRoom(): JSX.Element {
       return;
     }
     let cancelled = false;
-    void window.api.capture
-      .getPreset({ deviceId: selectedCanonical })
+    // Plan 08-11 / G-08-5 — safeInvoke unwraps the gate object to null; the
+    // `?? undefined` keeps the type contract and disables canRecord.
+    void safeInvoke(window.api.capture.getPreset({ deviceId: selectedCanonical }))
       .then((nextPreset) => {
         if (!cancelled) setPreset(nextPreset ?? undefined);
       })
@@ -208,12 +213,20 @@ export default function ProcedureRoom(): JSX.Element {
     setStartError(null);
     void (async (): Promise<void> => {
       try {
-        const device = await window.api.capture.getDefaultDevice();
+        // Plan 08-11 / G-08-5 — wrap the device + preset fetches through
+        // safeInvoke. A null result means the gate rejected the call;
+        // surface a license-specific message rather than the generic
+        // "No default capture device set" copy.
+        const device = await safeInvoke(window.api.capture.getDefaultDevice());
         if (!device) {
-          setStartError('No default capture device set. Open Settings → Capture and pick one.');
+          setStartError(
+            'License required to record. Activate your license in Settings → License.',
+          );
           return;
         }
-        const resolvedPreset = await window.api.capture.getPreset({ deviceId: device });
+        const resolvedPreset = await safeInvoke(
+          window.api.capture.getPreset({ deviceId: device }),
+        );
         if (!resolvedPreset) {
           setStartError('No preset saved for this device. Save one in Settings → Capture.');
           return;
