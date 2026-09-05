@@ -244,7 +244,7 @@ Plans:
 
 **Pitfalls addressed:** Pitfall 6 (license trivially bypassed).
 **Notes:** N-API tamper-resistant addon (LIC-05 from v2) is parked as a v1.1 hardening follow-up, not part of v1. The v1 JS verify path is the ship gate.
-**Plans:** 12 plans (6 base + 6 gap-closure) — complete
+**Plans:** 14 plans (6 base + 8 gap-closure / feature) — complete
 **Tracer-first decomposition:** Plan 01 ships the production-quality end-to-end verify-path slice (Ed25519 verify + embedded public key + `Object.freeze` + `@noble/ed25519` install + IPC `LICENSE_STATUS`/`LICENSE_ACTIVATE` + migration 0011 + paths.licenseDir + roundtrip integration test) covering LIC-02; Plan 02 wires the 14-day trial clock (settings.trial_started_at + wizard transaction + audit row) covering LIC-01; Plan 03 ships the `licenseGated` helper + wraps every existing `register*()` call + audit row on gate rejection + gate-blocks integration test covering LIC-04; Plan 04 ships `loadAndVerifyLicense` + the `LICENSE_PICK_AND_ACTIVATE` IPC channel (wraps `dialog.showOpenDialog` + verify in one main-side call, Phase 7 D-13 verbatim pattern) + vendor `scripts/gen-license.cjs` + .gitignore rules + LICENSE_ACTIVATE handler + extends `EXEMPT_CHANNELS` for the new picker channel completing LIC-02/LIC-03 activation; Plan 05 ships the License sub-page + SettingsSidebar entry + boot-time `<LicenseGate>` modal + `useLicenseStatus` hook + bilingual i18n completing LIC-03 UI; Plan 06 ships `scripts/check-license-gate.cjs` grep gate + audit/UI/RTL tests + `08-UAT.md` acceptance plan. Wave 1 = Plan 01. Wave 2 = Plans 02, 03 (parallel; depends on 01). Wave 3 = Plan 04 (depends on 01, 03), Plan 05 (depends on 01, 02, 04). Wave 4 = Plan 06 (depends on all).
 
 Plans:
