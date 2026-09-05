@@ -33,6 +33,8 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
 import { useRoute } from '@/lib/router';
+import { useLicenseStatus } from '@/hooks/useLicenseStatus';
+import type { LicenseState } from '@shared/ipc-contract';
 
 export type SettingsTab =
   | 'capture'
@@ -42,11 +44,32 @@ export type SettingsTab =
   | 'license'
   | 'backup-restore';
 
+// Plan 08-13 / UI audit Blocker 3 — the `sidebarBadge*` keys had no usage
+// site. The License entry now renders a colour dot + the state label so a
+// doctor can tell Trial from Expired without opening the page. Literal
+// class strings so tailwind's JIT picks them up.
+const LICENSE_DOT_COLOR: Record<LicenseState, string> = {
+  licensed: 'bg-emerald-500',
+  trial: 'bg-blue-500',
+  expired: 'bg-red-500',
+  unactivated: 'bg-slate-500',
+};
+
 export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX.Element {
   const { navigate } = useRoute();
   const { currentUser } = useSession();
   const { t } = useTranslation();
+  const { status: licenseStatus } = useLicenseStatus();
   const isAdmin = currentUser?.isFirstAdmin ?? false;
+  const licenseState = licenseStatus?.state ?? null;
+  const licenseBadge =
+    licenseState === null
+      ? null
+      : licenseState === 'trial'
+        ? t('license.sidebarBadgeTrial', { count: licenseStatus?.trialDaysRemaining ?? 0 })
+        : t(
+            `license.sidebarBadge${licenseState.charAt(0).toUpperCase()}${licenseState.slice(1)}`,
+          );
 
   return (
     <aside className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
@@ -92,6 +115,22 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <KeyRound className="size-4 mr-2" aria-hidden="true" />
         {t('license.sidebarEntry')}
+        {licenseState !== null ? (
+          <>
+            <span
+              className={`ms-auto inline-block size-2 shrink-0 rounded-full ${LICENSE_DOT_COLOR[licenseState]}`}
+              data-testid="settings-hub-license-dot"
+              data-state={licenseState}
+              aria-hidden="true"
+            />
+            <span
+              className="ms-2 truncate text-xs font-normal opacity-80"
+              data-testid="settings-hub-license-badge"
+            >
+              {licenseBadge}
+            </span>
+          </>
+        ) : null}
       </Button>
       <Button
         variant={activeTab === 'backup-restore' ? 'default' : 'outline'}

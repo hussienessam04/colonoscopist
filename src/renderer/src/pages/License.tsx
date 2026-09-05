@@ -27,7 +27,16 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Copy, KeyRound, Loader2 } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  Clock,
+  Copy,
+  KeyRound,
+  Loader2,
+  Minus,
+  type LucideIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
@@ -60,7 +69,23 @@ function statusBadgeColor(state: LicenseState): string {
     case 'expired':
       return 'bg-red-500';
     case 'unactivated':
-      return 'bg-slate-400';
+      return 'bg-slate-500';
+  }
+}
+
+// Plan 13 / UI audit Warning 3 (Pillar 3) — state must not be signalled
+// by colour alone. Each state pairs its dot with a distinct glyph so a
+// deuteranopic reader can still tell Licensed from Expired.
+function statusIcon(state: LicenseState): LucideIcon {
+  switch (state) {
+    case 'licensed':
+      return Check;
+    case 'trial':
+      return Clock;
+    case 'expired':
+      return AlertTriangle;
+    case 'unactivated':
+      return Minus;
   }
 }
 
@@ -112,7 +137,7 @@ export default function License(): JSX.Element {
       // ponytail: clipboard access can be denied (browser permissions).
       // The doctor can still read the machine id from the card —
       // surface a soft warning instead of crashing.
-      toast.error(t('license.loadLicFailed'));
+      toast.error(t('license.machineIdCopyFailed'));
     }
   }
 
@@ -122,6 +147,10 @@ export default function License(): JSX.Element {
           `license.status${status.state.charAt(0).toUpperCase()}${status.state.slice(1)}`,
         )
       : t('license.loading');
+
+  // Plan 13 — the dot lives in the Status row (not the CardTitle) so the
+  // status is stated once, with a glyph + text next to it.
+  const StatusIcon = status !== null ? statusIcon(status.state) : null;
 
   return (
     <SettingsLayout
@@ -135,42 +164,48 @@ export default function License(): JSX.Element {
           <CardTitle className="flex items-center gap-2">
             <KeyRound className="size-4" aria-hidden="true" />
             {t('license.statusTitle')}
-            {status !== null ? (
-              <span
-                className={`inline-block size-2 rounded-full ${statusBadgeColor(status.state)}`}
-                data-testid="license-status-dot"
-                data-state={status.state}
-              />
-            ) : null}
           </CardTitle>
           <CardDescription>{t('license.pageDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {status !== null ? (
             <>
-              <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
+              <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
                 <span className="text-muted-foreground">{t('license.statusLabel')}</span>
-                <span className="col-span-2" data-testid="license-status-label">
+                <span
+                  className="col-span-2 flex items-center gap-2"
+                  data-testid="license-status-label"
+                >
+                  <span
+                    className={`inline-block size-2 shrink-0 rounded-full ${statusBadgeColor(status.state)}`}
+                    data-testid="license-status-dot"
+                    data-state={status.state}
+                  />
+                  {StatusIcon ? (
+                    <StatusIcon className="size-4 shrink-0" aria-hidden="true" />
+                  ) : null}
                   {stateLabel}
                 </span>
               </div>
 
               {status.state === 'trial' ? (
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
                   <span className="text-muted-foreground">
                     {t('license.trialDaysRemainingLabel')}
                   </span>
                   <span className="col-span-2" data-testid="license-trial-days">
-                    {t('license.trialDaysRemainingValue', {
-                      days: status.trialDaysRemaining ?? 0,
-                    })}
+                    {(status.trialDaysRemaining ?? 0) === 0
+                      ? t('license.trialEndsToday')
+                      : t('license.trialDaysRemainingValue', {
+                          count: status.trialDaysRemaining ?? 0,
+                        })}
                   </span>
                 </div>
               ) : null}
 
               {status.state === 'licensed' ? (
                 <>
-                  <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
+                  <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
                     <span className="text-muted-foreground">{t('license.vendorIdLabel')}</span>
                     <span
                       className="col-span-2 font-mono"
@@ -179,7 +214,7 @@ export default function License(): JSX.Element {
                       {status.vendorId ?? '—'}
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
+                  <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
                     <span className="text-muted-foreground">
                       {t('license.licensedAtLabel')}
                     </span>
@@ -219,7 +254,7 @@ export default function License(): JSX.Element {
               </div>
             </>
           ) : loading ? (
-            <p className="text-sm text-muted-foreground italic">
+            <p className="text-sm text-muted-foreground">
               {t('license.loading')}
             </p>
           ) : null}

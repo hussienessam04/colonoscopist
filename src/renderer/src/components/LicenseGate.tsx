@@ -102,7 +102,7 @@ export function LicenseGate({ children }: { children: ReactNode }): JSX.Element 
                 onClick={dismiss}
                 data-testid="license-gate-continue-trial"
               >
-                {t('license.continueTrial')}
+                {t('license.continueWithTrial')}
               </Button>
             ) : null}
             <Button onClick={activate} data-testid="license-gate-activate-now">

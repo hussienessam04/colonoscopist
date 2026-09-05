@@ -8,6 +8,7 @@
 // export is preserved for tree-shakers that prefer a named import.
 
 import { useTranslation } from 'react-i18next';
+import { Button } from '@/components/ui/button';
 import { useRoute } from '@/lib/router';
 
 export function EmptyStateCard({ message }: { message?: string }): JSX.Element {
@@ -21,14 +22,14 @@ export function EmptyStateCard({ message }: { message?: string }): JSX.Element {
       <p className="text-sm text-muted-foreground">
         {message ?? t('license.emptyStateMessage')}
       </p>
-      <button
-        type="button"
+      <Button
+        variant="outline"
+        size="sm"
         onClick={() => navigate({ name: 'license' })}
-        className="text-sm font-medium text-primary underline"
         data-testid="gated-empty-state-open-license"
       >
         {t('license.emptyStateOpenLicense')}
-      </button>
+      </Button>
     </div>
   );
 }
