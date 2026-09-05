@@ -260,6 +260,14 @@ export function registerScreenshotsIpc(): void {
   // row to resolve the userData-relative file path (Anti-Pattern 2 +
   // T-08-15-T3 — security improves vs the previous crossOrigin/img
   // approach). EXEMPT from the license gate.
+  //
+  // Phase 8 / Plan 19 (G-08-12) — `bytes` is now a fresh ArrayBuffer
+  // (was `new Uint8Array(bytes)` where `bytes` was the Buffer from
+  // `fs.promises.readFile`). The Buffer-backed Uint8Array view shares
+  // the Buffer's underlying ArrayBuffer; Electron's IPC structured
+  // clone doesn't carry that shared buffer cleanly to the renderer,
+  // and the browser rejects the resulting blob with "browser rejected
+  // blob". Copying into a fresh ArrayBuffer round-trips byte-for-byte.
   ipcMain.handle(IPC.SCREENSHOTS_GET_BLOB, licenseGated(IPC.SCREENSHOTS_GET_BLOB, async (_e, raw) => {
     try {
       const { id } = safeParse(screenshotsGetBlobInput, raw, 'id');
@@ -273,9 +281,13 @@ export function registerScreenshotsIpc(): void {
       }
       const absPath = path.join(app.getPath('userData'), screenshot.filePath);
       const bytes = await readFile(absPath);
+      // Slice into a fresh ArrayBuffer so the renderer receives a
+      // standalone buffer, not a view over a Node Buffer.
+      const ab = new ArrayBuffer(bytes.byteLength);
+      new Uint8Array(ab).set(bytes);
       return {
         ok: true,
-        bytes: new Uint8Array(bytes),
+        bytes: ab,
         mimeType: 'image/jpeg',
       } satisfies ScreenshotGetBlobResult;
     } catch (err) {

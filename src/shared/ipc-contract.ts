@@ -380,10 +380,17 @@ export type ScreenshotCropResult =
   | { ok: false; code: 'IPC_SCREENSHOT_NOT_FOUND' | 'IPC_INVALID_CROP' | string };
 
 // Phase 8 / Plan 15 (G-08-8) — screenshots:get-blob result. `bytes` is a
-// Uint8Array of the raw JPEG; `mimeType` is the file's MIME (always
+// fresh ArrayBuffer of the raw JPEG; `mimeType` is the file's MIME (always
 // `image/jpeg` for v1 — the add path always writes JPEGs).
+//
+// Phase 8 / Plan 19 (G-08-12) — `ArrayBuffer` (was `Uint8Array`). The
+// renderer wraps it in `new Uint8Array(buffer)` for BlobPart. A Buffer-
+// backed Uint8Array view doesn't survive Electron's IPC structured clone
+// cleanly — the browser rejects the resulting blob with "browser rejected
+// blob". A fresh ArrayBuffer round-trips byte-for-byte and is the canonical
+// pattern for binary IPC payloads in Electron.
 export type ScreenshotGetBlobResult =
-  | { ok: true; bytes: Uint8Array; mimeType: string }
+  | { ok: true; bytes: ArrayBuffer; mimeType: string }
   | { ok: false; code: 'IPC_SCREENSHOT_NOT_FOUND' | string };
 
 // Phase 6 / Plan 01 — Doctor profile (PROF-01). Per CONTEXT.md D-02 the

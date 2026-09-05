@@ -118,10 +118,10 @@ export function ScreenshotLightbox({
         const result = await getBlob({ id: screenshot.id });
         if (cancelled) return;
         if (result.ok) {
-          // ponytail: copy into a fresh Uint8Array<ArrayBuffer> so the
-          // BlobPart type match works (same as ScreenshotCropModal).
-          const bytes = new Uint8Array(result.bytes.byteLength);
-          bytes.set(result.bytes);
+          // Phase 8 / Plan 19 (G-08-12) — `result.bytes` is a fresh
+          // ArrayBuffer (was Uint8Array view). Wrap in Uint8Array for
+          // BlobPart — same as ScreenshotCropModal.
+          const bytes = new Uint8Array(result.bytes);
           currentUrl = URL.createObjectURL(
             new Blob([bytes], { type: result.mimeType }),
           );

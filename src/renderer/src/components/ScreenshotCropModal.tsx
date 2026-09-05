@@ -261,12 +261,11 @@ export function ScreenshotCropModal({
         const result = await getBlob({ id: screenshotId });
         if (cancelled) return;
         if (result.ok) {
-          // ponytail: copy into a fresh Uint8Array<ArrayBuffer> so the
-          // BlobPart type match works (the IPC chunk may come through as
-          // Uint8Array<ArrayBufferLike> with a possibly-SharedArrayBuffer
-          // buffer view, which TS 5.5 rejects on BlobPart).
-          const bytes = new Uint8Array(result.bytes.byteLength);
-          bytes.set(result.bytes);
+          // Phase 8 / Plan 19 (G-08-12) — `result.bytes` is a fresh
+          // ArrayBuffer (was Uint8Array view). Wrap in Uint8Array for
+          // BlobPart; the underlying ArrayBuffer is clean (no Buffer
+          // view), so this is enough — no defensive copy required.
+          const bytes = new Uint8Array(result.bytes);
           createdUrl = URL.createObjectURL(
             new Blob([bytes], { type: result.mimeType }),
           );
