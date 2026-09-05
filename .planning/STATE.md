@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 16
+current_plan: 17
 status: testing
-stopped_at: Phase 08 Plan 16 shipped (Rectangle + Free-hand crop modes)
+stopped_at: Phase 08 Plan 17 shipped (shape editing + live preview after crop)
 paused_at: —
-last_updated: "2026-09-02T00:15:00Z"
+last_updated: "2026-09-02T00:16:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 16 (G-08-9 crop mode toggle: Rectangle | Free-hand | Polygon) shipped; 18/18 crop-modal tests pass (12 prior + 6 new)
+last_activity_desc: Phase 08 Plan 17 (G-08-10 shape editing + live preview) shipped; 30/30 component tests pass (25 crop-modal + 5 lightbox)
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 57
-  completed_plans: 57
+  total_plans: 58
+  completed_plans: 58
 ---
 
 **Current Plan:** 1
