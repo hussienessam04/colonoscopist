@@ -687,10 +687,13 @@ export function ScreenshotCropModal({
               data-testid="screenshot-crop-img"
               draggable={false}
               onError={() => {
-                // Plan 18 (G-08-11) — bubble up as a diagnostic so the
-                // user can Retry. The browser only fires onError when the
-                // src actually loads but the bytes aren't a valid image
-                // — distinct from an IPC failure.
+                // Plan 20 (G-08-13) — guard against Chromium's
+                // <img src=""> onError quirk. When imgSrc is null we
+                // render src='' to keep React happy, but Chromium fires
+                // onerror for empty-src URLs. The error only matters
+                // when we actually have a real blob URL — skip it
+                // otherwise so the loading state stays clean.
+                if (!imgSrc) return;
                 setImgErrorDetail(`Failed to load image: browser rejected blob`);
               }}
             />
