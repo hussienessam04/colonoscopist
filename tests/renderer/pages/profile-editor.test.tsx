@@ -536,3 +536,21 @@ describe('ProfileEditor', () => {
     });
   });
 });
+
+// Plan 08-10 / G-08-4 — when the gate returns {ok:false} via the
+// profile.get IPC the page detects the gate shape directly (the
+// useDoctorProfile hook is unchanged) and renders <EmptyStateCard>
+// inside SettingsLayout. No crash on undefined field reads.
+describe('ProfileEditor — gated-IPC graceful degrade (08-10)', () => {
+  it('renders <EmptyStateCard> when profile.get returns {ok: false, code: IPC_LICENSE_EXPIRED}', async () => {
+    const api = getApi();
+    api.profile.get.mockResolvedValue({ ok: false, code: 'IPC_LICENSE_EXPIRED' });
+    setSession();
+    await session.refresh();
+    render(<ProfileEditor />);
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+    // The clinic title card is gone — only the empty-state + the
+    // settings layout wrapper remain.
+    expect(screen.queryByTestId('profile-editor-clinicNameEn')).not.toBeInTheDocument();
+  });
+});

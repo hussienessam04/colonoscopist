@@ -231,3 +231,16 @@ describe('ReportEditor', () => {
     expect(lastCall.reveal).toBe(true);
   });
 });
+
+// Plan 08-10 / G-08-4 — when procedures.get returns {ok:false} the
+// ReportEditor no longer crashes on undefined reads; it renders the
+// <EmptyStateCard> inside the document Card.
+describe('ReportEditor — gated-IPC graceful degrade (08-10)', () => {
+  it('renders <EmptyStateCard> when procedures.get returns {ok: false, code: IPC_LICENSE_INVALID}', async () => {
+    const api = getApi();
+    api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
+    api.procedures.get.mockResolvedValue({ ok: false, code: 'IPC_LICENSE_INVALID' });
+    await renderReportEditor();
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+  });
+});

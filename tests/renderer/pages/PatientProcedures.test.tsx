@@ -233,6 +233,17 @@ describe('PatientProcedures page', () => {
     expect(getRoute().name).not.toBe('patients');
   });
 
+  it('renders <EmptyStateCard> when procedures.list returns {ok:false} even if patients.get succeeded', async () => {
+    const api = getApi();
+    api.patients.get.mockResolvedValue(PATIENT);
+    api.procedures.list.mockResolvedValue({ ok: false, code: 'IPC_LICENSE_EXPIRED' });
+    render(<PatientProcedures patientId={PATIENT_ID} />);
+    await waitFor(() => expect(api.procedures.list).toHaveBeenCalled());
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+    // Page didn't crash — patient header may render the avatar/heading.
+    expect(screen.queryByTestId('patient-procedure-row-a1')).not.toBeInTheDocument();
+  });
+
   it('text search filter: typing + Apply narrows the table to matching procedures', async () => {
     const api = getApi();
     api.procedures.list.mockResolvedValue({ rows: [PROC_A, PROC_B, PROC_C], total: 3 });

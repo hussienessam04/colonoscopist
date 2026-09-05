@@ -296,3 +296,22 @@ describe('PatientsList — UI polish (20260811-patients-list-polish)', () => {
     expect(range).toHaveTextContent('Showing 1-25 of 50');
   });
 });
+
+// Plan 08-10 / G-08-4 — when the gated IPC returns {ok: false} the
+// page must NOT crash on a missing rows/total destructure. It renders
+// <EmptyStateCard> instead. Regression test for the exact failure point
+// the UAT caught on PatientsList (the original reported issue).
+describe('PatientsList — gated-IPC graceful degrade (08-10)', () => {
+  it('renders <EmptyStateCard> when patients.list returns {ok: false, code: IPC_LICENSE_INVALID}', async () => {
+    const api = getApi();
+    api.patients.list.mockResolvedValue({
+      ok: false,
+      code: 'IPC_LICENSE_INVALID',
+    });
+    render(<PatientsList />);
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+    // Page did not crash on rows/total destructure; the table is
+    // rendered (no rows) but the EmptyStateCard sits above it.
+    expect(screen.queryByText('Alice Carter')).not.toBeInTheDocument();
+  });
+});

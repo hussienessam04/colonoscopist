@@ -128,3 +128,19 @@ describe('PatientForm (edit mode)', () => {
     expect(api.patients.update).not.toHaveBeenCalled();
   });
 });
+
+// Plan 08-10 / G-08-4 — gated patients.get must degrade gracefully
+// (render the empty-state card, do NOT navigate away, do NOT crash on
+// undefined reads).
+describe('PatientForm — gated-IPC graceful degrade (08-10)', () => {
+  it('render <EmptyStateCard> when patients.get returns {ok: false} in edit mode (no navigation, no crash)', async () => {
+    const api = getApi();
+    api.patients.get.mockResolvedValue({ ok: false, code: 'IPC_LICENSE_INVALID' });
+    render(<PatientForm mode="edit" patientId={existingPatient.id} />);
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+    // The form labels are gone — only the empty-state card is in the
+    // document. The router did NOT navigate away (we still see Back to
+    // patients inside the gated shell).
+    expect(screen.queryByLabelText(/full name/i)).not.toBeInTheDocument();
+  });
+});

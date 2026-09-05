@@ -306,3 +306,29 @@ describe('ProcedureReview gallery delete (G-05-13)', () => {
     );
   });
 });
+
+// Plan 08-10 / G-08-4 — gated IPC rejection on any of the useProcedures
+// channels (or patients.get) renders <EmptyStateCard> in the left
+// rail instead of crashing.
+describe('ProcedureReview — gated-IPC graceful degrade (08-10)', () => {
+  beforeEach(() => {
+    setRoute({ name: 'procedure-review', procedureId: 'proc-1' });
+    recordingStore.reset();
+    mockApi();
+  });
+
+  it('renders <EmptyStateCard> when useProcedures channels return {ok: false}', async () => {
+    const api = getApi();
+    // procedure gate rejects — should flip gated=true via useProcedures
+    // (propagated to the page's `gated = patientGated || proceduresGated`).
+    api.procedures.get.mockResolvedValue({ ok: false, code: 'IPC_LICENSE_INVALID' });
+    api.procedures.listSegments.mockResolvedValue([]);
+    api.procedureNotes.list.mockResolvedValue([]);
+    api.screenshots.list.mockResolvedValue([]);
+    api.patients.get.mockResolvedValue(patient);
+
+    render(<ProcedureReview />);
+
+    expect(await screen.findByTestId('gated-empty-state')).toBeInTheDocument();
+  });
+});
