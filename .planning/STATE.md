@@ -2,13 +2,13 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 0
-status: phase_complete
-stopped_at: Phase 08 complete — UAT 10/10 pass (6 gaps resolved via gap-closure plans 08-07..08-12)
+current_plan: 1
+status: testing
+stopped_at: Phase 08 marked complete — next phase is Phase 06 verify-work
 paused_at: —
-last_updated: "2026-09-02T00:11:00Z"
+last_updated: "2026-09-02T00:12:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 marked complete — all 12 plans (6 base + 6 gap-closure) shipped, VENDOR_PUBLIC_KEY_HEX reverted to shipped public half, UAT 10/10 pass
+last_activity_desc: Phase 08 marked complete + UAT 10/10 + SECURITY.md (28+ threats, 0 open) + UI-REVIEW.md (17/24, 3 blockers noted for v1.1). Phase 06 next.
 progress:
   total_phases: 8
   completed_phases: 8
