@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 11
+current_plan: 12
 status: testing
-stopped_at: UAT Test 10 (Bilingual License UI) pending; G-08-5 just resolved
+stopped_at: UAT Test 10 (Bilingual License UI) pending; G-08-6 just resolved
 paused_at: —
-last_updated: "2026-09-02T00:08:00Z"
+last_updated: "2026-09-02T00:09:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 11 (G-08-5 SettingsCapture + ProcedureRoom safeInvoke coverage) executed; 320/320 tests pass
+last_activity_desc: Phase 08 Plan 12 (G-08-6 useCaptureDeviceMap hook-level safeInvoke) executed; 21/21 tests pass
 progress:
   total_phases: 8
   completed_phases: 7
-  total_plans: 52
-  completed_plans: 51
+  total_plans: 53
+  completed_plans: 52
 ---
 
 **Current Plan:** 1

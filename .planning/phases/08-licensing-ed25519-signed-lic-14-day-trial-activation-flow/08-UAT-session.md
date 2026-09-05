@@ -1,17 +1,17 @@
 ---
 status: testing
 phase: 08-licensing-ed25519-signed-lic-14-day-trial-activation-flow
-source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md, 08-11-SUMMARY.md
+source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md, 08-11-SUMMARY.md, 08-12-SUMMARY.md
 started: 2026-09-02T00:00:00Z
-updated: 2026-09-02T00:08:00Z
+updated: 2026-09-02T00:09:00Z
 ---
 
 ## Current Test
 
-number: 10
-name: Bilingual License UI (EN + AR)
+number: 8
+name: Sidebar Badge Reflects License State
 expected: |
-  Switch app language to AR. Every License UI string translates: status labels, trial days remaining, vendor + licensed-at labels, machine id label, Load button, modal title + body, "Continue in trial" + "Activate now", EmptyStateCard text. RTL layout renders without right-edge overflow at 1280×800. Sidebar badge renders in Arabic.
+  Settings sidebar License entry shows a colored dot + label: green dot + "Licensed · Perpetual" when licensed; blue + "تجريبي"/"Trial" when on trial; red + "Expired"/"منتهي" when past 14d; gray + "Not activated"/"غير مفعّل" when unactivated. Also: Settings → Capture page must not crash on expired/unactivated state.
 awaiting: user response
 
 ## Tests
@@ -175,8 +175,30 @@ blocked: 3
 
 - gap_id: G-08-5
   truth: "When the license is expired/unactivated, ALL gated-IPC consumers render EmptyStateCard instead of crashing — including pages Plan 08-10 didn't cover (SettingsCapture, ProcedureRoom, etc.)"
-  status: failed
+  status: resolved
+  resolved_by: 08-11-PLAN.md
+  resolved_at: 2026-09-02
   reason: "User observed: with state='expired' (set via DB Browser 15-day-old trial_started_at), navigating to Settings → Capture causes the app to crash. SettingsCapture.tsx:77-104 uses `void window.api.capture.getDefaultDevice().then((device) => setSavedDeviceId(device))` — when the gate returns {ok:false}, `device` is the failure object, not a string, and downstream usage crashes. Plan 08-10 fixed 8 specific consumers but missed SettingsCapture + ProcedureRoom."
+  severity: major
+  test: 8
+  root_cause: "SettingsCapture.tsx:77-104 + ProcedureRoom.tsx:211 + 216 use the same shape assumption Plan 08-10 fixed in 8 other consumers. .then((device) => setSavedDeviceId(device)) receives the gate's {ok:false, code:'IPC_LICENSE_*'} as `device`, downstream code treats it as a string and crashes. Plan 08-10 covered PatientsList/PatientForm/PatientProcedures/ProcedurePreview/ProcedureReview/ReportEditor/ProfileEditor + useProcedures but did not include the capture.* IPC sites in SettingsCapture + ProcedureRoom."
+  artifacts:
+    - path: "src/renderer/src/pages/SettingsCapture.tsx"
+      issue: "Lines 77-104 + 160-161 use the unguarded shape assumption for window.api.capture.getDefaultDevice / getPreset / setDefaultDevice / setPreset"
+    - path: "src/renderer/src/pages/ProcedureRoom.tsx"
+      issue: "Lines 211 + 216 use the unguarded shape assumption for window.api.capture.getDefaultDevice / getPreset"
+  missing:
+    - "Wrap all capture.* IPC calls in SettingsCapture.tsx with safeInvoke"
+    - "Wrap all capture.* IPC calls in ProcedureRoom.tsx with safeInvoke"
+    - "Render EmptyStateCard on null result in SettingsCapture"
+    - "ProcedureRoom reuses existing no-device overlay path"
+    - "Add regression tests for both pages"
+  debug_session: "Plan 08-11 commits: 68b4a28 (SettingsCapture.tsx + ProcedureRoom.tsx wired with safeInvoke + EmptyStateCard) + faa35e6 (3 new regression tests in settings-capture.test.tsx + procedure-room.test.tsx) + abd0d0f (SUMMARY). Verification: typecheck:web clean for 5 modified files, vitest 15/15 pass on the two affected test files (10 settings-capture incl. 2 new + 5 procedure-room incl. 1 new), full renderer Vitest 320/320 green."
+
+- gap_id: G-08-6
+  truth: "Hooks that call gated IPCs (e.g. useCaptureDeviceMap → capture.listDevices) must also wrap with safeInvoke — Plan 08-11 covered the consuming pages but missed the hooks they depend on"
+  status: failed
+  reason: "User observed after Plan 08-11 ships: Settings → Capture still crashes on expired state. Root cause: useCaptureDeviceMap hook (used by SettingsCapture) calls `window.api.capture.listDevices()` unguarded. On expired state, the gate returns {ok:false}, setDshow(dshowDevices) sets dshow to the gate object, then dshow.find(...) on line 55 crashes. Plan 08-11 wrapped the page-level calls (getDefaultDevice, getPreset, setDefaultDevice, setPreset) but the hook fires first and crashes before the page can render."
   severity: major
   test: 8
   root_cause: ""
