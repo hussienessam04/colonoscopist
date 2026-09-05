@@ -19,16 +19,14 @@
 // <machineId>.lic to cwd. The .lic file is what the clinic loads via
 // the LICENSE_ACTIVATE / LICENSE_PICK_AND_ACTIVATE IPC handlers.
 
-const archiver = require('archiver');
-const ed = require('@noble/ed25519');
-const { sha512 } = require('@noble/hashes/sha2.js');
 const fs = require('node:fs');
 const path = require('node:path');
 
-// ponytail: sha512 hookup is REQUIRED for @noble/ed25519 v3 — the
-// library's default hash is undefined. Without this line, ed.signAsync
-// throws synchronously (same reason as src/main/license/verify.ts).
-ed.hashes.sha512 = sha512;
+// ponytail: archiver v8 + @noble/ed25519 v3 + @noble/hashes are ESM-only —
+// require() returns the namespace object, not the callable. Dynamic import
+// is the only interop shape that works under Node 22+ CJS (same root cause
+// as the Plan 08-07 ESM fix; src/main/backup/index.ts:52 already uses this
+// pattern).
 
 async function main() {
   const [machineFingerprint, vendorId] = process.argv.slice(2);
@@ -38,23 +36,34 @@ async function main() {
     process.exit(1);
   }
 
+  const archiverMod = await import('archiver');
+  const { ZipArchive } = archiverMod;
+  const ed = await import('@noble/ed25519');
+  const hashes = await import('@noble/hashes/sha2.js');
+  // ponytail: sha512 hookup is REQUIRED for @noble/ed25519 v3 — the
+  // library's default hash is undefined. Without this line, ed.signAsync
+  // throws synchronously (same reason as src/main/license/verify.ts).
+  ed.hashes.sha512 = hashes.sha512;
+
   const keyPath =
     process.env.LICENSE_SIGNING_KEY_PATH || path.join(process.cwd(), 'secrets', 'ed25519.private');
   let privateKey;
   try {
-    const keyHex = fs.readFileSync(keyPath, 'utf8').trim();
-    privateKey = Uint8Array.from(keyHex.split(',').map((s) => parseInt(s.trim(), 10)));
+    const keyRaw = fs.readFileSync(keyPath, 'utf8').trim();
+    // Accept both formats: comma-separated decimal bytes (legacy) OR pure hex
+    if (keyRaw.includes(',')) {
+      privateKey = Uint8Array.from(keyRaw.split(',').map((s) => parseInt(s.trim(), 10)));
+    } else {
+      privateKey = Uint8Array.from(keyRaw.match(/.{1,2}/g).map((h) => parseInt(h, 16)));
+    }
   } catch (err) {
     console.error(`Failed to read private key from ${keyPath}: ${err.message}`);
-    console.error(
-      'Generate a key with: node -e "import(\'@noble/ed25519\').then(m => { const k = m.keygen(); console.log(Array.from(k.secretKey).join(\',\')); })"',
-    );
     process.exit(2);
   }
 
   if (privateKey.length !== 32) {
     console.error(
-      `Private key must be exactly 32 bytes (got ${privateKey.length}). Comma-separated bytes expected.`,
+      `Private key must be exactly 32 bytes (got ${privateKey.length}).`,
     );
     process.exit(2);
   }
@@ -73,7 +82,7 @@ async function main() {
 
   const outPath = `${machineFingerprint.slice(0, 12)}.lic`;
   const output = fs.createWriteStream(outPath);
-  const archive = archiver('zip', { zlib: { level: 9 } });
+  const archive = new ZipArchive({ zlib: { level: 9 } });
   archive.pipe(output);
   archive.append(json, { name: 'license.json' });
   archive.append(signature, { name: 'license.sig' });
