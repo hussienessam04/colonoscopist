@@ -83,6 +83,8 @@ type MockApi = {
     list: ReturnType<typeof vi.fn>;
     delete: ReturnType<typeof vi.fn>;
     updateAnnotation: ReturnType<typeof vi.fn>;
+    // Phase 8 / Plan 14 — permanent crop (SCRN-02 extended).
+    crop: ReturnType<typeof vi.fn>;
   };
   // Phase 6 / Plan 02 — Profile + Reports namespaces. Plan 06-01 wired
   // the IPC contract; the renderer pages (ProfileEditor, ReportEditor,
@@ -227,6 +229,11 @@ export function mockApi(): MockApi {
       list: vi.fn().mockResolvedValue([]),
       delete: vi.fn().mockResolvedValue(undefined),
       updateAnnotation: vi.fn(),
+      crop: vi.fn().mockResolvedValue({
+        ok: true,
+        newDimensions: { width: 10, height: 10 },
+        byteSize: 4,
+      }),
     },
     // Phase 6 / Plan 02 — defaults that resolve to safe empty values
     // so any page that mounts the ProfileEditor / ReportEditor on

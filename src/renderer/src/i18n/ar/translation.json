@@ -538,5 +538,16 @@
     "sidebarBadgeUnactivated": "غير مفعّل",
     "emptyStateMessage": "الترخيص مطلوب — افتح الإعدادات → الترخيص للتفعيل.",
     "emptyStateOpenLicense": "افتح إعدادات الترخيص"
+  },
+  "screenshot": {
+    "cropButton": "قص",
+    "cropModalTitle": "قص صورة الشاشة",
+    "cropApply": "تطبيق",
+    "cropCancel": "إلغاء",
+    "cropSuccess": "تم قص صورة الشاشة",
+    "cropInProgress": "جارٍ القص…",
+    "cropSelectHint": "اسحب لتحديد منطقة",
+    "cropInvalid": "يجب أن يكون التحديد داخل الصورة",
+    "cropFailed": "فشل القص"
   }
 }

@@ -22,6 +22,8 @@
 // T-05-28 + the new subdir allow-list from G-05-14) protects this
 // route.
 
+import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -29,7 +31,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Trash2, X } from 'lucide-react';
+import { Crop, Trash2, X } from 'lucide-react';
+import { ScreenshotCropModal } from '@/components/ScreenshotCropModal';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import { screenshotUrl } from '@/lib/screenshot-url';
 import type { Screenshot } from '@shared/ipc-contract';
@@ -56,12 +59,19 @@ export function ScreenshotLightbox({
   onDelete,
   testId,
 }: ScreenshotLightboxProps): JSX.Element {
+  const { t } = useTranslation();
+  const [cropOpen, setCropOpen] = useState(false);
+  // Plan 14 — crop overwrites the source JPEG in place, so the URL is
+  // unchanged and the browser would serve the stale cached bytes. Bump
+  // a token after a successful crop to force a re-fetch. Stays 0 (and
+  // the URL stays pristine) until the doctor actually crops.
+  const [cacheBuster, setCacheBuster] = useState(0);
   const open = screenshot !== null;
   // G-05-15 — canonicalize onto the shared helper. The lightbox owns
   // no URL composition logic; it just calls the helper and trusts the
   // URL. The leaf-filename regex + the literal `screenshots/` subdir
   // + the /media/ route shape all live in `screenshotUrl` now.
-  const src = screenshot
+  const baseSrc = screenshot
     ? screenshotUrl({
         mediaBaseUrl,
         patientId,
@@ -69,14 +79,16 @@ export function ScreenshotLightbox({
         filePath: screenshot.filePath,
       })
     : null;
+  const src = baseSrc !== null && cacheBuster > 0 ? `${baseSrc}?v=${cacheBuster}` : baseSrc;
   const testIdPrefix = testId ?? 'screenshot-lightbox';
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(nextOpen) => {
-        if (!nextOpen) onClose();
-      }}
-    >
+    <>
+      <Dialog
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) onClose();
+        }}
+      >
       <DialogContent
         className="max-w-4xl border-slate-700 bg-slate-900 text-white"
         data-testid={testIdPrefix}
@@ -121,20 +133,43 @@ export function ScreenshotLightbox({
             </p>
           )}
         </div>
-        {onDelete && screenshot ? (
-          <div className="flex justify-end">
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => onDelete(screenshot)}
-              data-testid="screenshot-lightbox-delete"
-            >
-              <Trash2 aria-hidden="true" />
-              Delete
-            </Button>
+        {screenshot && (onDelete || src) ? (
+          <div className="flex justify-end gap-2">
+            {src ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setCropOpen(true)}
+                data-testid="screenshot-lightbox-crop"
+              >
+                <Crop aria-hidden="true" />
+                {t('screenshot.cropButton')}
+              </Button>
+            ) : null}
+            {onDelete ? (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => onDelete(screenshot)}
+                data-testid="screenshot-lightbox-delete"
+              >
+                <Trash2 aria-hidden="true" />
+                Delete
+              </Button>
+            ) : null}
           </div>
         ) : null}
       </DialogContent>
-    </Dialog>
+      </Dialog>
+      {screenshot && src ? (
+        <ScreenshotCropModal
+          open={cropOpen}
+          screenshotId={screenshot.id}
+          src={src}
+          onClose={() => setCropOpen(false)}
+          onCropped={() => setCacheBuster(Date.now())}
+        />
+      ) : null}
+    </>
   );
 }

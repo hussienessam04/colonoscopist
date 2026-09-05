@@ -530,5 +530,16 @@
     "sidebarBadgeUnactivated": "Not activated",
     "emptyStateMessage": "License required — open Settings → License to activate.",
     "emptyStateOpenLicense": "Open License settings"
+  },
+  "screenshot": {
+    "cropButton": "Crop",
+    "cropModalTitle": "Crop screenshot",
+    "cropApply": "Apply",
+    "cropCancel": "Cancel",
+    "cropSuccess": "Screenshot cropped",
+    "cropInProgress": "Cropping…",
+    "cropSelectHint": "Drag to select an area",
+    "cropInvalid": "Selection must be inside the image",
+    "cropFailed": "Crop failed"
   }
 }
