@@ -27,7 +27,7 @@ import yauzl from 'yauzl';
 // — the matching private key (NOT included here) signs vendor `.lic` files
 // via scripts/gen-license.cjs (Plan 04).
 export const VENDOR_PUBLIC_KEY_HEX =
-  'fe5adcec4424f65402686c7fd3f175fead71dd53fcec9f85326d35e0b43038e9';
+  '3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363';
 
 export type VerifyResult =
   | {
