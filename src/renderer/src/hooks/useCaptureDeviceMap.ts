@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CaptureDevice } from '@shared/ipc-contract';
+import { safeInvoke } from '@/lib/ipc-result';
 
 const comparable = (value: string): string => value.trim().toLocaleLowerCase();
 
@@ -18,15 +19,26 @@ export function useCaptureDeviceMap(): {
 
   useEffect(() => {
     let cancelled = false;
-
-    void Promise.all([
-      window.api.capture.listDevices(),
-      navigator.mediaDevices.enumerateDevices(),
-    ])
-      .then(([dshowDevices, mediaDevices]) => {
+    // Plan 08-12 / G-08-6 — wrap capture.listDevices through safeInvoke.
+    // On license state 'expired' / 'unactivated' the main-process gate
+    // returns {ok:false, code:'IPC_LICENSE_*'}; safeInvoke yields null
+    // and we surface an empty device list + a license-aware error so
+    // downstream SettingsCapture / ProcedureRoom render the EmptyStateCard
+    // path instead of crashing on dshow.find() (which would receive the
+    // {ok:false} object as if it were CaptureDevice[]).
+    void safeInvoke(window.api.capture.listDevices())
+      .then((dshowDevices) => {
         if (cancelled) return;
-        setDshow(dshowDevices);
-        setBrowser(mediaDevices.filter((device) => device.kind === 'videoinput'));
+        if (dshowDevices === null) {
+          setDshow([]);
+          setError('License required — activate to list capture devices.');
+          return;
+        }
+        return navigator.mediaDevices.enumerateDevices().then((mediaDevices) => {
+          if (cancelled) return;
+          setDshow(dshowDevices);
+          setBrowser(mediaDevices.filter((device) => device.kind === 'videoinput'));
+        });
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
