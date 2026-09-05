@@ -43,6 +43,7 @@ import { Button } from '@/components/ui/button';
 import { Crop, Trash2, X } from 'lucide-react';
 import { ScreenshotCropModal } from '@/components/ScreenshotCropModal';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { screenshotUrl } from '@/lib/screenshot-url';
 import type { Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotLightboxProps = {
@@ -82,11 +83,20 @@ export function ScreenshotLightbox({
 
   // Phase 8 / Plan 17 (G-08-10) — `mediaBaseUrl`, `patientId`, and
   // `procedureId` were only consumed by the (removed) MediaServer URL
-  // path. They're still in the public props for backward-compat with
-  // existing callers; we ignore them now.
-  void mediaBaseUrl;
-  void patientId;
-  void procedureId;
+  // path. Plan 18 (G-08-11) re-uses them for the crop modal's read-only
+  // fallback: when getBlob fails, the modal displays the screenshot
+  // via the MediaServer URL via screenshotUrl().
+  // ponytail: returns null when mediaBaseUrl is null — the fallback is
+  // silently skipped in that case (the modal still shows the error +
+  // Retry button).
+  const fallbackSrc = screenshot && mediaBaseUrl
+    ? screenshotUrl({
+        mediaBaseUrl,
+        patientId,
+        procedureId,
+        filePath: screenshot.filePath,
+      })
+    : null;
 
   // Fetch JPEG bytes via IPC and build a fresh blob: URL on every
   // (screenshot.id, cacheBuster) transition. The previous blob URL is
@@ -216,6 +226,11 @@ export function ScreenshotLightbox({
         <ScreenshotCropModal
           open={cropOpen}
           screenshotId={screenshot.id}
+          // Plan 18 (G-08-11) — bumped after a successful crop so the
+          // modal re-fetches the freshly-cropped bytes; without this
+          // the modal's <img> keeps showing the pre-crop blob.
+          cacheBuster={cacheBuster}
+          fallbackSrc={fallbackSrc}
           // ponytail: do NOT pass `src` — the modal fetches its own blob
           // via screenshots.getBlob. Sharing ours would couple the two
           // blob lifecycles and confuse the URL.revokeObjectURL cleanup.
@@ -223,7 +238,8 @@ export function ScreenshotLightbox({
           onCropped={() => {
             // Plan 17 live preview: bump cacheBuster so this component
             // re-runs its blob-fetch effect and the <img> rebinds to
-            // the newly-cropped JPEG bytes.
+            // the newly-cropped JPEG bytes. Plan 18: the modal also
+            // receives the new value and re-fetches its own blob.
             setCacheBuster(Date.now());
           }}
         />

@@ -554,6 +554,8 @@
     "cropModeHint": "اختر نمطاً، ثم اسحب للتحديد",
     "cropAtLeastThreePoints": "أضف 3 نقاط على الأقل لتحديد شكل",
     "cropInvalid": "يجب أن يكون التحديد داخل الصورة",
-    "cropFailed": "فشل القص"
+    "cropFailed": "فشل القص",
+    "cropRetry": "إعادة المحاولة",
+    "cropReadOnly": "عرض فقط"
   }
 }

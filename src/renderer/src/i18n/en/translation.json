@@ -546,6 +546,8 @@
     "cropModeHint": "Choose a mode, then drag to select",
     "cropAtLeastThreePoints": "Add at least 3 points to define a shape",
     "cropInvalid": "Selection must be inside the image",
-    "cropFailed": "Crop failed"
+    "cropFailed": "Crop failed",
+    "cropRetry": "Retry",
+    "cropReadOnly": "Show only"
   }
 }

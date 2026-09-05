@@ -115,6 +115,15 @@ export type ScreenshotCropModalProps = {
   // Kept for backward compat (tests / older callers). When omitted the
   // modal fetches its own blob URL via `screenshots.getBlob` on mount.
   src?: string;
+  // Plan 18 (G-08-11) — bumped by the parent Lightbox after a successful
+  // crop so the modal re-fetches the freshly-cropped bytes and the <img>
+  // rebinds without close/reopen. Defaults to 0 (mount only).
+  cacheBuster?: number;
+  // Plan 18 (G-08-11) — read-only fallback URL composed by the Lightbox
+  // via `screenshotUrl()` against the MediaServer `/media/` route. When
+  // getBlob fails the doctor can pick "Show only" to display this URL
+  // (no crop UI — canvas-taint blocks drawImage from a MediaServer URL).
+  fallbackSrc?: string | null;
   onClose: () => void;
   onCropped: (result: { width: number; height: number; byteSize: number }) => void;
 };
@@ -159,6 +168,8 @@ export function ScreenshotCropModal({
   open,
   screenshotId,
   src,
+  cacheBuster = 0,
+  fallbackSrc = null,
   onClose,
   onCropped,
 }: ScreenshotCropModalProps): JSX.Element {
@@ -191,18 +202,45 @@ export function ScreenshotCropModal({
 
   const [imgSrc, setImgSrc] = useState<string | null>(src ?? null);
   const [applying, setApplying] = useState(false);
-  const [imgError, setImgError] = useState<string | null>(null);
+  // Plan 18 (G-08-11) — Diagnostic state for the image fetch. Carries
+  // the actual IPC code (e.g. `IPC_SCREENSHOT_NOT_FOUND`) so the user
+  // can report it back; a generic "Crop failed" string is useless for
+  // debugging. Retry bumps `retryNonce` to force the fetch effect to
+  // rerun without flipping `open`.
+  const [imgErrorDetail, setImgErrorDetail] = useState<string | null>(null);
+  // Plan 18 (G-08-11) — read-only fallback display. When getBlob fails
+  // the modal shows the error UI + a "Show only" button. Clicking it
+  // flips `showReadOnly` on, which renders the parent-supplied
+  // `fallbackSrc` (a MediaServer URL — canvas-taint rules out cropping
+  // from it, so the crop UI is hidden in this branch).
+  const [showReadOnly, setShowReadOnly] = useState(false);
+  const [retryNonce, setRetryNonce] = useState(0);
+
+  // Plan 18 (G-08-11) — Retry handler. Resets the error + fallback flags
+  // and bumps retryNonce so the getBlob useEffect re-runs.
+  function retry(): void {
+    setImgErrorDetail(null);
+    setImgSrc(null);
+    setShowReadOnly(false);
+    setRetryNonce((n) => n + 1);
+  }
 
   // Fetch the JPEG bytes via IPC and build a blob: URL. Used as the
   // <img> src so drawImage() does not taint the canvas. The blob URL is
   // revoked on close/unmount to free the allocation.
+  //
+  // Plan 18 (G-08-11) — re-runs when `cacheBuster` (parent bumped after
+  // a successful crop) or `retryNonce` (user clicked Retry) changes so
+  // the modal rebinds to the freshly-cropped bytes or recovers from a
+  // transient IPC error without a close/reopen.
   useEffect(() => {
     if (!open) {
       setFinalPolygon([]);
       setRect(null);
       setFreehandPath([]);
       setDrag(null);
-      setImgError(null);
+      setImgErrorDetail(null);
+      setShowReadOnly(false);
       // Note: image src is revoked in the cleanup below when the effect
       // re-runs (open=false). Keep state simple.
       return;
@@ -211,11 +249,12 @@ export function ScreenshotCropModal({
     let createdUrl: string | null = null;
     void (async (): Promise<void> => {
       // Try the IPC first. If it succeeds we own a blob: URL — clean up
-      // on unmount. If it fails fall through to the caller-provided
-      // `src` (tests + older callers).
+      // on unmount. If it fails, surface the actual IPC code (Plan 18)
+      // so the doctor can report it back; do NOT fall back to `src`
+      // (Plan 17 removed the legacy caller-provided src path).
       const getBlob = window.api.screenshots?.getBlob;
       if (typeof getBlob !== 'function') {
-        setImgSrc(src ?? null);
+        setImgErrorDetail(`Failed to load image: IPC channel unavailable`);
         return;
       }
       try {
@@ -231,15 +270,17 @@ export function ScreenshotCropModal({
           createdUrl = URL.createObjectURL(
             new Blob([bytes], { type: result.mimeType }),
           );
+          setImgErrorDetail(null);
           setImgSrc(createdUrl);
           return;
         }
-        // Fall back to the caller-provided src if it exists.
-        setImgSrc(src ?? null);
-        setImgError(t('screenshot.cropFailed'));
-      } catch {
+        setImgErrorDetail(`Failed to load image: ${result.code ?? 'unknown'}`);
+        setImgSrc(null);
+      } catch (err) {
         if (cancelled) return;
-        setImgSrc(src ?? null);
+        const message = err instanceof Error ? err.message : 'unknown';
+        setImgErrorDetail(`Failed to load image: ${message}`);
+        setImgSrc(null);
       }
     })();
     return () => {
@@ -248,7 +289,7 @@ export function ScreenshotCropModal({
         URL.revokeObjectURL(createdUrl);
       }
     };
-  }, [open, screenshotId, src, t]);
+  }, [open, screenshotId, src, t, retryNonce, cacheBuster]);
 
   // Reset every selection state — used by the mode toggle buttons and
   // the Clear button. Switching modes mid-selection should never leave a
@@ -625,7 +666,7 @@ export function ScreenshotCropModal({
                     : 'crosshair',
             }}
           >
-            {imgSrc === null ? (
+            {imgSrc === null && imgErrorDetail === null ? (
               // ponytail: render the <img> ALWAYS so the test surface +
               // the naturalWidth/Height refs are stable from the first
               // render. The src is empty until the IPC fetch lands; the
@@ -647,8 +688,11 @@ export function ScreenshotCropModal({
               data-testid="screenshot-crop-img"
               draggable={false}
               onError={() => {
-                // Surface the error inline — the user can hit Cancel.
-                setImgError(t('screenshot.cropFailed'));
+                // Plan 18 (G-08-11) — bubble up as a diagnostic so the
+                // user can Retry. The browser only fires onError when the
+                // src actually loads but the bytes aren't a valid image
+                // — distinct from an IPC failure.
+                setImgErrorDetail(`Failed to load image: browser rejected blob`);
               }}
             />
             {/* SVG overlay — covers the image's bounding box exactly.
@@ -715,16 +759,66 @@ export function ScreenshotCropModal({
                 ))}
               </svg>
             ) : null}
-            {imgError !== null ? (
-              <p
-                className="mt-2 text-center text-sm text-red-400"
-                data-testid="screenshot-crop-img-error"
+            {/* Plan 18 (G-08-11) — diagnostic error UI. Shows the actual
+                IPC code (or throw message) + a Retry button so the user
+                can recover without closing the modal. When the parent
+                provided a fallbackSrc, a "Show only" button toggles
+                read-only display via the MediaServer URL. */}
+            {imgErrorDetail !== null ? (
+              <div
+                className="flex flex-col items-center justify-center gap-3 p-8 text-center"
+                data-testid="crop-modal-error"
               >
-                {imgError}
-              </p>
+                <p
+                  className="text-sm text-red-400"
+                  data-testid="screenshot-crop-img-error"
+                >
+                  {imgErrorDetail}
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={retry}
+                    data-testid="crop-modal-retry"
+                  >
+                    {t('screenshot.cropRetry')}
+                  </Button>
+                  {fallbackSrc !== null && !showReadOnly ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowReadOnly(true)}
+                      data-testid="crop-modal-readonly"
+                    >
+                      {t('screenshot.cropReadOnly')}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
             ) : null}
           </div>
         </div>
+        {/* Plan 18 (G-08-11) — read-only display branch. Rendered as a
+            sibling of the surface div (NOT inside it) so the surface
+            handlers can't accidentally enable a crop attempt against a
+            tainted MediaServer URL. Canvas-taint rules out drawImage
+            from this src, so Apply stays disabled (finalPolygon stays
+            empty — the existing gating does the right thing). */}
+        {showReadOnly && fallbackSrc !== null ? (
+          <div
+            className="flex justify-center rounded bg-black"
+            data-testid="screenshot-crop-readonly"
+          >
+            <img
+              src={fallbackSrc}
+              alt={t('screenshot.cropModalTitle')}
+              className="max-h-[60vh] w-auto object-contain"
+              data-testid="screenshot-crop-readonly-img"
+              draggable={false}
+            />
+          </div>
+        ) : null}
         {finalPolygon.length > 0 && finalPolygon.length < MIN_POLYGON_VERTICES ? (
           <p
             className="text-center text-sm text-amber-500"

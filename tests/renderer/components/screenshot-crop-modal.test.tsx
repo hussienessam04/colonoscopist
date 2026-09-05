@@ -665,4 +665,116 @@ describe('ScreenshotCropModal (Plan 14 + Plan 15 polygon)', () => {
     expect(minY).toBeGreaterThan(100 - 1); // starting sample y; allow 1px slack
     expect(arg.cropPolygon.length).toBeGreaterThanOrEqual(3);
   });
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Phase 8 / Plan 18 (G-08-11) — diagnostic error display + Retry +
+  // cacheBuster refresh + media-server URL fallback. Closes the user-
+  // reported "Crop failed" + stale-image-after-crop issues from Plan 17.
+  //
+  // The modal must surface the actual IPC code so the doctor can report
+  // it back; Retry must re-trigger the fetch without a close/reopen; a
+  // cacheBuster change from the parent must re-fetch the freshly-cropped
+  // bytes so the modal's <img> rebinds immediately.
+  // ─────────────────────────────────────────────────────────────────────
+
+  it('Plan 18: getBlob ok:false surfaces the IPC code + Retry button', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockResolvedValue({
+      ok: false,
+      code: 'IPC_SCREENSHOT_NOT_FOUND',
+    });
+    renderModal();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('crop-modal-error')).toBeInTheDocument(),
+    );
+    // The error message must contain the actual code, not the v1
+    // generic "Crop failed" string.
+    expect(
+      screen.getByTestId('screenshot-crop-img-error').textContent,
+    ).toContain('IPC_SCREENSHOT_NOT_FOUND');
+    // Retry button is visible + clickable.
+    expect(screen.getByTestId('crop-modal-retry')).toBeInTheDocument();
+  });
+
+  it('Plan 18: clicking Retry re-triggers the getBlob fetch', async () => {
+    const api = getApi();
+    api.screenshots.getBlob
+      .mockResolvedValueOnce({ ok: false, code: 'IPC_SCREENSHOT_NOT_FOUND' })
+      // Second call resolves successfully — proves Retry re-runs the effect.
+      .mockResolvedValueOnce({
+        ok: true,
+        bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x03, 0x04]),
+        mimeType: 'image/jpeg',
+      });
+    renderModal();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('crop-modal-error')).toBeInTheDocument(),
+    );
+    expect(api.screenshots.getBlob).toHaveBeenCalledTimes(1);
+
+    // Click Retry — the effect re-runs and the success path clears the error.
+    fireEvent.click(screen.getByTestId('crop-modal-retry'));
+    await waitFor(() => expect(api.screenshots.getBlob).toHaveBeenCalledTimes(2));
+    await waitFor(() =>
+      expect(screen.queryByTestId('crop-modal-error')).toBeNull(),
+    );
+  });
+
+  it('Plan 18: cacheBuster change re-fetches the blob URL (live preview after crop)', async () => {
+    const api = getApi();
+    const onCropped = vi.fn();
+    api.screenshots.crop.mockResolvedValue({
+      ok: true,
+      newDimensions: { width: 100, height: 100 },
+      byteSize: 4,
+    });
+
+    const { rerender } = render(
+      <ScreenshotCropModal
+        open
+        screenshotId={7}
+        cacheBuster={0}
+        onClose={vi.fn()}
+        onCropped={onCropped}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(api.screenshots.getBlob).toHaveBeenCalledTimes(1),
+    );
+    const firstSrc = (screen.getByTestId('screenshot-crop-img') as HTMLImageElement).src;
+
+    // Parent bumps cacheBuster after a successful crop — the modal must
+    // re-fetch the freshly-cropped bytes and rebind the <img>.
+    rerender(
+      <ScreenshotCropModal
+        open
+        screenshotId={7}
+        cacheBuster={Date.now()}
+        onClose={vi.fn()}
+        onCropped={onCropped}
+      />,
+    );
+    await waitFor(() =>
+      expect(api.screenshots.getBlob).toHaveBeenCalledTimes(2),
+    );
+    const secondSrc = (screen.getByTestId('screenshot-crop-img') as HTMLImageElement).src;
+    // Each fetch creates a fresh blob: URL — the rebind is the whole point.
+    expect(secondSrc).not.toBe(firstSrc);
+  });
+
+  it('Plan 18: getBlob catch path surfaces the error message in the diagnostic', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockRejectedValue(new Error('IPC channel closed'));
+    renderModal();
+
+    await waitFor(() =>
+      expect(screen.getByTestId('crop-modal-error')).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByTestId('screenshot-crop-img-error').textContent,
+    ).toContain('IPC channel closed');
+  });
 });
