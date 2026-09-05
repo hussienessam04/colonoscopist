@@ -1,34 +1,34 @@
 ---
 status: testing
 phase: 08-licensing-ed25519-signed-lic-14-day-trial-activation-flow
-source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md
+source: 08-01-SUMMARY.md, 08-02-SUMMARY.md, 08-03-SUMMARY.md, 08-04-SUMMARY.md, 08-05-SUMMARY.md, 08-06-SUMMARY.md, 08-07-SUMMARY.md, 08-08-SUMMARY.md, 08-09-SUMMARY.md, 08-10-SUMMARY.md
 started: 2026-09-02T00:00:00Z
-updated: 2026-09-02T00:05:00Z
+updated: 2026-09-02T00:06:00Z
 ---
 
 ## Current Test
 
-number: 1
-name: Cold Start Smoke Test
+number: 3
+name: LicenseGate Modal Appears on First Boot (unactivated)
 expected: |
-  Fresh install (no .lic, no prior app data). Launch the app. App boots without errors. The wizard appears and asks for PIN + clinic info. After completion, the app shows the Patient List with the Settings sidebar showing a License entry. License status returns 'trial' with 14 days remaining.
+  Wipe trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, "Activate now" primary button, and (for unactivated only) "Continue in trial" outline button. The modal is dismissable per-session.
 awaiting: user response
 
 ## Tests
 
 ### 1. Cold Start Smoke Test
 expected: Fresh install (no .lic, no prior app data) — app boots cleanly, wizard appears, completes, migration 0011 applies, license status returns trial/14-days-remaining after wizard bootstrap. No errors in main process console.
-result: issue
-reported: "User shared screenshot: LicenseGate modal 'Activate Colonoscopist' with 'Continue in trial' + 'Activate now' buttons fires ON TOP OF the wizard. The user is mid-wizard ('Set up your clinic', PIN + clinic + language fields visible) and the modal blocks the form. This is different from the previous G-08-2 (post-wizard cache); this is the modal firing DURING the wizard itself. App.tsx:158 wraps every route (including 'wizard') with <LicenseGate>; LicenseGate.tsx has no wizard-route awareness, so it fires for state='unactivated' regardless of route."
-severity: major
+result: pass
 
 ### 2. Fresh Install Starts 14-Day Trial
 expected: After wizard completion, Settings → License shows a status card reading "Trial" with "14 days remaining". The audit page shows a `license.trial_started` row.
-result: pending
+result: pass
 
 ### 3. LicenseGate Modal Appears on First Boot (unactivated)
-expected: Clear `<userData>/data/license/` sidecar AND wipe the trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, a "Continue in trial" outline button (only for unactivated), and an "Activate now" primary button. The modal is dismissable per-session.
-result: pending
+expected: Wipe trial_started_at row in settings (simulate expired trial), restart app. A modal appears above any route with "Welcome to Colonoscopist" copy, "Activate now" primary button, and (for unactivated only) "Continue in trial" outline button. The modal is dismissable per-session.
+result: issue
+reported: "Modal renders momentarily then app white-screens before user can interact. The gated IPC `patients.list` returns `{ok: false, code: 'IPC_LICENSE_INVALID'}` but the renderer's SWR hook (likely usePatients) doesn't handle the discriminated union — crashes React tree, white screen."
+severity: blocker
 
 ### 4. Activate via Valid .lic File
 expected: Settings → License → click "Load .lic file…" → file picker opens filtered to `*.lic`. Pick a valid Ed25519-signed `license.json` + `license.sig` sidecar that matches this workstation's fingerprint. Toast success appears. Page updates to show "Licensed · Perpetual" badge (green dot), vendor id, licensed-at timestamp, and machine id grouped in 4-char blocks.
@@ -73,9 +73,9 @@ result: pending
 ## Summary
 
 total: 10
-passed: 0
+passed: 2
 issues: 1
-pending: 3
+pending: 1
 skipped: 0
 blocked: 6
 
@@ -148,3 +148,14 @@ blocked: 6
     - "Add 2 new test cases (wizard route + login route exemption) to tests/renderer/pages/license-gate.test.tsx"
     - "Re-run typecheck:web + license-gate tests to confirm no regression to the 6 existing cases"
   debug_session: "Plan 08-09 commits: db1dfb7 (LicenseGate.tsx: widen destructure + widen predicate + header comment update) + 7636ee5 (license-gate.test.tsx: 2 new regression-guard test cases) + a7070fa (SUMMARY). Verification: typecheck:web no new errors, license-gate tests 8/8 pass (6 existing + 2 new). Wizard now renders cleanly on first launch; modal still gates every authenticated route as before."
+
+- gap_id: G-08-4
+  truth: "When the LicenseGate modal fires for unactivated state and a gated IPC returns {ok: false, code: 'IPC_LICENSE_INVALID'}, the renderer renders gracefully (empty-state fallback) rather than crashing to a white screen — modal must remain interactable"
+  status: failed
+  reason: "User observed: deleted trial_started_at row → login → modal renders briefly → white screen before user can click. The gated IPC (likely patients.list via usePatients SWR hook) returns {ok: false, code: 'IPC_LICENSE_INVALID'} but the SWR hook doesn't branch on the discriminated union — likely crashes React tree or returns malformed data that breaks downstream render."
+  severity: blocker
+  test: 3
+  root_cause: ""
+  artifacts: []
+  missing: []
+  debug_session: ""
