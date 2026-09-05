@@ -1,4 +1,4 @@
-// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 + Plan 16 (SCRN-02 extended).
+// ScreenshotCropModal — Phase 8 / Plan 14 + Plan 15 + Plan 16 + Plan 17 (SCRN-02 extended).
 //
 // A doctor's mid-procedure framing often includes scope chrome or
 // adjacent anatomy. This modal lets the user define a crop area over
@@ -53,6 +53,62 @@ import {
 import { Button } from '@/components/ui/button';
 import type { CropPolygon } from '@shared/ipc-contract';
 
+// Phase 8 / Plan 17 (G-08-10) — shape editing after commit. The Rectangle /
+// Free-hand / Polygon modes flow into the same `finalPolygon` state. Once
+// committed, vertices and edges become draggable so the doctor can nudge a
+// selection without redrawing from scratch. ponytail: these helpers are
+// tiny — standard textbook primitives, no library.
+const VERTEX_HIT_RADIUS_PX = 8; // mouseover / click radius to grab a vertex
+
+function clamp(v: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, v));
+}
+
+function hitTestVertex(
+  x: number,
+  y: number,
+  polygon: DisplayPoint[],
+): number {
+  for (let i = 0; i < polygon.length; i++) {
+    const p = polygon[i]!;
+    if (Math.hypot(p.x - x, p.y - y) <= VERTEX_HIT_RADIUS_PX) return i;
+  }
+  return -1;
+}
+
+// Ray casting. Points exactly on an edge return false — for our purposes
+// (decide drag-vs-no-drag) treating "on edge" as "outside" is fine.
+function pointInPolygon(
+  x: number,
+  y: number,
+  polygon: DisplayPoint[],
+): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const pi = polygon[i]!;
+    const pj = polygon[j]!;
+    if (pi.y === pj.y) continue;
+    const intersect =
+      (pi.y > y) !== (pj.y > y) &&
+      x < ((pj.x - pi.x) * (y - pi.y)) / (pj.y - pi.y) + pi.x;
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
+function rectToPolygon(start: DisplayPoint, end: DisplayPoint): DisplayPoint[] {
+  const x = Math.min(start.x, end.x);
+  const y = Math.min(start.y, end.y);
+  const w = Math.abs(end.x - start.x);
+  const h = Math.abs(end.y - start.y);
+  return [
+    { x, y },
+    { x: x + w, y },
+    { x: x + w, y: y + h },
+    { x, y: y + h },
+  ];
+}
+
 export type ScreenshotCropModalProps = {
   open: boolean;
   screenshotId: number;
@@ -77,6 +133,12 @@ type DisplayPoint = { x: number; y: number };
 type Mode = 'rectangle' | 'freehand' | 'polygon';
 
 type DragRect = { start: DisplayPoint; end: DisplayPoint };
+// Phase 8 / Plan 17 (G-08-10) — shape-edit transient state. All three reset
+// together on mode-switch / clear / dialog close.
+type DragState =
+  | { kind: 'vertex'; index: number }
+  | { kind: 'shape'; lastMove: DisplayPoint }
+  | null;
 
 // Compute the bounding box of a polygon (axis-aligned). v1 simplification.
 function polygonBBox(points: CropPolygon): { x: number; y: number; width: number; height: number } {
@@ -121,6 +183,11 @@ export function ScreenshotCropModal({
   // Freehand mode drag-in-progress: sample list. Resets on mouseup or
   // on switch out of freehand.
   const [freehandPath, setFreehandPath] = useState<DisplayPoint[]>([]);
+  // Phase 8 / Plan 17 (G-08-10) — shape editing after commit. `null`
+  // outside an active edit; 'vertex' means a single vertex index is
+  // being dragged; 'shape' means the interior was grabbed and the
+  // whole polygon is being translated.
+  const [drag, setDrag] = useState<DragState>(null);
 
   const [imgSrc, setImgSrc] = useState<string | null>(src ?? null);
   const [applying, setApplying] = useState(false);
@@ -134,6 +201,7 @@ export function ScreenshotCropModal({
       setFinalPolygon([]);
       setRect(null);
       setFreehandPath([]);
+      setDrag(null);
       setImgError(null);
       // Note: image src is revoked in the cleanup below when the effect
       // re-runs (open=false). Keep state simple.
@@ -189,6 +257,7 @@ export function ScreenshotCropModal({
     setFinalPolygon([]);
     setRect(null);
     setFreehandPath([]);
+    setDrag(null);
   }
 
   // Map a mouse event to DISPLAY pixel coords, clamped to the image's
@@ -204,9 +273,28 @@ export function ScreenshotCropModal({
   }
 
   // Surface drag/click handlers — mode-aware.
+  // Phase 8 / Plan 17 (G-08-10): if a polygon is already committed and
+  // the user clicks a vertex or grabs the interior, that takes priority
+  // over the mode's normal "start drawing" flow. Polygon mode keeps its
+  // existing "click to add a vertex" behaviour — an in-progress polygon
+  // is never edited mid-build.
   function handleSurfaceMouseDown(e: React.MouseEvent): void {
     const p = pointFromEvent(e);
     if (!p) return;
+    if (mode !== 'polygon' && finalPolygon.length >= MIN_POLYGON_VERTICES) {
+      const vertexIdx = hitTestVertex(p.x, p.y, finalPolygon);
+      if (vertexIdx >= 0) {
+        setDrag({ kind: 'vertex', index: vertexIdx });
+        return;
+      }
+      if (pointInPolygon(p.x, p.y, finalPolygon)) {
+        setDrag({ kind: 'shape', lastMove: p });
+        return;
+      }
+      // Click outside the committed polygon — fall through and start
+      // a fresh rect/freehand drag (which commits a new finalPolygon on
+      // mouseup, replacing the old one). Polygon mode skips this entirely.
+    }
     if (mode === 'rectangle') {
       setRect({ start: p, end: p });
     } else if (mode === 'freehand') {
@@ -223,6 +311,42 @@ export function ScreenshotCropModal({
   function handleSurfaceMouseMove(e: React.MouseEvent): void {
     const p = pointFromEvent(e);
     if (!p) return;
+    // Plan 17: active shape-edit wins over the mode's drawing flow.
+    if (drag !== null) {
+      if (drag.kind === 'vertex') {
+        // Clamp to the image rect so a vertex can't be dragged outside.
+        const img = imgRef.current;
+        const rect = img?.getBoundingClientRect();
+        const maxX = rect?.width ?? Infinity;
+        const maxY = rect?.height ?? Infinity;
+        const clamped: DisplayPoint = {
+          x: clamp(p.x, 0, maxX),
+          y: clamp(p.y, 0, maxY),
+        };
+        setFinalPolygon((prev) =>
+          prev.map((pt, i) => (i === drag.index ? clamped : pt)),
+        );
+        return;
+      }
+      // Shape-drag — translate every vertex by the delta since the last
+      // move, clamped to the image bounds, and update `lastMove` for
+      // the next iteration.
+      const dx = p.x - drag.lastMove.x;
+      const dy = p.y - drag.lastMove.y;
+      if (dx === 0 && dy === 0) return;
+      const img = imgRef.current;
+      const rect = img?.getBoundingClientRect();
+      const maxX = rect?.width ?? Infinity;
+      const maxY = rect?.height ?? Infinity;
+      setFinalPolygon((prev) =>
+        prev.map((pt) => ({
+          x: clamp(pt.x + dx, 0, maxX),
+          y: clamp(pt.y + dy, 0, maxY),
+        })),
+      );
+      setDrag({ kind: 'shape', lastMove: p });
+      return;
+    }
     if (mode === 'rectangle') {
       // Functional setState — see rect/setRect note above.
       setRect((prev) => (prev ? { start: prev.start, end: p } : null));
@@ -240,6 +364,13 @@ export function ScreenshotCropModal({
   }
 
   function handleSurfaceMouseUp(e: React.MouseEvent): void {
+    // Plan 17: end any in-progress shape edit. Setting drag back to null
+    // is a no-op on a regular draw (drag is null on entry to a free
+    // rectangle / freehand draw), so this is just a clean reset for
+    // the edit path.
+    if (drag !== null) {
+      setDrag(null);
+    }
     if (mode === 'rectangle') {
       // Read the mouseup point from the event so the commit width/height
       // matches where the user actually released. React 18 batching
@@ -252,20 +383,13 @@ export function ScreenshotCropModal({
         if (!prev) return null;
         const startPoint = prev.start;
         const endPoint = releasePoint ?? prev.end;
-        const x = Math.min(startPoint.x, endPoint.x);
-        const y = Math.min(startPoint.y, endPoint.y);
-        const w = Math.abs(endPoint.x - startPoint.x);
-        const h = Math.abs(endPoint.y - startPoint.y);
-        if (w >= RECT_MIN_DIM_PX && h >= RECT_MIN_DIM_PX) {
-          // Convert rect to a 4-corner polygon so the IPC contract is
-          // uniform across modes.
-          setFinalPolygon([
-            { x, y },
-            { x: x + w, y },
-            { x: x + w, y: y + h },
-            { x, y: y + h },
-          ]);
+        if (
+          Math.abs(endPoint.x - startPoint.x) < RECT_MIN_DIM_PX ||
+          Math.abs(endPoint.y - startPoint.y) < RECT_MIN_DIM_PX
+        ) {
+          return null;
         }
+        setFinalPolygon(rectToPolygon(startPoint, endPoint));
         return null;
       });
       return;
@@ -293,6 +417,9 @@ export function ScreenshotCropModal({
   // We don't listen globally for mouseup — but we DO cancel the in-progress
   // shape on leave, so a partial commit doesn't leak as a preview.
   function handleSurfaceMouseLeave(): void {
+    if (drag !== null) {
+      setDrag(null);
+    }
     if (mode === 'rectangle') {
       setRect(null);
     } else if (mode === 'freehand') {
@@ -489,6 +616,14 @@ export function ScreenshotCropModal({
             onMouseLeave={handleSurfaceMouseLeave}
             onKeyDown={handleKeyDown}
             data-testid="screenshot-crop-surface"
+            style={{
+              cursor:
+                drag !== null
+                  ? 'grabbing'
+                  : finalPolygon.length >= MIN_POLYGON_VERTICES
+                    ? 'move'
+                    : 'crosshair',
+            }}
           >
             {imgSrc === null ? (
               // ponytail: render the <img> ALWAYS so the test surface +

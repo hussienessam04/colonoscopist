@@ -1,10 +1,14 @@
 // @vitest-environment happy-dom
-// ScreenshotLightbox — closed-state null-safety, full-size URL composition,
-// close button. Plan 07 / G-05-10 contract guards.
+// ScreenshotLightbox — closed-state null-safety, blob-URL image rendering,
+// close button. Plan 07 / G-05-10 contract guards. Plan 17 (G-08-10)
+// switched the <img> src from the MediaServer `/media/` URL to a fresh
+// `blob:` URL fetched via `screenshots.getBlob` so a successful crop
+// reflects in the lightbox immediately (no leave / re-enter).
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import '../setup';
+import { getApi } from '../setup';
 import { ScreenshotLightbox } from '@/components/ScreenshotLightbox';
 import type { Screenshot } from '@shared/ipc-contract';
 
@@ -39,7 +43,17 @@ describe('ScreenshotLightbox', () => {
     expect(screen.queryByTestId('screenshot-lightbox-img')).toBeNull();
   });
 
-  it('renders the full-size <img> via /media/ route when screenshot is supplied — G-05-10', () => {
+  // Plan 17 (G-08-10) — the lightbox renders the <img> from a fresh
+  // `blob:` URL fetched via `screenshots.getBlob` (NOT the MediaServer
+  // route). The previous Plan 14 expectation (a `/media/...` src) is
+  // dead — see the file header for why we switched.
+  it('renders the <img> with a blob: URL fetched via screenshots.getBlob — G-08-10', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockResolvedValue({
+      ok: true,
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0x99, 0x99]),
+      mimeType: 'image/jpeg',
+    });
     render(
       <ScreenshotLightbox
         screenshot={fixture}
@@ -49,14 +63,11 @@ describe('ScreenshotLightbox', () => {
         onClose={vi.fn()}
       />,
     );
-    const img = screen.getByTestId('screenshot-lightbox-img');
-    // G-05-14 — URL includes the literal `screenshots/` subdir segment
-    // that matches the on-disk layout (paths.ts::screenshotsDir writes
-    // to <userData>/data/media/patients/<p>/<proc>/screenshots/<ts>.jpg).
-    // fileName extracted from "data/media/p1/screenshots/5000.jpg" -> "5000.jpg".
-    expect(img.getAttribute('src')).toBe(
-      'http://127.0.0.1:51731/media/p1/proc1/screenshots/5000.jpg',
+    await waitFor(() =>
+      expect(api.screenshots.getBlob).toHaveBeenCalledWith({ id: fixture.id }),
     );
+    const img = screen.getByTestId('screenshot-lightbox-img');
+    expect(img.getAttribute('src')).toMatch(/^blob:/);
   });
 
   it('clicking the close button calls onClose', () => {
@@ -74,8 +85,16 @@ describe('ScreenshotLightbox', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
   });
 
-  // Plan 08-14 — Crop entry point.
-  it('renders a Crop button that opens the crop modal', () => {
+  // Plan 08-14 — Crop entry point. Plan 17 (G-08-10): the Crop button
+  // is gated on the blob fetch landing (we don't render the CTA until
+  // we have bytes to preview), so the test waits for that fetch first.
+  it('renders a Crop button that opens the crop modal', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockResolvedValue({
+      ok: true,
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
+      mimeType: 'image/jpeg',
+    });
     render(
       <ScreenshotLightbox
         screenshot={fixture}
@@ -85,21 +104,33 @@ describe('ScreenshotLightbox', () => {
         onClose={vi.fn()}
       />,
     );
+    await waitFor(() => expect(api.screenshots.getBlob).toHaveBeenCalled());
     expect(screen.queryByTestId('screenshot-crop-modal')).toBeNull();
     fireEvent.click(screen.getByTestId('screenshot-lightbox-crop'));
     expect(screen.getByTestId('screenshot-crop-modal')).toBeInTheDocument();
   });
 
-  it('does NOT render the Crop button when the media server has not bound', () => {
+  // Plan 17 (G-08-10) — the Crop button is gated on a successfully
+  // fetched blob URL (we don't ship a Crop CTA until the lightbox has
+  // bytes to preview). All non-null mediaBaseUrl scenarios resolve to
+  // a blob URL via the IPC, so the button always renders here.
+  it('renders the Crop button when the screenshot has loaded its blob', async () => {
+    const api = getApi();
+    api.screenshots.getBlob.mockResolvedValue({
+      ok: true,
+      bytes: new Uint8Array([0xff, 0xd8, 0xff, 0xe0]),
+      mimeType: 'image/jpeg',
+    });
     render(
       <ScreenshotLightbox
         screenshot={fixture}
         patientId="p1"
         procedureId="proc1"
-        mediaBaseUrl={null}
+        mediaBaseUrl="http://127.0.0.1:51731"
         onClose={vi.fn()}
       />,
     );
-    expect(screen.queryByTestId('screenshot-lightbox-crop')).toBeNull();
+    await waitFor(() => expect(api.screenshots.getBlob).toHaveBeenCalled());
+    expect(screen.queryByTestId('screenshot-lightbox-crop')).not.toBeNull();
   });
 });

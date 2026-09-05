@@ -1,14 +1,23 @@
 // ScreenshotLightbox — full-size view of a captured screenshot.
 //
 // Plan 07 / G-05-10 + Plan 11 / G-05-14: a dialog modal that renders
-// the captured JPEG at its native (up to 1280px) resolution via the
-// existing `/media/` route. Screenshots live under a `screenshots/`
-// literal subdir on disk (per `paths.ts::screenshotsDir()` +
-// `screenshots.ts:add`), so the URL composition includes that segment.
-// The parent page owns `selectedScreenshot` state; passing
-// `screenshot={null}` closes the dialog. Closing paths: × button
-// (testid `screenshot-lightbox-close`), Esc, click-outside-via-overlay
-// (Radix defaults).
+// the captured JPEG at its native (up to 1280px) resolution.
+//
+// Phase 8 / Plan 17 (G-08-10) — live preview after crop. The Plan 14
+// version composed a URL via `screenshotUrl()` against the MediaServer
+// `/media/` route. That route caches bytes on first hit; after a crop
+// overwrites the source file on disk, the MediaServer could still
+// serve the cached bytes, and bumping a `?v=` query string isn't enough
+// to defeat an aggressive intermediary cache. Plan 17 switches the
+// lightbox to the same `screenshots.getBlob` → `blob:` URL pattern
+// ScreenshotCropModal already uses (per Plan 15 G-08-8). A `cacheBuster`
+// counter on the component side re-fires the fetch effect after each
+// crop's `onCropped` callback; the freshly-recreated `blob:` URL is
+// different from any cached prior one, so the browser rebinds the
+// `<img>` immediately. No need to close and reopen the modal.
+//
+// Closing paths: × button (testid `screenshot-lightbox-close`), Esc,
+// click-outside-via-overlay (Radix defaults).
 //
 // Parity with the timeline delete: the lightbox accepts the same
 // `onDelete` callback the timeline receives. The doctor's delete from
@@ -17,12 +26,12 @@
 // surfaces.
 //
 // ponytail: no new dependencies. shadcn Dialog + lucide X / Trash2 are
-// already in the bundle. URL composition mirrors the existing
-// ProcedureReview video src so the path-escape regex (T-05-08 +
-// T-05-28 + the new subdir allow-list from G-05-14) protects this
-// route.
+// already in the bundle. The `mediaBaseUrl` / `patientId` /
+// `procedureId` props are retained (existing callers still pass them)
+// but no longer consumed by the component — the blob URL flows from
+// the IPC instead of the MediaServer route.
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Dialog,
@@ -34,7 +43,6 @@ import { Button } from '@/components/ui/button';
 import { Crop, Trash2, X } from 'lucide-react';
 import { ScreenshotCropModal } from '@/components/ScreenshotCropModal';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
-import { screenshotUrl } from '@/lib/screenshot-url';
 import type { Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotLightboxProps = {
@@ -61,26 +69,69 @@ export function ScreenshotLightbox({
 }: ScreenshotLightboxProps): JSX.Element {
   const { t } = useTranslation();
   const [cropOpen, setCropOpen] = useState(false);
-  // Plan 14 — crop overwrites the source JPEG in place, so the URL is
-  // unchanged and the browser would serve the stale cached bytes. Bump
-  // a token after a successful crop to force a re-fetch. Stays 0 (and
-  // the URL stays pristine) until the doctor actually crops.
+  // Phase 8 / Plan 17 (G-08-10) — live preview after crop. We switched
+  // from the MediaServer URL (which caches the file on first hit) to a
+  // fresh `blob:` URL fetched per render. After a successful crop the
+  // on-disk JPEG is overwritten; bumping `cacheBuster` makes the effect
+  // re-fetch and produce a brand-new blob URL — the browser sees a new
+  // <img src> and rebinds without needing leave/re-enter.
   const [cacheBuster, setCacheBuster] = useState(0);
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
   const open = screenshot !== null;
-  // G-05-15 — canonicalize onto the shared helper. The lightbox owns
-  // no URL composition logic; it just calls the helper and trusts the
-  // URL. The leaf-filename regex + the literal `screenshots/` subdir
-  // + the /media/ route shape all live in `screenshotUrl` now.
-  const baseSrc = screenshot
-    ? screenshotUrl({
-        mediaBaseUrl,
-        patientId,
-        procedureId,
-        filePath: screenshot.filePath,
-      })
-    : null;
-  const src = baseSrc !== null && cacheBuster > 0 ? `${baseSrc}?v=${cacheBuster}` : baseSrc;
   const testIdPrefix = testId ?? 'screenshot-lightbox';
+
+  // Phase 8 / Plan 17 (G-08-10) — `mediaBaseUrl`, `patientId`, and
+  // `procedureId` were only consumed by the (removed) MediaServer URL
+  // path. They're still in the public props for backward-compat with
+  // existing callers; we ignore them now.
+  void mediaBaseUrl;
+  void patientId;
+  void procedureId;
+
+  // Fetch JPEG bytes via IPC and build a fresh blob: URL on every
+  // (screenshot.id, cacheBuster) transition. The previous blob URL is
+  // revoked in the cleanup so we don't leak object URLs.
+  useEffect(() => {
+    if (!screenshot) {
+      setImageUrl(null);
+      return;
+    }
+    let cancelled = false;
+    let currentUrl: string | null = null;
+    void (async (): Promise<void> => {
+      const getBlob = window.api.screenshots?.getBlob;
+      if (typeof getBlob !== 'function') {
+        setImageUrl(null);
+        return;
+      }
+      try {
+        const result = await getBlob({ id: screenshot.id });
+        if (cancelled) return;
+        if (result.ok) {
+          // ponytail: copy into a fresh Uint8Array<ArrayBuffer> so the
+          // BlobPart type match works (same as ScreenshotCropModal).
+          const bytes = new Uint8Array(result.bytes.byteLength);
+          bytes.set(result.bytes);
+          currentUrl = URL.createObjectURL(
+            new Blob([bytes], { type: result.mimeType }),
+          );
+          setImageUrl(currentUrl);
+        } else {
+          setImageUrl(null);
+        }
+      } catch {
+        if (cancelled) return;
+        setImageUrl(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (currentUrl !== null) {
+        URL.revokeObjectURL(currentUrl);
+      }
+    };
+  }, [screenshot?.id, cacheBuster]);
+
   return (
     <>
       <Dialog
@@ -115,9 +166,9 @@ export function ScreenshotLightbox({
           <X aria-hidden="true" />
         </Button>
         <div className="flex items-center justify-center rounded bg-black">
-          {src ? (
+          {imageUrl ? (
             <img
-              src={src}
+              src={imageUrl}
               alt={
                 screenshot
                   ? `Screenshot at ${formatDurationHHMMSS(screenshot.timestampInVideoMs)}`
@@ -129,13 +180,13 @@ export function ScreenshotLightbox({
             />
           ) : (
             <p className="p-6 text-slate-400" data-testid="screenshot-lightbox-no-media">
-              Media server not ready
+              {screenshot ? 'Loading screenshot…' : 'No screenshot'}
             </p>
           )}
         </div>
-        {screenshot && (onDelete || src) ? (
+        {screenshot && (onDelete || imageUrl) ? (
           <div className="flex justify-end gap-2">
-            {src ? (
+            {imageUrl ? (
               <Button
                 variant="secondary"
                 size="sm"
@@ -161,13 +212,20 @@ export function ScreenshotLightbox({
         ) : null}
       </DialogContent>
       </Dialog>
-      {screenshot && src ? (
+      {screenshot && imageUrl ? (
         <ScreenshotCropModal
           open={cropOpen}
           screenshotId={screenshot.id}
-          src={src}
+          // ponytail: do NOT pass `src` — the modal fetches its own blob
+          // via screenshots.getBlob. Sharing ours would couple the two
+          // blob lifecycles and confuse the URL.revokeObjectURL cleanup.
           onClose={() => setCropOpen(false)}
-          onCropped={() => setCacheBuster(Date.now())}
+          onCropped={() => {
+            // Plan 17 live preview: bump cacheBuster so this component
+            // re-runs its blob-fetch effect and the <img> rebinds to
+            // the newly-cropped JPEG bytes.
+            setCacheBuster(Date.now());
+          }}
         />
       ) : null}
     </>
