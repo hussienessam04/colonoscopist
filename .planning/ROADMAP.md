@@ -244,7 +244,7 @@ Plans:
 
 **Pitfalls addressed:** Pitfall 6 (license trivially bypassed).
 **Notes:** N-API tamper-resistant addon (LIC-05 from v2) is parked as a v1.1 hardening follow-up, not part of v1. The v1 JS verify path is the ship gate.
-**Plans:** 8 plans (6 base + 2 gap-closure)
+**Plans:** 12 plans (6 base + 6 gap-closure) — complete
 **Tracer-first decomposition:** Plan 01 ships the production-quality end-to-end verify-path slice (Ed25519 verify + embedded public key + `Object.freeze` + `@noble/ed25519` install + IPC `LICENSE_STATUS`/`LICENSE_ACTIVATE` + migration 0011 + paths.licenseDir + roundtrip integration test) covering LIC-02; Plan 02 wires the 14-day trial clock (settings.trial_started_at + wizard transaction + audit row) covering LIC-01; Plan 03 ships the `licenseGated` helper + wraps every existing `register*()` call + audit row on gate rejection + gate-blocks integration test covering LIC-04; Plan 04 ships `loadAndVerifyLicense` + the `LICENSE_PICK_AND_ACTIVATE` IPC channel (wraps `dialog.showOpenDialog` + verify in one main-side call, Phase 7 D-13 verbatim pattern) + vendor `scripts/gen-license.cjs` + .gitignore rules + LICENSE_ACTIVATE handler + extends `EXEMPT_CHANNELS` for the new picker channel completing LIC-02/LIC-03 activation; Plan 05 ships the License sub-page + SettingsSidebar entry + boot-time `<LicenseGate>` modal + `useLicenseStatus` hook + bilingual i18n completing LIC-03 UI; Plan 06 ships `scripts/check-license-gate.cjs` grep gate + audit/UI/RTL tests + `08-UAT.md` acceptance plan. Wave 1 = Plan 01. Wave 2 = Plans 02, 03 (parallel; depends on 01). Wave 3 = Plan 04 (depends on 01, 03), Plan 05 (depends on 01, 02, 04). Wave 4 = Plan 06 (depends on all).
 
 Plans:
@@ -280,7 +280,6 @@ Plans:
   - **Verification:** `node scripts/run-vitest.cjs --run tests/renderer/pages/settings-capture.test.tsx tests/renderer/pages/procedure-room.test.tsx` 15/15 pass (10 settings-capture incl. 2 new + 5 procedure-room incl. 1 new); full renderer Vitest suite 320/320 green; `npm run typecheck:web` no new errors (6 pre-existing errors in `useReport.ts`/`ReportEditor.tsx` from untracked `20260812-redesign-report-procedure-type/` quick task are out of scope); 3 atomic commits.
 - [x] 08-12-PLAN.md — Gap closure (G-08-6): hook-level safeInvoke — wrapped `window.api.capture.listDevices()` in `src/renderer/src/hooks/useCaptureDeviceMap.ts:29` with `safeInvoke(...)`. On null (gate rejection) → `setDshow([])` + `setError('License required — activate to list capture devices.')`. Mirrors the G-08-4/G-08-5 pattern at the hook level (Plan 08-11 fixed page-level IPC calls but missed the hooks they depend on). (Wave 5, depends_on: 08-11)
   - **Verification:** `node scripts/run-vitest.cjs --run tests/renderer/hooks/use-capture-device-map.test.tsx tests/renderer/pages/settings-capture.test.tsx tests/renderer/pages/procedure-room.test.tsx` 21/21 pass (6 hook + 10 settings-capture + 5 procedure-room); 3 atomic commits.
-- [ ] 08-11-PLAN.md — Gap closure (G-08-5): mirror Plan 08-10 fix on the 2 pages it missed. SettingsCapture.tsx: wrap 4 capture.* IPC sites (getDefaultDevice/getPreset hydration + setDefaultDevice/setPreset save) with safeInvoke; add `gated` state; render EmptyStateCard on null; Save toasts on gate-rejected persistence. ProcedureRoom.tsx: wrap 3 capture.* IPC sites (getDefaultDevice hydration + getPreset effect + getDefaultDevice/getPreset in handleRecordToggle) with safeInvoke; rely on the existing "No device selected" overlay instead of EmptyStateCard (no new gated state needed — overlay already handles the null case). 3 new regression tests (2 SettingsCapture + 1 ProcedureRoom). No changes to main-process gate contract. (Wave 5, depends_on: 08-10)
 
 ---
 
@@ -295,7 +294,7 @@ Plans:
 | 5 | Screenshots + Review + Trim | 6 | 4 | yes (Procedure Review screen) |
 | 6 | Profile + Report + PDF | 9 | 6 | yes (Doctor Profile + Report Editor) |
 | 7 | Search + Audit UI + Backup + i18n | 8 | 6 | yes (Search results + Audit + Backup + language switcher) |
-| 8 | Licensing | 4 | 6 | yes (License gate UI) |
+| 8 | Licensing | 4 | 6 | yes (License gate UI) | complete (12/12 plans: 6 base + 6 gap-closure; verified 2026-09-02) |
 
 **Total v1 requirements:** 50. **Mapped:** 50. **Unmapped:** 0 ✓
 

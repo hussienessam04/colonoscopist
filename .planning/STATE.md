@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 12
-status: testing
-stopped_at: UAT Test 10 (Bilingual License UI) pending; G-08-6 just resolved
+current_plan: 0
+status: phase_complete
+stopped_at: Phase 08 complete — UAT 10/10 pass (6 gaps resolved via gap-closure plans 08-07..08-12)
 paused_at: —
-last_updated: "2026-09-02T00:09:00Z"
+last_updated: "2026-09-02T00:11:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 12 (G-08-6 useCaptureDeviceMap hook-level safeInvoke) executed; 21/21 tests pass
+last_activity_desc: Phase 08 marked complete — all 12 plans (6 base + 6 gap-closure) shipped, VENDOR_PUBLIC_KEY_HEX reverted to shipped public half, UAT 10/10 pass
 progress:
   total_phases: 8
-  completed_phases: 7
+  completed_phases: 8
   total_plans: 53
-  completed_plans: 52
+  completed_plans: 53
 ---
 
 **Current Plan:** 1

@@ -21,6 +21,11 @@ A gloved, busy doctor can hit Record on a procedure, capture findings as screens
 
 - **SCRN-01, SCRN-02** — Mid-procedure + post-recording screenshot capture + persistent JPEG store (validated in Phase 5, 05-01 / 05-04).
 - **REV-01, REV-02, REV-03, REV-04** — Procedure Review screen with pause markers + clickable screenshot timeline + post-recording capture + non-destructive trim with restore (validated in Phase 5, 05-01 / 05-02 / 05-03 / 05-04).
+- **LIC-01** — 14-day trial with full features, no card required. `wizardBootstrap` writes `trial_started_at` inside `db.transaction` + cache invalidation post-commit (validated in Phase 8, 08-02 / 08-08).
+- **LIC-02** — Ed25519-signed `.lic` bound to machine fingerprint (CPU + disk serial + MAC, SHA-256). `verifyLicense` is `Object.freeze`d at module export; tampered payloads (byte-flip, wrong signature, fingerprint mismatch) are rejected with `IPC_LICENSE_INVALID` (validated in Phase 8, 08-01 / 08-04 / 08-07).
+- **LIC-03** — Activation prompt + expired trial gates the entire UI via boot-time `<LicenseGate>` modal (route-aware: exempts wizard + login routes per Plan 08-09). Renderer handles gate rejection via `safeInvoke` + `<EmptyStateCard>` instead of white-screen (validated in Phase 8, 08-05 / 08-09 / 08-10 / 08-11 / 08-12).
+- **LIC-04** — All `ipcMain.handle` registrations gated through `licenseGated` helper with narrow `EXEMPT_CHANNELS` (AUTH_* + LICENSE_* + AUDIT_*); every gate rejection writes a `license.gate_rejected` audit row before returning `{ok: false, code: 'IPC_LICENSE_*'}`. Runtime guard test + grep-gate CI script lock the invariant (validated in Phase 8, 08-03 / 08-06 / 08-10).
+- **I18N-03** — License UI strings bilingual (EN + AR, 34 keys including the new `license.emptyState*` keys from Plan 08-10); sidebar badge renders in Arabic; RTL layout clean (validated in Phase 8, 08-05 / 08-10, UAT Test 10).
 
 ### Active
 
@@ -80,6 +85,10 @@ A gloved, busy doctor can hit Record on a procedure, capture findings as screens
 | Screenshot frame source = canvas snapshot from `<video>`/`<img>` at capture time (not MJPEG-tee or one-shot ffmpeg `image2`) | Simplest implementation that satisfies both mid-procedure and post-recording entry points; reuses the same `captureScreenshot(source)` lib. Trade-off: live-preview feed needs to be present at capture time (already true since renderer renders it). | ✓ Validated in Phase 5 |
 | Trim = `-ss before -i -c copy` (stream copy) with ±500ms accuracy | Faster than re-encode (no quality loss), but cuts may land a few hundred ms off from the doctor's intended handle. Doctor can fine-tune via drag handles. Trade-off accepted for v1; pixel-exact re-encode deferred. | ✓ Validated in Phase 5 |
 | Media server = long-lived HTTP on `127.0.0.1:<random>` with `/media/` route + HTTP Range support | `<video>` can't load `file://` under contextIsolation; local HTTP serves the mp4 + Range requests for Chromium seek. Path-escape protection + random port prevent local-network access. | ✓ Validated in Phase 5 |
+| `@noble/ed25519` v3 + `@noble/hashes` v2 used via dynamic `await import()` inside `_verifyLicense` | Both packages are pure ESM (`"type": "module"`); electron-vite's `externalizeDepsPlugin` keeps them external so the bundled CJS main emits `require()` calls that Node 24's CJS loader rejects with `ERR_REQUIRE_ESM`. Plan 08-07 fixed via function-scoped `await import()` (mirrors `src/main/backup/index.ts:52` archiver precedent). | ✓ Validated in Phase 8 (08-07) |
+| `safeInvoke<T>(p) → Promise<T \| null>` centralized helper + `<EmptyStateCard>` for renderer-side gated-IPC failure handling (Plans 08-10/11/12) | Main-process gate returns `{ok: false, code: 'IPC_LICENSE_*'}` per Plan 03 documented intent; renderer-side discrimination was never implemented and 10+ pages + 1 hook would crash on gate rejection. Centralizing the discriminator makes the bug structurally impossible for new gated-IPC consumers. The EmptyStateCard renders "Open License settings" as the user-facing recovery path. | ✓ Validated in Phase 8 (08-10/11/12) |
+| LicenseGate modal exempts `wizard` + `login` routes (Plan 08-09) | The wizard IS the path to start the trial; gating it with the activation modal is contradictory. Login is similarly pre-authentication. LicenseGate reads `useRoute()` and skips the modal for both routes. | ✓ Validated in Phase 8 (08-09) |
+| `wizardBootstrap` calls `invalidateLicenseCache()` post-commit (Plan 08-08) | The license status cache was warmed at `app.whenReady()` before wizardBootstrap ran; without invalidation, the cache held stale `state: 'unactivated'` and the modal fired post-wizard. Mirrors `loadAndVerifyLicense` (`load-license.ts:117-119`) precedent. | ✓ Validated in Phase 8 (08-08) |
 
 ## Evolution
 
@@ -100,4 +109,4 @@ This document evolves at phase transitions and milestone boundaries.
 5. Update Context with current state (clinic feedback, perf numbers, support load)
 
 ---
-*Last updated: 2026-08-07 after Phase 5 execution (Screenshots + Procedure Review + Trim — 4/4 plans shipped, 484/484 tests pass, 6/6 phase requirements validated)*
+*Last updated: 2026-09-02 after Phase 8 completion (Licensing — 12/12 plans shipped [6 base + 6 gap-closure], UAT 10/10 pass, 5/5 LIC-01..04 + I18N-03 requirements validated)*
