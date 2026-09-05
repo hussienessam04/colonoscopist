@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 15
+current_plan: 16
 status: testing
-stopped_at: Phase 08 Plan 15 shipped (4 user-reported fixes: polygon crop + canvas taint + reports column restore + clipboard IPC)
+stopped_at: Phase 08 Plan 16 shipped (Rectangle + Free-hand crop modes)
 paused_at: —
-last_updated: "2026-09-02T00:14:00Z"
+last_updated: "2026-09-02T00:15:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 15 (G-08-8 — 4 fixes: polygon crop UI + blob-URL image fetch + migration 0012 reports column restore + Electron clipboard IPC) shipped; 28+ tests pass on affected suites
+last_activity_desc: Phase 08 Plan 16 (G-08-9 crop mode toggle: Rectangle | Free-hand | Polygon) shipped; 18/18 crop-modal tests pass (12 prior + 6 new)
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 56
-  completed_plans: 56
+  total_plans: 57
+  completed_plans: 57
 ---
 
 **Current Plan:** 1
