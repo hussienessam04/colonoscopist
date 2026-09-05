@@ -521,6 +521,8 @@
     "sidebarBadgeLicensed": "مفعّل · دائم",
     "sidebarBadgeTrial": "تجريبي · {{days}} يوم متبقي",
     "sidebarBadgeExpired": "منتهي",
-    "sidebarBadgeUnactivated": "غير مفعّل"
+    "sidebarBadgeUnactivated": "غير مفعّل",
+    "emptyStateMessage": "الترخيص مطلوب — افتح الإعدادات → الترخيص للتفعيل.",
+    "emptyStateOpenLicense": "افتح إعدادات الترخيص"
   }
 }

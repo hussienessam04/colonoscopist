@@ -521,6 +521,8 @@
     "sidebarBadgeLicensed": "Licensed · Perpetual",
     "sidebarBadgeTrial": "Trial · {{days}}d remaining",
     "sidebarBadgeExpired": "Expired",
-    "sidebarBadgeUnactivated": "Not activated"
+    "sidebarBadgeUnactivated": "Not activated",
+    "emptyStateMessage": "License required — open Settings → License to activate.",
+    "emptyStateOpenLicense": "Open License settings"
   }
 }
