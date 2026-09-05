@@ -2,18 +2,18 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-current_plan: 17
+current_plan: 18
 status: testing
-stopped_at: Phase 08 Plan 17 shipped (shape editing + live preview after crop)
+stopped_at: Phase 08 Plan 18 shipped (crop modal diagnostics + cacheBuster refresh + media-server URL fallback)
 paused_at: —
-last_updated: "2026-09-02T00:16:00Z"
+last_updated: "2026-09-02T00:17:00Z"
 last_activity: 2026-09-02
-last_activity_desc: Phase 08 Plan 17 (G-08-10 shape editing + live preview) shipped; 30/30 component tests pass (25 crop-modal + 5 lightbox)
+last_activity_desc: Phase 08 Plan 18 (G-08-11 crop modal diagnostics + Retry + cacheBuster refresh + fallbackSrc) shipped; 34/34 tests pass on affected files
 progress:
   total_phases: 8
   completed_phases: 8
-  total_plans: 58
-  completed_plans: 58
+  total_plans: 59
+  completed_plans: 59
 ---
 
 **Current Plan:** 1
