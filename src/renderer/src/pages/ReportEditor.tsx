@@ -17,8 +17,10 @@
 // Phase 6 UAT G-08-8 — Save indicator + Finalize button.
 
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -66,48 +68,98 @@ const ANATOMY_BOXES_BY_TYPE: Record<
 // via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
 // the report PDF — it restricts to data/media/patients/ paths). The
 // bytes are wrapped in a Blob + ObjectURL which the iframe loads.
-function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | null {
-  const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    if (reportId === null) {
-      setSrc(null);
-      return;
-    }
-    let cancelled = false;
-    let objectUrlToRevoke: string | null = null;
-    (async (): Promise<void> => {
-      try {
-        const result = await safeInvoke(
-          window.api.reports?.getPdfBlob?.({ id: reportId }),
-        );
-        if (cancelled || result === null || result === undefined) return;
-        const blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: result.mime });
-        const url = URL.createObjectURL(blob);
-        objectUrlToRevoke = url;
-        setSrc(url);
-      } catch {
-        // best-effort
+//
+// Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
+// Print button actually triggers the OS print dialog by calling
+// `iframe.contentWindow.print()` once the PDF blob is loaded. The
+// forwardRef + useImperativeHandle pattern lets the parent invoke
+// `print()` from a click handler.
+export type PrintPreviewHandle = {
+  print: () => Promise<boolean>;
+};
+const PrintPreview = forwardRef<PrintPreviewHandle, { reportId: string | null }>(
+  function PrintPreviewImpl({ reportId }, ref): JSX.Element | null {
+    const iframeRef = useRef<HTMLIFrameElement | null>(null);
+    const [src, setSrc] = useState<string | null>(null);
+    // Resolves when the iframe's `load` event fires (or the
+    // 4-second safety timeout). Stored in a ref so the imperative
+    // `print()` method can `await` it without re-creating the
+    // promise on every render.
+    const loadPromiseRef = useRef<Promise<void>>(Promise.resolve());
+    const resolveLoadRef = useRef<(() => void) | null>(null);
+    useEffect(() => {
+      if (reportId === null) {
+        setSrc(null);
+        return;
       }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrlToRevoke !== null) {
-        URL.revokeObjectURL(objectUrlToRevoke);
-      }
-    };
-  }, [reportId]);
-  if (src === null) return null;
-  return (
-    <iframe
-      ref={iframeRef}
-      src={src}
-      title="PDF preview"
-      style={{ position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', border: 0, opacity: 0.01 }}
-      data-testid="report-editor-pdf-iframe"
-    />
-  );
-}
+      let cancelled = false;
+      let objectUrlToRevoke: string | null = null;
+      loadPromiseRef.current = new Promise<void>((resolve) => {
+        resolveLoadRef.current = resolve;
+      });
+      (async (): Promise<void> => {
+        try {
+          const result = await safeInvoke(
+            window.api.reports?.getPdfBlob?.({ id: reportId }),
+          );
+          if (cancelled || result === null || result === undefined) return;
+          const blob = new Blob(
+            [result.bytes as Uint8Array<ArrayBuffer>],
+            { type: result.mime },
+          );
+          const url = URL.createObjectURL(blob);
+          objectUrlToRevoke = url;
+          setSrc(url);
+        } catch {
+          // best-effort — leave the load promise unresolved; the
+          // 4s timeout in `print()` caps the wait.
+        }
+      })();
+      return () => {
+        cancelled = true;
+        if (objectUrlToRevoke !== null) {
+          URL.revokeObjectURL(objectUrlToRevoke);
+        }
+      };
+    }, [reportId]);
+    useImperativeHandle(
+      ref,
+      () => ({
+        print: async (): Promise<boolean> => {
+          const iframe = iframeRef.current;
+          if (iframe === null) return false;
+          const win = iframe.contentWindow;
+          if (win === null) return false;
+          // Wait for the iframe to finish loading the PDF before
+          // firing print(); Chromium refuses to print a half-loaded
+          // document. Cap the wait so a stuck iframe doesn't hang
+          // the doctor's workflow.
+          await Promise.race([
+            loadPromiseRef.current,
+            new Promise<void>((resolve) => setTimeout(resolve, 4000)),
+          ]);
+          win.focus();
+          win.print();
+          return true;
+        },
+      }),
+      [],
+    );
+    if (src === null) return null;
+    return (
+      <iframe
+        ref={iframeRef}
+        src={src}
+        title="PDF preview"
+        style={{ position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', border: 0, opacity: 0.01 }}
+        data-testid="report-editor-pdf-iframe"
+        onLoad={() => {
+          resolveLoadRef.current?.();
+        }}
+      />
+    );
+  },
+);
 
 export default function ReportEditor({
   procedureId: initialProcedureId,
@@ -375,6 +427,13 @@ export default function ReportEditor({
 
   const handlePrint = useCallback(async (): Promise<void> => {
     if (report === null) return;
+    // Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
+    // Print button now triggers the OS print dialog directly via the
+    // hidden iframe (PrintPreview). Falls back to opening the PDF in
+    // the OS viewer if the iframe hasn't loaded yet (e.g. the report
+    // has no PDF path yet).
+    const ok = await printIframeRef.current?.print();
+    if (ok === true) return;
     try {
       await window.api.reports.openPdf({ id: report.id, reveal: false });
       toast.success('PDF opened — use the viewer toolbar to print');
@@ -488,6 +547,12 @@ export default function ReportEditor({
       cancelled = true;
     };
   }, [procedureId]);
+
+  // Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
+  // imperative handle to the hidden PDF iframe (PrintPreview).
+  // handlePrint() calls `.print()` to trigger the OS print dialog
+  // without bouncing through the PDF viewer first.
+  const printIframeRef = useRef<PrintPreviewHandle | null>(null);
 
   const isFinalized = report?.status === 'finalized';
   const procedureType: 'colon' | 'upper_gi' = report?.procedureType ?? 'colon';
@@ -614,7 +679,11 @@ export default function ReportEditor({
     // #F7F1E6) instead of slate-100 — feels like a clinical chart
     // resting on a desk, not a SaaS dashboard.
     <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
-      <PrintPreview key={report?.pdfPath ?? 'none'} reportId={report?.id ?? null} />
+      <PrintPreview
+        key={report?.pdfPath ?? 'none'}
+        reportId={report?.id ?? null}
+        ref={printIframeRef}
+      />
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-4">
           <div>
@@ -673,15 +742,6 @@ export default function ReportEditor({
                 >
                   <FolderOpen className="size-4 mr-1" aria-hidden="true" />
                   {t('report.revealPdfButton')}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleRegenPdf()}
-                  data-testid="report-editor-regen-pdf"
-                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-                >
-                  {t('report.regenPdfButton')}
                 </Button>
               </>
             ) : null}
@@ -830,13 +890,15 @@ export default function ReportEditor({
                   {/* Procedure-type toggle — quick task
                       20260906-report-editor-clinical-refresh: teal accent
                       on the active state (matches the document's
-                      signature stripe). */}
-                  <div className="mt-4">
+                      signature stripe).
+                      Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails:
+                      centered in the procedure block. */}
+                  <div className="mt-4 text-center">
                     <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
                       {t('report.procedureTypeLabel')}
                     </label>
                     <div
-                      className="inline-flex rounded border border-[#E0D9C6] bg-[#FBF7EE]"
+                      className="mx-auto inline-flex rounded border border-[#E0D9C6] bg-[#FBF7EE]"
                       role="radiogroup"
                       aria-label={t('report.procedureTypeLabel')}
                       data-testid="report-editor-procedure-type"
@@ -973,19 +1035,32 @@ export default function ReportEditor({
                 >
                   {indicatorText}
                 </p>
-                {!isFinalized ? (
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {!isFinalized ? (
+                    <Button
+                      onClick={() => void handleFinalize()}
+                      disabled={report === null}
+                      // Quick task 20260906-report-editor-clinical-refresh —
+                      // warm coral accent on the primary action; reads
+                      // as the only "loud" button on the page.
+                      className="bg-[#C66B4D] px-5 text-white hover:bg-[#B05C40] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
+                      data-testid="report-editor-finalize"
+                    >
+                      {t('report.finalizeButton')}
+                    </Button>
+                  ) : null}
+                  {/* Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
+                      Re-render PDF moved to the end of the document so
+                      the natural workflow reads fill → finalize →
+                      re-render → print. */}
                   <Button
-                    onClick={() => void handleFinalize()}
-                    disabled={report === null}
-                    // Quick task 20260906-report-editor-clinical-refresh —
-                    // warm coral accent on the primary action; reads
-                    // as the only "loud" button on the page.
-                    className="mt-3 self-start bg-[#C66B4D] px-5 text-white hover:bg-[#B05C40] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
-                    data-testid="report-editor-finalize"
+                    onClick={() => void handleRegenPdf()}
+                    data-testid="report-editor-regen-pdf"
+                    className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                   >
-                    {t('report.finalizeButton')}
+                    {t('report.regenPdfButton')}
                   </Button>
-                ) : null}
+                </div>
               </div>
 
               {/* RIGHT — screenshots rail (sticky on scroll, lg+) */}

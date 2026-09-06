@@ -94,7 +94,10 @@ function ScreenshotThumbnailImpl({
         <img
           src={thumbnailSrc}
           alt={`Screenshot at ${formatDurationHHMMSS(screenshot.timestampInVideoMs)}`}
-          className={`size-full object-cover ${onAnnotate ? 'pt-5 pb-5' : 'pb-5'}`}
+          // Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
+          // object-contain so the FULL image is visible inside the 110×120
+          // box (letterboxed on tall/wide captures) instead of cropping.
+          className={`size-full object-contain bg-slate-900 ${onAnnotate ? 'pt-5 pb-5' : 'pb-5'}`}
           onError={() => setErrored(true)}
           draggable={false}
           data-testid="screenshot-thumbnail-img"
