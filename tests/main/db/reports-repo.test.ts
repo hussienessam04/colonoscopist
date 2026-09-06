@@ -184,20 +184,26 @@ describe('reportsRepo', () => {
     expect(typeof finalized.finalizedAt).toBe('number');
   });
 
-  it('finalize throws when called on an already-finalized row (status guard)', async () => {
+  // Quick task 20260906-finalize-idempotent — `finalize` is now
+  // idempotent on an already-finalized row. The renderer relies on
+  // this to recover from a "Back between finalize and regenPdf"
+  // half-finalized state: the no-op finalize returns the row, the
+  // follow-up regenPdf writes the PDF, the report is fully
+  // finalized. finalized_at is NOT bumped on the second call so
+  // the original finalize event timestamp is preserved.
+  it('finalize is idempotent on an already-finalized row (no-op, no finalizedAt bump)', async () => {
     const { procedureId, doctorId } = await bootstrap();
     const { reportsRepo } = await import('../../../src/main/db/reports-repo');
     const created = reportsRepo.getOrCreate(procedureId, doctorId);
-    reportsRepo.finalize(created.id);
-    let caught: unknown = null;
-    try {
-      reportsRepo.finalize(created.id);
-    } catch (err) {
-      caught = err;
-    }
-    const { IpcErrorException } = await import('../../../src/shared/errors');
-    expect(caught).toBeInstanceOf(IpcErrorException);
-    expect((caught as InstanceType<typeof IpcErrorException>).ipc.code).toBe('IPC_NOT_FOUND');
+    const first = reportsRepo.finalize(created.id);
+    const firstFinalizedAt = first.finalizedAt;
+    expect(firstFinalizedAt).not.toBeNull();
+    // Tiny delay so a non-idempotent implementation would clearly bump
+    // finalized_at to a different value.
+    await new Promise((r) => setTimeout(r, 5));
+    const second = reportsRepo.finalize(created.id);
+    expect(second.status).toBe('finalized');
+    expect(second.finalizedAt).toBe(firstFinalizedAt);
   });
 
   it('setPdfPath stores userData-relative path', async () => {

@@ -294,15 +294,26 @@ export const reportsRepo = {
     return rowToReport(stmts().getById.get(id) as ReportRow);
   },
 
-  // D-06 — flips draft → finalized, stamps finalized_at. Idempotent only
-  // in the no-op sense: a second finalize on the same row throws because
-  // the status guard rejects rows that are already 'finalized'.
+  // D-06 — flips draft → finalized, stamps finalized_at.
+  // Quick task 20260906-finalize-idempotent — made idempotent.
+  // The renderer calls `finalize` then `regenPdf` sequentially; if
+  // the doctor clicks Back between the two calls, the row lands in
+  // `status='finalized', pdfPath=null` (half-finalized). When the
+  // doctor re-enters and clicks Finalize again, the old code threw
+  // "already finalized" and the report was stuck until something
+  // else triggered a regenPdf. Idempotent finalize: rows in
+  // 'finalized' state no-op the UPDATE and return the existing row
+  // so the renderer's `regenPdf` call writes the PDF and the
+  // report recovers. Throws only when the row truly doesn't exist.
   finalize(id: string): Report {
-    const info = stmts().finalize.run({ id, now: Date.now() });
-    if (info.changes === 0) {
+    const current = stmts().getById.get(id) as ReportRow | undefined;
+    if (current === undefined) {
       throw new IpcErrorException(
-        ipcError('IPC_NOT_FOUND', `Report ${id} not found or already finalized`),
+        ipcError('IPC_NOT_FOUND', `Report ${id} not found`),
       );
+    }
+    if (current.status === 'draft') {
+      stmts().finalize.run({ id, now: Date.now() });
     }
     return rowToReport(stmts().getById.get(id) as ReportRow);
   },
