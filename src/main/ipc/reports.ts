@@ -488,13 +488,25 @@ export function registerReportsIpc(): void {
           ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
         );
       }
-      // Open the PDF in a hidden BrowserWindow so the OS print dialog
-      // has a real PDF document to preview + print. The window is
-      // `show: false` (hidden from the user) + `webPreferences.offscreen`
-      // would be heavier than necessary — a hidden window with the
-      // default Chromium PDF viewer is enough.
+      // Open the PDF in a BrowserWindow so the OS print dialog can
+      // preview + print. Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
+      // the previous `show: false` (hidden) window couldn't render a
+      // preview because Chromium needs a compositor surface. The window
+      // is now `show: true` but positioned -10000,-10000 (well off-screen)
+      // + `minimized: true` so the doctor never sees it. If the dialog
+      // still doesn't preview, the doctor can fall back to the OS viewer's
+      // Print menu.
       const printWin = new BrowserWindow({
-        show: false,
+        show: true,
+        x: -10000,
+        y: -10000,
+        minWidth: 800,
+        minHeight: 600,
+        minimizable: false,
+        maximizable: false,
+        resizable: false,
+        skipTaskbar: true,
+        showInTaskbar: false,
         webPreferences: {
           plugins: true, // Chromium PDF viewer
           contextIsolation: true,
@@ -502,6 +514,7 @@ export function registerReportsIpc(): void {
           sandbox: true,
         },
       });
+      printWin.minimize();
       try {
         await printWin.loadURL(pathToFileURL(abs).toString());
         // webContents.print returns a callback that fires when the

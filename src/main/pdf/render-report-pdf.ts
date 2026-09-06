@@ -67,7 +67,13 @@ function loadReactPdf(): Promise<typeof import('@react-pdf/renderer')> {
 // step 7. A report with at least one attached screenshot renders well
 // above this; a render under this size indicates a silent PDF failure
 // (e.g. empty template, image embed error).
-const MIN_PDF_BYTES = 5_000;
+// Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
+// lowered from 5_000 to 1_000. A minimal report (no screenshots
+// attached, empty boxes, short text) legitimately produces a
+// ~2-3 KB PDF — the 5 KB threshold was tuned for typical reports
+// with embedded screenshots. 1 KB still catches a true truncated
+// write (0 bytes) while letting minimal reports through.
+const MIN_PDF_BYTES = 1_000;
 
 // Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-25: register the bundled
 // Noto Sans Arabic TTF exactly once per process. The Font.register API

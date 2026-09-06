@@ -28,7 +28,6 @@ import {
   ArrowLeft,
   BookmarkPlus,
   FileText,
-  FolderOpen,
   List,
   Printer,
   ScrollText,
@@ -361,16 +360,10 @@ export default function ReportEditor({
     }
   }, [report, t]);
 
-  const handleRevealPdf = useCallback(async (): Promise<void> => {
-    if (report === null) return;
-    try {
-      await window.api.reports.openPdf({ id: report.id, reveal: true });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : t("report.openPdfFailed"),
-      );
-    }
-  }, [report, t]);
+  // Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
+  // `handleRevealPdf` removed (the doctor doesn't use the Reveal in
+  // Explorer button — the screenshot timeline already surfaces the
+  // source files).
 
   const handlePrint = useCallback(async (): Promise<void> => {
     if (report === null) return;
@@ -673,17 +666,6 @@ export default function ReportEditor({
                 >
                   <FileText className="size-4 mr-1" aria-hidden="true" />
                   {t("report.openPdfButton")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleRevealPdf()}
-                  disabled={report?.pdfPath === null}
-                  data-testid="report-editor-reveal-pdf"
-                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-                >
-                  <FolderOpen className="size-4 mr-1" aria-hidden="true" />
-                  {t("report.revealPdfButton")}
                 </Button>
               </>
             ) : null}

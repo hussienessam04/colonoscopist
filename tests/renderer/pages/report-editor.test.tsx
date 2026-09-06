@@ -276,28 +276,12 @@ describe('ReportEditor', () => {
     expect(lastCall.reveal).toBe(false);
   });
 
-  it('Reveal in Explorer button (post-finalize) calls api.reports.openPdf with reveal: true', async () => {
-    const api = getApi();
-    api.reports.getOrCreate.mockResolvedValue(FINALIZED_REPORT);
-    api.reports.openPdf.mockResolvedValue({ opened: true });
-    await renderReportEditor();
-    await screen.findByTestId('report-editor-reveal-pdf');
-    await act(async () => {
-      fireEvent.click(screen.getByTestId('report-editor-reveal-pdf'));
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-    await waitFor(() => {
-      expect(api.reports.openPdf).toHaveBeenCalled();
-    });
-    const lastCall = api.reports.openPdf.mock.calls.at(-1)![0] as {
-      id: string;
-      reveal?: boolean;
-    };
-    expect(lastCall.id).toBe('00000000-0000-4000-8000-000000000777');
-    expect(lastCall.reveal).toBe(true);
-  });
+  // Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
+  // 'Reveal in Explorer' button removed (the doctor doesn't use it;
+  // the screenshot timeline already surfaces the source files).
 });
+
+// Plan 08-10 / G-08-4 — when procedures.get returns {ok:false} the
 
 // Plan 08-10 / G-08-4 — when procedures.get returns {ok:false} the
 // ReportEditor no longer crashes on undefined reads; it renders the
