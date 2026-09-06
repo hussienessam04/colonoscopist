@@ -19,9 +19,8 @@
 // renderReportPdf orchestrator writes the pdf_path + pdf_generated_at
 // + emits report.pdf_generated (see pdf/render-report-pdf.ts).
 
-import { ipcMain, shell, app, BrowserWindow } from 'electron';
+import { ipcMain, shell, app } from 'electron';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
 
 import { z } from 'zod';
 import {
@@ -466,12 +465,18 @@ export function registerReportsIpc(): void {
     }
   }));
 
-  // Quick task 20260906-print-via-webcontents-save-changes-at-end —
-  // route the OS print dialog through Electron's `webContents.print`
-  // instead of the iframe `contentWindow.print()` path. The iframe
-  // approach surfaces "This app doesn't support print preview" for
-  // PDF blob: URLs in Electron; `webContents.print` uses the OS-native
-  // print pipeline with full preview.
+  // Quick task 20260907-fix-print-pdf — replace the
+  // BrowserWindow + webContents.print() dance with shell.openPath().
+  // The prior approach (hidden → off-screen + minimized BrowserWindow
+  // calling webContents.print) failed to render a preview because
+  // Windows pauses the compositor for hidden/minimized windows, and
+  // Chromium needs an active compositor to paint the preview pane
+  // inside the OS print dialog — Chromium's fallback is the literal
+  // message "This app doesn't support print preview". shell.openPath
+  // delegates to the clinic's default PDF viewer (Edge / Adobe Reader
+  // / etc.), which has a fully working native print dialog with
+  // preview. The doctor prints from there (Ctrl+P or File → Print).
+  // This is the same approach handleOpenPdf already uses successfully.
   ipcMain.handle(IPC.REPORTS_PRINT, licenseGated(IPC.REPORTS_PRINT, async (_e, raw) => {
     try {
       const userId = requireSession();
@@ -488,54 +493,24 @@ export function registerReportsIpc(): void {
           ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
         );
       }
-      // Open the PDF in a BrowserWindow so the OS print dialog can
-      // preview + print. Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
-      // the previous `show: false` (hidden) window couldn't render a
-      // preview because Chromium needs a compositor surface. The window
-      // is now `show: true` but positioned -10000,-10000 (well off-screen)
-      // + `minimized: true` so the doctor never sees it. If the dialog
-      // still doesn't preview, the doctor can fall back to the OS viewer's
-      // Print menu.
-      const printWin = new BrowserWindow({
-        show: true,
-        x: -10000,
-        y: -10000,
-        minWidth: 800,
-        minHeight: 600,
-        minimizable: false,
-        maximizable: false,
-        resizable: false,
-        skipTaskbar: true,
-        showInTaskbar: false,
-        webPreferences: {
-          plugins: true, // Chromium PDF viewer
-          contextIsolation: true,
-          nodeIntegration: false,
-          sandbox: true,
-        },
+      // ponytail: shell.openPath returns '' on success and a non-empty
+      // error string on failure (no PDF viewer installed, etc.). Surface
+      // any non-empty return as IPC_INTERNAL so the renderer can show a
+      // retry affordance — the doctor can then fall back to "Open PDF".
+      const openedError = await shell.openPath(abs);
+      audit({
+        action: 'report.pdf_printed',
+        entityType: 'report',
+        entityId: id,
+        userId,
+        metadata: { pdfPath: report.pdfPath, openedForPrint: true },
       });
-      printWin.minimize();
-      try {
-        await printWin.loadURL(pathToFileURL(abs).toString());
-        // webContents.print returns a callback that fires when the
-        // dialog closes (success = true / failure = false).
-        const printed: boolean = await new Promise<boolean>((resolve) => {
-          printWin.webContents.print(
-            { silent: false, printBackground: true, pageSize: 'Letter' },
-            (success: boolean) => resolve(success),
-          );
-        });
-        audit({
-          action: 'report.pdf_printed',
-          entityType: 'report',
-          entityId: id,
-          userId,
-          metadata: { pdfPath: report.pdfPath, success: printed },
-        });
-        return { ok: true } as const;
-      } finally {
-        if (!printWin.isDestroyed()) printWin.destroy();
+      if (openedError) {
+        throw new IpcErrorException(
+          ipcError('IPC_INTERNAL', openedError),
+        );
       }
+      return { ok: true } as const;
     } catch (err) {
       throw asIpcError(err);
     }
