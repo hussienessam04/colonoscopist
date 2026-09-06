@@ -285,6 +285,16 @@ export default function ProcedureReview({
   // portal so its DOM position is independent of the page layout.
   const [lightboxScreenshot, setLightboxScreenshot] = useState<Screenshot | null>(null);
 
+  // ponytail: shared cache-buster for ScreenshotTimeline thumbnails.
+  // The lightbox already bumps its own internal cacheBuster for the
+  // blob-URL preview (Plan 17), but the timeline thumbnails still
+  // load via the MediaServer URL where the on-disk file change is
+  // invisible to the browser cache. Bumping this on every crop
+  // appends `?v=<value>` to each thumbnail URL so the browser
+  // refetches. Initial value 0 keeps the no-crop case identical
+  // (no `?v=` appended, no extra request).
+  const [croppedAtMs, setCroppedAtMs] = useState(0);
+
   // Phase 6 / Plan 02 — Generate report / Edit report CTA. Disabled
   // while the procedure is still recording (no meaningful content).
   // Click: ensure the draft exists via getOrCreate, then navigate to
@@ -438,6 +448,7 @@ export default function ProcedureReview({
               onDelete={handleDelete}
               onAnnotate={handleAnnotate}
               onOpen={setLightboxScreenshot}
+              mediaCacheBuster={croppedAtMs}
             />
           </div>
 
@@ -555,6 +566,7 @@ export default function ProcedureReview({
           mediaBaseUrl={mediaUrl.url}
           onClose={() => setLightboxScreenshot(null)}
           onDelete={handleDelete}
+          onCropped={() => setCroppedAtMs(Date.now())}
         />
       </div>
     </main>

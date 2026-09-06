@@ -91,6 +91,13 @@ export type ScreenshotTimelineProps = {
   attached?: ReportScreenshot[];
   onToggleAttach?: (screenshotId: number) => void;
   onReorder?: (orderedIds: number[]) => void;
+  // ponytail: shared cache-buster for the MediaServer-backed thumbnail
+  // URLs. The parent bumps this on every crop (lightbox onCropped
+  // callback); the timeline appends `?v=<value>` to each thumbnail URL
+  // so the browser refetches the freshly-cropped JPEG bytes. Localhost
+  // MediaServer has no intermediary cache so `?v=` is sufficient
+  // (unlike the lightbox which needs a `blob:` URL because Plan 17).
+  mediaCacheBuster?: number;
   testId?: string;
 };
 
@@ -118,6 +125,7 @@ export function ScreenshotTimeline({
   attached,
   onToggleAttach,
   onReorder,
+  mediaCacheBuster,
   testId,
 }: ScreenshotTimelineProps): JSX.Element {
   const canCapture = captureAllowed(status) && onCapture !== undefined;
@@ -266,12 +274,18 @@ export function ScreenshotTimeline({
               // `string | undefined`. Coerce `null` → `undefined` so the
               // conditional render (`thumbnailSrc && !errored`) falls through
               // to the placeholder without a TS strict-mode error.
-              thumbnailSrc={screenshotUrl({
-                mediaBaseUrl,
-                patientId,
-                procedureId,
-                filePath: s.filePath,
-              }) ?? undefined}
+              thumbnailSrc={(() => {
+                const base = screenshotUrl({
+                  mediaBaseUrl,
+                  patientId,
+                  procedureId,
+                  filePath: s.filePath,
+                });
+                if (base === null) return undefined;
+                return mediaCacheBuster !== undefined
+                  ? `${base}?v=${mediaCacheBuster}`
+                  : base;
+              })()}
               onSeek={onSeek}
               onDelete={onDelete}
               onAnnotate={onAnnotate}

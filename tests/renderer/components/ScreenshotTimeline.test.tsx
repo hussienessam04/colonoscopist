@@ -324,6 +324,56 @@ describe('ScreenshotTimeline', () => {
     // always does). Assert the absence.
     expect(screen.queryByLabelText('Thumbnail pending')).toBeNull();
   });
+
+  // Bug: cropping a screenshot updates the lightbox preview but the
+  // timeline thumbnail kept showing the pre-crop image until the
+  // doctor left and re-entered the procedure page. The fix: the parent
+  // passes a `mediaCacheBuster` (Date.now() on each crop) and the
+  // timeline appends `?v=<bust>` to each MediaServer URL. This guards
+  // the contract so a future regression that drops the bust returns
+  // to the silent-stale-thumbnail bug.
+  it('appends ?v=<bust> to every thumbnail <img> src when mediaCacheBuster is supplied', () => {
+    const { rerender } = render(
+      <ScreenshotTimeline
+        procedureId="p1"
+        patientId="p1"
+        mediaBaseUrl="http://127.0.0.1:51731"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+    // Without the bust, src is the raw MediaServer URL.
+    const beforeImgs = screen.getAllByTestId('screenshot-thumbnail-img');
+    expect(beforeImgs[0]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/5000.jpg',
+    );
+    expect(beforeImgs[1]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg',
+    );
+    // With the bust, every src carries the same ?v= (the URL becomes
+    // unique, the browser refetches).
+    rerender(
+      <ScreenshotTimeline
+        procedureId="p1"
+        patientId="p1"
+        mediaBaseUrl="http://127.0.0.1:51731"
+        screenshots={fixture}
+        onSeek={vi.fn()}
+        onCapture={vi.fn()}
+        onDelete={vi.fn()}
+        mediaCacheBuster={1_700_000_000_000}
+      />,
+    );
+    const afterImgs = screen.getAllByTestId('screenshot-thumbnail-img');
+    expect(afterImgs[0]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/5000.jpg?v=1700000000000',
+    );
+    expect(afterImgs[1]!.getAttribute('src')).toBe(
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg?v=1700000000000',
+    );
+  });
 });
 
 describe('Scrubber pointer events (companion)', () => {

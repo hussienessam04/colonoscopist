@@ -56,6 +56,14 @@ export type ScreenshotLightboxProps = {
   mediaBaseUrl: string | null;
   onClose: () => void;
   onDelete?: (screenshot: Screenshot) => void;
+  // ponytail: fired after every successful crop (Plan 17 lightbox + Plan
+  // 18 modal both rebind via their own cacheBuster). The parent uses
+  // this to bump a shared `mediaCacheBuster` so the ScreenshotTimeline
+  // thumbnails — which still load via the MediaServer `/media/` URL —
+  // also rebind to the freshly-cropped bytes. Without this seam, the
+  // timeline keeps showing the pre-crop thumbnail until the doctor
+  // leaves and re-enters the procedure page.
+  onCropped?: () => void;
   testId?: string;
 };
 
@@ -66,6 +74,7 @@ export function ScreenshotLightbox({
   mediaBaseUrl,
   onClose,
   onDelete,
+  onCropped,
   testId,
 }: ScreenshotLightboxProps): JSX.Element {
   const { t } = useTranslation();
@@ -241,6 +250,10 @@ export function ScreenshotLightbox({
             // the newly-cropped JPEG bytes. Plan 18: the modal also
             // receives the new value and re-fetches its own blob.
             setCacheBuster(Date.now());
+            // ponytail: notify the parent so the timeline thumbnails
+            // (which still load via the MediaServer URL) can rebind
+            // too. Without this, only the lightbox updates on crop.
+            onCropped?.();
           }}
         />
       ) : null}
