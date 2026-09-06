@@ -25,7 +25,7 @@ import {
   type ChangeEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, BookmarkPlus, FileText, FolderOpen, Printer, ScrollText } from 'lucide-react';
+import { ArrowLeft, BookmarkPlus, FileText, FolderOpen, List, Printer, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -584,23 +584,26 @@ export default function ReportEditor({
           placeholder={placeholder}
           // Quick task 20260906-report-editor-clinical-refresh — clinical
           // field treatment. Soft ivory tint, hairline rule, teal accent
-          // on focus (matches the document's signature accent). pb-7
+          // on focus (matches the document's signature accent). pb-9
           // leaves room for the bullet button at the bottom-right.
-          className="w-full resize-y rounded border border-[#E0D9C6] bg-[#FBF7EE] p-3 pb-7 text-sm leading-relaxed text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
+          className="w-full resize-y rounded border border-[#E0D9C6] bg-[#FBF7EE] p-3 pb-9 text-sm leading-relaxed text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
           data-testid={`report-editor-${scope}`}
         />
-        <Button
+        {/* Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached —
+            enhanced bullet button: icon-only, anchored in the bottom-right
+            of the textarea with a small teal pill background + tooltip.
+            Reads as a tool affordance, not a button competing with the
+            Templates / Save buttons in the heading row. */}
+        <button
           type="button"
-          variant="outline"
-          size="sm"
           onClick={() => handleBullet(key)()}
-          className="absolute bottom-1 right-1 h-6 border-[#E0D9C6] bg-white px-2 text-xs text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-          data-testid={`report-editor-bullet-${scope}`}
+          aria-label={t('report.bullet')}
           title={t('report.addBulletHint')}
+          data-testid={`report-editor-bullet-${scope}`}
+          className="absolute bottom-1.5 right-1.5 inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#E0D9C6] bg-white text-[#0E3A47] shadow-sm transition-colors hover:border-[#0E3A47] hover:bg-[#E6EFF1] focus:border-[#0E3A47] focus:bg-[#E6EFF1] focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/40"
         >
-          <span className="mr-1">•</span>
-          {t('report.bullet')}
-        </Button>
+          <List className="size-3.5" aria-hidden="true" />
+        </button>
       </div>
     </section>
   );
@@ -728,31 +731,53 @@ export default function ReportEditor({
                 {/* signature header band at the top of the editor (it only */}
                 {/* matters on the rendered PDF). The page-level "Report */}
                 {/* editor" h1 + finalized badge above still surface the */}
-                {/* context. */}
+                {/* context.
+                    Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached:
+                    unified with the Procedure meta-row treatment — small-caps
+                    label above, mono value below, in a 4-col grid. */}
                 <section className="mb-6">
                   <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
                     {t('common.patient')}
                   </h2>
                   <div
-                    className="flex flex-wrap gap-x-6 text-sm text-[#13202E]"
+                    className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm md:grid-cols-4"
                     data-testid="report-editor-patient-block"
                   >
-                    <span>
-                      <span className="text-[#8C8478]">{t('common.name')}: </span>
-                      <strong>{patient?.fullName ?? '—'}</strong>
-                    </span>
-                    <span>
-                      <span className="text-[#8C8478]">{t('common.mrn')}: </span>
-                      {patient?.mrn}
-                    </span>
-                    <span>
-                      <span className="text-[#8C8478]">{t('common.dob')}: </span>
-                      {patient?.dob ?? '—'}
-                    </span>
-                    <span>
-                      <span className="text-[#8C8478]">{t('common.gender')}: </span>
-                      {patient?.gender ?? '—'}
-                    </span>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
+                        {t('common.name')}
+                      </p>
+                      <p
+                        className="mt-0.5 truncate font-medium text-[#13202E]"
+                        title={patient?.fullName ?? ''}
+                      >
+                        {patient?.fullName ?? '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
+                        {t('common.mrn')}
+                      </p>
+                      <p className="mt-0.5 font-mono text-sm text-[#13202E]">
+                        {patient?.mrn}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
+                        {t('common.dob')}
+                      </p>
+                      <p className="mt-0.5 font-mono text-sm text-[#13202E]">
+                        {patient?.dob ?? '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
+                        {t('common.gender')}
+                      </p>
+                      <p className="mt-0.5 text-sm text-[#13202E]">
+                        {patient?.gender ?? '—'}
+                      </p>
+                    </div>
                   </div>
                 </section>
 

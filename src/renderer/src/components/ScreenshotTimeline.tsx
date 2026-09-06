@@ -50,6 +50,7 @@
 import { Button } from '@/components/ui/button';
 import { ScreenshotThumbnail } from '@/components/ScreenshotThumbnail';
 import { screenshotUrl } from '@/lib/screenshot-url';
+import { useTranslation } from 'react-i18next';
 import type { ProcedureStatus, ReportScreenshot, Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotTimelineProps = {
@@ -138,6 +139,7 @@ export function ScreenshotTimeline({
   testId,
   layout = 'row',
 }: ScreenshotTimelineProps): JSX.Element {
+  const { t } = useTranslation();
   const canCapture = captureAllowed(status) && onCapture !== undefined;
   // ponytail: prefer the rich `attached` prop (with sortOrder) for
   // ordering; fall back to the legacy `attachedIds` Set for callers
@@ -227,8 +229,15 @@ export function ScreenshotTimeline({
           <div
             key={s.id}
             data-screenshot-id={s.id}
-            className={`relative rounded ${
-              isAttached ? 'border-2 border-blue-500' : 'border-2 border-transparent'
+            // Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached —
+            // attached state: teal accent border + soft teal tint background
+            // so the thumbnail itself reads as "chosen" at a glance.
+            // Unattached: transparent border + no tint so the thumbnail
+            // visually disappears into the rail background.
+            className={`relative overflow-hidden rounded-md transition-colors ${
+              isAttached
+                ? 'border-2 border-[#0E3A47] bg-[#E6EFF1]/40 shadow-[0_2px_8px_-2px_rgba(14,58,71,0.25)]'
+                : 'border-2 border-transparent'
             }`}
             data-testid={isAttached ? 'screenshot-attached' : undefined}
           >
@@ -242,7 +251,7 @@ export function ScreenshotTimeline({
                 aria-label={isAttached ? 'Detach from report' : 'Attach to report'}
                 className={`absolute left-1 bottom-1 z-20 flex h-5 w-5 items-center justify-center rounded text-xs font-bold shadow-md focus-visible:ring-2 focus-visible:ring-white ${
                   isAttached
-                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    ? 'bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
                 data-testid={isAttached ? 'screenshot-detach-toggle' : 'screenshot-attach-toggle'}
@@ -250,13 +259,25 @@ export function ScreenshotTimeline({
                 {isAttached ? '✓' : '+'}
               </button>
             ) : null}
+            {/* Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached —
+                small "Attached" badge at the top-right so the doctor can
+                scan a long timeline and immediately see what's chosen.
+                Sits above the move ‹ › buttons when both are visible. */}
+            {isAttached ? (
+              <div
+                className="absolute right-1 top-1 z-20 rounded bg-[#0E3A47] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow"
+                data-testid="screenshot-attached-badge"
+              >
+                {t('common.attached')}
+              </div>
+            ) : null}
             {/* Phase 6 UAT G-06-5 — small Move-Left / Move-Right buttons
                 on each attached thumbnail. Hidden when the screenshot
                 isn't attached (toggle is off) or is at the head/tail of
                 the attached list (no-op moves). Replaces the
                 drag-to-reorder mechanism. */}
             {isAttached && (canMoveLeft || canMoveRight) ? (
-              <div className="absolute right-1 top-1 z-20 flex gap-1">
+              <div className="absolute bottom-7 right-1 z-20 flex gap-1">
                 <button
                   type="button"
                   onClick={(e) => {
