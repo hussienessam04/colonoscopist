@@ -28,7 +28,6 @@ import {
   BookmarkPlus,
   FileText,
   List,
-  Printer,
   ScrollText,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -76,12 +75,13 @@ const ANATOMY_BOXES_BY_TYPE: Record<
 const FIELD_CLASS =
   "block w-full rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-2 text-sm text-[#13202E] placeholder:text-[#A39A86] transition-colors hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30";
 
-// Quick task 20260906-print-via-webcontents-save-changes-at-end —
-// the iframe-based PrintPreview is gone. The OS print dialog is now
-// driven by Electron's `webContents.print` (REPORTS_PRINT IPC, main
-// process loads the PDF in a hidden BrowserWindow + calls print).
-// Reliable PDF preview; the iframe path surfaced "This app doesn't
-// support print preview" for blob: URLs containing PDFs.
+// Quick task 20260907-remove-print-button — the Print button is
+// gone (and so is `handlePrint`, the REPORTS_PRINT IPC, and the
+// preload `reports.print` bridge). The "Open PDF" button alone
+// drives the PDF flow: shell.openPath opens the report in the
+// clinic's default viewer (Edge / Adobe Reader), which has a fully
+// working native print dialog with preview — the doctor prints
+// from there (Ctrl+P or File → Print).
 
 export default function ReportEditor({
   procedureId: initialProcedureId,
@@ -375,27 +375,10 @@ export default function ReportEditor({
     }
   }, [report, t]);
 
-  // Quick task 20260906-pdf-min-bytes-print-preview-reveal-explorer —
-  // `handleRevealPdf` removed (the doctor doesn't use the Reveal in
-  // Explorer button — the screenshot timeline already surfaces the
-  // source files).
-
-  const handlePrint = useCallback(async (): Promise<void> => {
-    if (report === null) return;
-    // Quick task 20260906-print-via-webcontents-save-changes-at-end —
-    // route the OS print dialog through Electron's
-    // `webContents.print` (loaded in a hidden BrowserWindow with the
-    // Chromium PDF viewer). Reliable PDF preview; the previous
-    // iframe `contentWindow.print()` path surfaced "This app doesn't
-    // support print preview" for blob: URLs containing PDFs.
-    try {
-      await window.api.reports.print({ id: report.id });
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : t("report.openPdfFailed"),
-      );
-    }
-  }, [report, t]);
+  // Quick task 20260907-remove-print-button — `handlePrint` removed
+  // (the Print button is gone; the Open PDF button now serves both
+  // "view the PDF" and "print the PDF" — the doctor prints from the
+  // system viewer's native print dialog).
 
   const handleToggleAttach = useCallback(
     (screenshotId: number): void => {
@@ -651,30 +634,17 @@ export default function ReportEditor({
           </div>
           <div className="flex items-center gap-2">
             {isFinalized ? (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handlePrint()}
-                  disabled={report?.pdfPath === null}
-                  data-testid="report-editor-print"
-                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-                >
-                  <Printer className="size-4 mr-1" aria-hidden="true" />
-                  {t("report.printButton")}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void handleOpenPdf()}
-                  disabled={report?.pdfPath === null}
-                  data-testid="report-editor-open-pdf"
-                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-                >
-                  <FileText className="size-4 mr-1" aria-hidden="true" />
-                  {t("report.openPdfButton")}
-                </Button>
-              </>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleOpenPdf()}
+                disabled={report?.pdfPath === null}
+                data-testid="report-editor-open-pdf"
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
+              >
+                <FileText className="size-4 mr-1" aria-hidden="true" />
+                {t("report.openPdfButton")}
+              </Button>
             ) : null}
             <Button
               variant="outline"

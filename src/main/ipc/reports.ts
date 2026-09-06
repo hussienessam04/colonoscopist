@@ -465,56 +465,10 @@ export function registerReportsIpc(): void {
     }
   }));
 
-  // Quick task 20260907-fix-print-pdf — replace the
-  // BrowserWindow + webContents.print() dance with shell.openPath().
-  // The prior approach (hidden → off-screen + minimized BrowserWindow
-  // calling webContents.print) failed to render a preview because
-  // Windows pauses the compositor for hidden/minimized windows, and
-  // Chromium needs an active compositor to paint the preview pane
-  // inside the OS print dialog — Chromium's fallback is the literal
-  // message "This app doesn't support print preview". shell.openPath
-  // delegates to the clinic's default PDF viewer (Edge / Adobe Reader
-  // / etc.), which has a fully working native print dialog with
-  // preview. The doctor prints from there (Ctrl+P or File → Print).
-  // This is the same approach handleOpenPdf already uses successfully.
-  ipcMain.handle(IPC.REPORTS_PRINT, licenseGated(IPC.REPORTS_PRINT, async (_e, raw) => {
-    try {
-      const userId = requireSession();
-      const { id } = safeParse(reportIdSchema, raw, 'id');
-      const report = reportsRepo.getById(id);
-      if (!report || !report.pdfPath) {
-        throw new IpcErrorException(
-          ipcError('IPC_NOT_FOUND', 'pdf not generated yet'),
-        );
-      }
-      const abs = reportPdfPath(id);
-      if (!existsSync(abs)) {
-        throw new IpcErrorException(
-          ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
-        );
-      }
-      // ponytail: shell.openPath returns '' on success and a non-empty
-      // error string on failure (no PDF viewer installed, etc.). Surface
-      // any non-empty return as IPC_INTERNAL so the renderer can show a
-      // retry affordance — the doctor can then fall back to "Open PDF".
-      const openedError = await shell.openPath(abs);
-      audit({
-        action: 'report.pdf_printed',
-        entityType: 'report',
-        entityId: id,
-        userId,
-        metadata: { pdfPath: report.pdfPath, openedForPrint: true },
-      });
-      if (openedError) {
-        throw new IpcErrorException(
-          ipcError('IPC_INTERNAL', openedError),
-        );
-      }
-      return { ok: true } as const;
-    } catch (err) {
-      throw asIpcError(err);
-    }
-  }));
+  // Quick task 20260907-remove-print-button — REPORTS_PRINT handler
+  // removed (the Print button is gone; Open PDF alone drives the
+  // PDF flow and the doctor prints from the system viewer's native
+  // print dialog).
 
   ipcMain.handle(IPC.REPORTS_ATTACH_SCREENSHOT, licenseGated(IPC.REPORTS_ATTACH_SCREENSHOT, (_e, raw) => {
     try {

@@ -60,10 +60,6 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // routine clinical action on existing data, not new capture. The
   // gated SCREENSHOTS_ADD still blocks new captures when unlicensed.
   IPC.SCREENSHOTS_CROP,
-  // Quick task 20260906-print-via-webcontents-save-changes-at-end —
-  // printing an already-generated PDF is a routine read on existing
-  // data. Same rationale as SCREENSHOTS_GET_BLOB / SCREENSHOTS_CROP.
-  IPC.REPORTS_PRINT,
   // Phase 8 / Plan 15 (G-08-8) — reading an already-captured screenshot's
   // bytes (so the renderer can build a blob: URL for the crop modal).
   // Same rationale as SCREENSHOTS_CROP: routine read on existing data.
