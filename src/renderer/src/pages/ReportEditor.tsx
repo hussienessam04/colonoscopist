@@ -303,6 +303,31 @@ export default function ReportEditor({
     [report, t],
   );
 
+  // Quick task 20260906-report-editor-layout-and-bullets — bullet
+  // toggle for each box. Prefix every non-empty line of the box's
+  // body with `"• "`; if every line is already bulleted, remove the
+  // bullets instead (idempotent). Triggered by the small "• Bullet"
+  // button next to Templates / Save template. Per-line selection is
+  // out of scope; the textarea-level state is the source of truth.
+  const handleBullet = useCallback(
+    (key: keyof ReportEditableFields) => (): void => {
+      if (report === null) return;
+      const current = report[key] ?? '';
+      const lines = current.split('\n');
+      const allBulleted = lines.every(
+        (line) => line === '' || /^\s*•\s*/.test(line),
+      );
+      const next = allBulleted
+        ? lines.map((line) => line.replace(/^\s*•\s*/, '')).join('\n')
+        : lines.map((line) => (line === '' ? '' : `• ${line}`)).join('\n');
+      const patched = { [key]: next } as Partial<ReportEditableFields>;
+      setLocal(patched);
+      const nextReport = { ...report, ...patched } as Report;
+      trigger(nextReport);
+    },
+    [report, setLocal, trigger],
+  );
+
   const handleFinalize = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
@@ -515,6 +540,17 @@ export default function ReportEditor({
             type="button"
             variant="ghost"
             size="sm"
+            onClick={() => handleBullet(key)()}
+            data-testid={`report-editor-bullet-${scope}`}
+            title={t('report.addBulletHint')}
+          >
+            <span className="mr-1">•</span>
+            {t('report.bullet')}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setTemplatesDialogScope(scope)}
             data-testid={`report-editor-templates-${scope}`}
           >
@@ -624,9 +660,12 @@ export default function ReportEditor({
           </div>
         </header>
 
-        <div className="mx-auto flex max-w-3xl flex-col gap-5">
+        {/* Quick task 20260906-report-editor-layout-and-bullets — full
+            page width. The two-column layout (boxes left, screenshots
+            right) lives inside the document <article>. */}
+        <div className="mx-auto w-full max-w-7xl px-2">
           <article
-            className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm"
+            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
             data-testid="report-editor-document"
           >
             {loading && report === null ? (
@@ -635,209 +674,221 @@ export default function ReportEditor({
 
             {gated ? <EmptyStateCard /> : null}
 
-            {/* Patient block — quick task 20260906 dropped the logo + */}
-            {/* signature header band at the top of the editor (it only */}
-            {/* matters on the rendered PDF). The page-level "Report */}
-            {/* editor" h1 + finalized badge above still surface the */}
-            {/* context. */}
-            <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.patient')}</h2>
-              <div
-                className="flex flex-wrap gap-x-4 text-sm text-slate-700"
-                data-testid="report-editor-patient-block"
-              >
-                <span>
-                  {t('common.name')}: <strong>{patient?.fullName ?? '—'}</strong>
-                </span>
-                <span>{t('common.mrn')}: {patient?.mrn}</span>
-                <span>{t('common.dob')}: {patient?.dob ?? '—'}</span>
-                <span>{t('common.gender')}: {patient?.gender ?? '—'}</span>
-              </div>
-            </section>
+            <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_320px]">
+              {/* LEFT — patient / procedure / boxes */}
+              <div className="min-w-0">
+                {/* Patient block — quick task 20260906 dropped the logo + */}
+                {/* signature header band at the top of the editor (it only */}
+                {/* matters on the rendered PDF). The page-level "Report */}
+                {/* editor" h1 + finalized badge above still surface the */}
+                {/* context. */}
+                <section className="mb-4">
+                  <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.patient')}</h2>
+                  <div
+                    className="flex flex-wrap gap-x-4 text-sm text-slate-700"
+                    data-testid="report-editor-patient-block"
+                  >
+                    <span>
+                      {t('common.name')}: <strong>{patient?.fullName ?? '—'}</strong>
+                    </span>
+                    <span>{t('common.mrn')}: {patient?.mrn}</span>
+                    <span>{t('common.dob')}: {patient?.dob ?? '—'}</span>
+                    <span>{t('common.gender')}: {patient?.gender ?? '—'}</span>
+                  </div>
+                </section>
 
-            {/* Procedure block + instrument + premedication */}
-            <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.procedure')}</h2>
-              <div className="flex flex-col gap-2 text-sm text-slate-700">
-                <span>{t('common.date')}: {procedureDateLabel}</span>
-                <span>{t('common.duration')}: {procedureDurationLabel}</span>
-                <span>{t('common.doctor')}: {doctorName}</span>
-              </div>
+                {/* Procedure block + instrument + premedication */}
+                <section className="mb-4">
+                  <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.procedure')}</h2>
+                  <div className="flex flex-col gap-2 text-sm text-slate-700">
+                    <span>{t('common.date')}: {procedureDateLabel}</span>
+                    <span>{t('common.duration')}: {procedureDurationLabel}</span>
+                    <span>{t('common.doctor')}: {doctorName}</span>
+                  </div>
 
-              {/* Procedure-type toggle */}
-              <div className="mt-4">
-                <label className="mb-1 block text-xs font-medium text-slate-700">
-                  {t('report.procedureTypeLabel')}
-                </label>
+                  {/* Procedure-type toggle */}
+                  <div className="mt-4">
+                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                      {t('report.procedureTypeLabel')}
+                    </label>
+                    <div
+                      className="inline-flex rounded border border-slate-300 bg-slate-50"
+                      role="radiogroup"
+                      aria-label={t('report.procedureTypeLabel')}
+                      data-testid="report-editor-procedure-type"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => void handleProcedureTypeChange('colon')}
+                        aria-pressed={procedureType === 'colon'}
+                        className={`px-3 py-1.5 text-sm ${
+                          procedureType === 'colon'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                        data-testid="report-editor-procedure-type-colon"
+                      >
+                        {t('report.procedureTypeColon')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleProcedureTypeChange('upper_gi')}
+                        aria-pressed={procedureType === 'upper_gi'}
+                        className={`px-3 py-1.5 text-sm ${
+                          procedureType === 'upper_gi'
+                            ? 'bg-blue-600 text-white'
+                            : 'text-slate-700 hover:bg-slate-100'
+                        }`}
+                        data-testid="report-editor-procedure-type-upper-gi"
+                      >
+                        {t('report.procedureTypeUpperGi')}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Instrument picker */}
+                  <div className="mt-3">
+                    <label
+                      htmlFor="report-editor-instrument"
+                      className="mb-1 block text-xs font-medium text-slate-700"
+                    >
+                      {t('report.instrumentLabel')}
+                    </label>
+                    <select
+                      id="report-editor-instrument"
+                      value={report?.instrument ?? ''}
+                      onChange={(e) => void handleInstrumentChange(e)}
+                      className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm"
+                      data-testid="report-editor-instrument-select"
+                    >
+                      <option value="">{t('report.instrumentNone')}</option>
+                      {usedDevices.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                    {instrumentLabel === '' && usedDevices.length === 0 ? (
+                      <p className="mt-1 text-xs text-slate-500">
+                        {t('report.instrumentNoneConfigured')}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  {/* Premedication override */}
+                  <div className="mt-3">
+                    <label
+                      htmlFor="report-editor-premedication"
+                      className="mb-1 block text-xs font-medium text-slate-700"
+                    >
+                      {t('report.premedicationLabel')}
+                    </label>
+                    <Input
+                      id="report-editor-premedication"
+                      value={premedicationInput}
+                      onChange={(e) => setPremedicationInput(e.target.value)}
+                      onBlur={() => void premedicationCommitted(premedicationInput)}
+                      placeholder={premedicationDisplay}
+                      data-testid="report-editor-premedication"
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      {premedicationInput === ''
+                        ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
+                        : t('report.premedicationOverrideActive')}
+                    </p>
+                  </div>
+                </section>
+
+                {/* Anatomy boxes (conditional on procedureType) — quick
+                    task 20260906-report-editor-polish lays them out in a
+                    2-column grid so the page fits more on screen without
+                    scrolling. Conclusion + recommendation stay full-width
+                    below. */}
                 <div
-                  className="inline-flex rounded border border-slate-300 bg-slate-50"
-                  role="radiogroup"
-                  aria-label={t('report.procedureTypeLabel')}
-                  data-testid="report-editor-procedure-type"
+                  className="grid grid-cols-1 gap-x-4 md:grid-cols-2"
+                  data-testid="report-editor-anatomy-grid"
                 >
-                  <button
-                    type="button"
-                    onClick={() => void handleProcedureTypeChange('colon')}
-                    aria-pressed={procedureType === 'colon'}
-                    className={`px-3 py-1.5 text-sm ${
-                      procedureType === 'colon'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                    data-testid="report-editor-procedure-type-colon"
-                  >
-                    {t('report.procedureTypeColon')}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleProcedureTypeChange('upper_gi')}
-                    aria-pressed={procedureType === 'upper_gi'}
-                    className={`px-3 py-1.5 text-sm ${
-                      procedureType === 'upper_gi'
-                        ? 'bg-blue-600 text-white'
-                        : 'text-slate-700 hover:bg-slate-100'
-                    }`}
-                    data-testid="report-editor-procedure-type-upper-gi"
-                  >
-                    {t('report.procedureTypeUpperGi')}
-                  </button>
+                  {anatomyBoxes.map((box) =>
+                    renderBox(
+                      box,
+                      box,
+                      scopeLabel(box),
+                      4,
+                      t('report.boxPlaceholder', { scope: scopeLabel(box) }),
+                    ),
+                  )}
                 </div>
-              </div>
 
-              {/* Instrument picker */}
-              <div className="mt-3">
-                <label
-                  htmlFor="report-editor-instrument"
-                  className="mb-1 block text-xs font-medium text-slate-700"
+                {/* Conclusion + recommendation always-on */}
+                {renderBox(
+                  'conclusion',
+                  'conclusion',
+                  scopeLabel('conclusion'),
+                  3,
+                  t('report.boxPlaceholder', { scope: scopeLabel('conclusion') }),
+                )}
+                {renderBox(
+                  'recommendation',
+                  'recommendation',
+                  scopeLabel('recommendation'),
+                  3,
+                  t('report.boxPlaceholder', { scope: scopeLabel('recommendation') }),
+                )}
+
+                {/* Footer dropped alongside the top logo band (quick task
+                    20260906-report-editor-polish) — the footer signature +
+                    clinic name still appear on the rendered PDF, not in
+                    the editor preview. */}
+
+                <p
+                  className="mt-4 text-xs text-muted-foreground"
+                  data-testid="report-editor-save-indicator"
+                  role="status"
+                  aria-live="polite"
                 >
-                  {t('report.instrumentLabel')}
-                </label>
-                <select
-                  id="report-editor-instrument"
-                  value={report?.instrument ?? ''}
-                  onChange={(e) => void handleInstrumentChange(e)}
-                  className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm"
-                  data-testid="report-editor-instrument-select"
-                >
-                  <option value="">{t('report.instrumentNone')}</option>
-                  {usedDevices.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-                {instrumentLabel === '' && usedDevices.length === 0 ? (
-                  <p className="mt-1 text-xs text-slate-500">
-                    {t('report.instrumentNoneConfigured')}
-                  </p>
+                  {indicatorText}
+                </p>
+                {!isFinalized ? (
+                  <Button
+                    onClick={() => void handleFinalize()}
+                    disabled={report === null}
+                    className="mt-2 self-start"
+                    data-testid="report-editor-finalize"
+                  >
+                    {t('report.finalizeButton')}
+                  </Button>
                 ) : null}
               </div>
 
-              {/* Premedication override */}
-              <div className="mt-3">
-                <label
-                  htmlFor="report-editor-premedication"
-                  className="mb-1 block text-xs font-medium text-slate-700"
-                >
-                  {t('report.premedicationLabel')}
-                </label>
-                <Input
-                  id="report-editor-premedication"
-                  value={premedicationInput}
-                  onChange={(e) => setPremedicationInput(e.target.value)}
-                  onBlur={() => void premedicationCommitted(premedicationInput)}
-                  placeholder={premedicationDisplay}
-                  data-testid="report-editor-premedication"
-                />
-                <p className="mt-1 text-xs text-slate-500">
-                  {premedicationInput === ''
-                    ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
-                    : t('report.premedicationOverrideActive')}
-                </p>
-              </div>
-            </section>
-
-            {/* Anatomy boxes (conditional on procedureType) — quick
-                task 20260906 lays them out in a 2-column grid so the
-                page fits more on screen without scrolling. Conclusion +
-                recommendation stay full-width below. */}
-            <div
-              className="grid grid-cols-1 gap-x-4 md:grid-cols-2"
-              data-testid="report-editor-anatomy-grid"
-            >
-              {anatomyBoxes.map((box) =>
-                renderBox(
-                  box,
-                  box,
-                  scopeLabel(box),
-                  4,
-                  t('report.boxPlaceholder', { scope: scopeLabel(box) }),
-                ),
-              )}
-            </div>
-
-            {/* Conclusion + recommendation always-on */}
-            {renderBox(
-              'conclusion',
-              'conclusion',
-              scopeLabel('conclusion'),
-              3,
-              t('report.boxPlaceholder', { scope: scopeLabel('conclusion') }),
-            )}
-            {renderBox(
-              'recommendation',
-              'recommendation',
-              scopeLabel('recommendation'),
-              3,
-              t('report.boxPlaceholder', { scope: scopeLabel('recommendation') }),
-            )}
-
-            {/* Attached screenshots */}
-            <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">
-                {t('report.attachedScreenshots')}
-                <span className="ml-2 text-xs font-normal text-slate-500">
-                  ({attached.length} of {screenshots.length})
-                </span>
-              </h2>
-              <ScreenshotTimeline
-                procedureId={procedureId}
-                patientId={procedure?.patientId ?? ''}
-                mediaBaseUrl={mediaUrl.url}
-                status="completed"
-                screenshots={screenshots}
-                onSeek={() => {
-                  /* no-op in editor */
-                }}
-                attached={attached}
-                onToggleAttach={handleToggleAttach}
-                onReorder={reorder}
-                testId="report-editor-screenshot-timeline"
-              />
-            </section>
-
-            {/* Footer dropped alongside the top logo band (quick task
-                20260906) — the footer signature + clinic name still
-                appear on the rendered PDF, not in the editor preview. */}
-
-            <p
-              className="mt-4 text-xs text-muted-foreground"
-              data-testid="report-editor-save-indicator"
-              role="status"
-              aria-live="polite"
-            >
-              {indicatorText}
-            </p>
-            {!isFinalized ? (
-              <Button
-                onClick={() => void handleFinalize()}
-                disabled={report === null}
-                className="mt-2 self-start"
-                data-testid="report-editor-finalize"
+              {/* RIGHT — screenshots rail (sticky on scroll, lg+) */}
+              <aside
+                className="min-w-0"
+                data-testid="report-editor-screenshots-rail"
               >
-                {t('report.finalizeButton')}
-              </Button>
-            ) : null}
+                <div className="lg:sticky lg:top-4">
+                  <h2 className="mb-2 text-sm font-bold text-slate-900">
+                    {t('report.attachedScreenshots')}
+                    <span className="ml-2 text-xs font-normal text-slate-500">
+                      ({attached.length} of {screenshots.length})
+                    </span>
+                  </h2>
+                  <ScreenshotTimeline
+                    procedureId={procedureId}
+                    patientId={procedure?.patientId ?? ''}
+                    mediaBaseUrl={mediaUrl.url}
+                    status="completed"
+                    screenshots={screenshots}
+                    onSeek={() => {
+                      /* no-op in editor */
+                    }}
+                    attached={attached}
+                    onToggleAttach={handleToggleAttach}
+                    onReorder={reorder}
+                    testId="report-editor-screenshot-timeline"
+                  />
+                </div>
+              </aside>
+            </div>
           </article>
         </div>
       </div>

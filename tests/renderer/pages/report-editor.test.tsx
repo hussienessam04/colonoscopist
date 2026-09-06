@@ -99,6 +99,35 @@ describe('ReportEditor', () => {
     expect(screen.queryByTestId('report-editor-stomach')).not.toBeInTheDocument();
   });
 
+  // Quick task 20260906-report-editor-layout-and-bullets — the bullet
+  // button prefixes every non-empty line of the box with `"• "`. The
+  // contract is symmetric: clicking again un-bullets every line.
+  it('bullet button prefixes every non-empty line with "• " and un-bullets on a second click', async () => {
+    const api = getApi();
+    api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
+    api.reports.updateDraft.mockImplementation(async (input) => ({
+      ...DRAFT_REPORT,
+      colon: input.colon ?? '',
+    }));
+    await renderReportEditor();
+    const colonBox = await screen.findByTestId('report-editor-colon');
+    fireEvent.change(colonBox, { target: { value: 'line one\nline two\n\nline three' } });
+    const bulletBtn = await screen.findByTestId('report-editor-bullet-colon');
+    fireEvent.click(bulletBtn);
+    await waitFor(() => {
+      expect((colonBox as HTMLTextAreaElement).value).toBe(
+        '• line one\n• line two\n\n• line three',
+      );
+    });
+    // Second click strips the bullets.
+    fireEvent.click(bulletBtn);
+    await waitFor(() => {
+      expect((colonBox as HTMLTextAreaElement).value).toBe(
+        'line one\nline two\n\nline three',
+      );
+    });
+  });
+
   it('draft textarea change fires api.reports.updateDraft after debounce', async () => {
     const api = getApi();
     api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
