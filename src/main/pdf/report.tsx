@@ -110,10 +110,28 @@ export type ReportPdfInput = {
   patientGender: string | null;
   // Procedure block.
   procedureDurationLabel: string;
-  // Body sections.
-  findings: string;
-  diagnosis: string;
-  recommendations: string;
+  // Quick task 20260812-redesign-report — procedure-type toggle.
+  // Drives which anatomy boxes render below:
+  //   colon    → colon + ileum + (always-on) conclusion + recommendation
+  //   upper_gi → esophagus + stomach + pylorus + duodenum +
+  //              (always-on) conclusion + recommendation
+  procedureType: 'colon' | 'upper_gi';
+  // Quick task 20260812-redesign-report — instrument label (looked up
+  // from used_devices.id by the orchestrator; empty when the doctor
+  // hasn't picked one yet).
+  instrumentLabel: string;
+  // Quick task 20260812-redesign-report — 8 procedure-type-specific
+  // box columns. The template only renders the subset that matches
+  // procedureType (anatomy boxes), plus always-on conclusion +
+  // recommendation.
+  esophagus: string;
+  stomach: string;
+  pylorus: string;
+  duodenum: string;
+  colon: string;
+  ileum: string;
+  conclusion: string;
+  recommendation: string;
   // Attached screenshots (one per page, ordered ASC by sortOrder).
   attachedScreenshots: AttachedScreenshot[];
   // Phase 7 / Plan 07-04 — I18N-03 + RPT-06: 'en' keeps Helvetica + LTR
@@ -350,9 +368,16 @@ export function createReportPdfElement(
     patientDob,
     patientGender,
     procedureDurationLabel,
-    findings,
-    diagnosis,
-    recommendations,
+    procedureType,
+    instrumentLabel,
+    esophagus,
+    stomach,
+    pylorus,
+    duodenum,
+    colon,
+    ileum,
+    conclusion,
+    recommendation,
     attachedScreenshots,
     language = 'en',
   } = input;
@@ -599,52 +624,137 @@ export function createReportPdfElement(
               )
             : doctorName,
         ),
+        // Quick task 20260812-redesign-report — instrument line in the
+        // procedure block. Empty when the doctor hasn't picked one
+        // yet; the line is omitted entirely in that case (no
+        // placeholder, matching the premedication pattern above).
+        instrumentLabel !== ''
+          ? React.createElement(
+              P.Text,
+              null,
+              isAr ? 'الجهاز: ' : 'Instrument: ',
+              instrumentLabel,
+            )
+          : null,
       ),
 
-      // Findings / Diagnosis / Recommendations — body sections flow
-      // through the bidi wrapper so Arabic text renders RTL while
-      // English stays LTR.
-      React.createElement(
-        P.View,
-        { style: styles.section },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Findings',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Findings'),
-        rtlText('findings', findings || '—'),
-      ),
-      React.createElement(
-        P.View,
-        { style: styles.section },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Diagnosis',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Diagnosis'),
-        rtlText('diagnosis', diagnosis || '—'),
-      ),
-      // Recommendations is included for completeness even though the
-      // Phase 6 UAT removed it from the editor — historical reports
-      // still carry the column value and the PDF must render it.
-      recommendations
+      // Quick task 20260812-redesign-report — anatomy boxes switch on
+      // procedureType (colon → colon + ileum; upper_gi → esophagus +
+      // stomach + pylorus + duodenum) + always-on conclusion +
+      // recommendation. Body text flows through the bidi wrapper so
+      // Arabic renders RTL while English stays LTR. Each box renders
+      // a '—' placeholder when empty so the PDF keeps its layout even
+      // before the doctor types.
+      procedureType === 'upper_gi'
         ? React.createElement(
             P.View,
-            { style: styles.section },
+            { style: styles.section, 'data-testid': 'report-pdf-esophagus' },
             isAr
               ? React.createElement(
                   P.Text,
                   { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Recommendations',
+                  'Esophagus',
                 )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendations'),
-            rtlText('recommendations', recommendations),
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Esophagus'),
+            rtlText('esophagus', esophagus || '—'),
           )
         : null,
+      procedureType === 'upper_gi'
+        ? React.createElement(
+            P.View,
+            { style: styles.section, 'data-testid': 'report-pdf-stomach' },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Stomach',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Stomach'),
+            rtlText('stomach', stomach || '—'),
+          )
+        : null,
+      procedureType === 'upper_gi'
+        ? React.createElement(
+            P.View,
+            { style: styles.section, 'data-testid': 'report-pdf-pylorus' },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Pylorus',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Pylorus'),
+            rtlText('pylorus', pylorus || '—'),
+          )
+        : null,
+      procedureType === 'upper_gi'
+        ? React.createElement(
+            P.View,
+            { style: styles.section, 'data-testid': 'report-pdf-duodenum' },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Duodenum',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Duodenum'),
+            rtlText('duodenum', duodenum || '—'),
+          )
+        : null,
+      procedureType === 'colon'
+        ? React.createElement(
+            P.View,
+            { style: styles.section, 'data-testid': 'report-pdf-colon' },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Colon',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Colon'),
+            rtlText('colon', colon || '—'),
+          )
+        : null,
+      procedureType === 'colon'
+        ? React.createElement(
+            P.View,
+            { style: styles.section, 'data-testid': 'report-pdf-ileum' },
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
+                  'Ileum',
+                )
+              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Ileum'),
+            rtlText('ileum', ileum || '—'),
+          )
+        : null,
+      // Conclusion + recommendation always-on regardless of
+      // procedureType.
+      React.createElement(
+        P.View,
+        { style: styles.section, 'data-testid': 'report-pdf-conclusion' },
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Conclusion',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Conclusion'),
+        rtlText('conclusion', conclusion || '—'),
+      ),
+      React.createElement(
+        P.View,
+        { style: styles.section, 'data-testid': 'report-pdf-recommendation' },
+        isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.sectionTitle, direction: 'rtl' } },
+              'Recommendation',
+            )
+          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendation'),
+        rtlText('recommendation', recommendation || '—'),
+      ),
 
       // Phase 6 UAT G-06-4 — attached screenshots render as small
       // INLINE thumbnails in a grid BELOW the body sections (not

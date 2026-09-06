@@ -71,10 +71,17 @@ describe('reportsRepo', () => {
     expect(row.procedureId).toBe(procedureId);
     expect(row.doctorId).toBe(doctorId);
     expect(row.status).toBe('draft');
-    expect(row.findings).toBe('');
-    expect(row.diagnosis).toBe('');
-    expect(row.recommendations).toBe('');
-    expect(row.procedureDetails).toBe('');
+    expect(row.procedureType).toBe('colon');
+    expect(row.instrument).toBeNull();
+    expect(row.premedicationOverride).toBeNull();
+    expect(row.esophagus).toBe('');
+    expect(row.stomach).toBe('');
+    expect(row.pylorus).toBe('');
+    expect(row.duodenum).toBe('');
+    expect(row.colon).toBe('');
+    expect(row.ileum).toBe('');
+    expect(row.conclusion).toBe('');
+    expect(row.recommendation).toBe('');
     expect(row.finalizedAt).toBeNull();
     expect(row.pdfPath).toBeNull();
     expect(row.pdfGeneratedAt).toBeNull();
@@ -108,20 +115,18 @@ describe('reportsRepo', () => {
     expect((caught as { code: string }).code).toBe('SQLITE_CONSTRAINT_UNIQUE');
   });
 
-  it('updateDraft writes the four free-text fields', async () => {
+  it('updateDraft writes the eight procedure-type-specific boxes', async () => {
     const { procedureId, doctorId } = await bootstrap();
     const { reportsRepo } = await import('../../../src/main/db/reports-repo');
     const created = reportsRepo.getOrCreate(procedureId, doctorId);
     const updated = reportsRepo.updateDraft(created.id, {
-      findings: 'Polyp at 12 oclock',
-      diagnosis: 'Tubular adenoma',
-      recommendations: 'Follow-up in 3 years',
-      procedureDetails: 'Cecal intubation achieved',
+      colon: 'Polyp at 12 oclock',
+      conclusion: 'Tubular adenoma',
+      recommendation: 'Follow-up in 3 years',
     });
-    expect(updated.findings).toBe('Polyp at 12 oclock');
-    expect(updated.diagnosis).toBe('Tubular adenoma');
-    expect(updated.recommendations).toBe('Follow-up in 3 years');
-    expect(updated.procedureDetails).toBe('Cecal intubation achieved');
+    expect(updated.colon).toBe('Polyp at 12 oclock');
+    expect(updated.conclusion).toBe('Tubular adenoma');
+    expect(updated.recommendation).toBe('Follow-up in 3 years');
   });
 
   it('updateDraft does NOT change procedure_id or doctor_id (locked fields)', async () => {
@@ -130,10 +135,8 @@ describe('reportsRepo', () => {
     const { getDb } = await import('../../../src/main/db');
     const created = reportsRepo.getOrCreate(procedureId, doctorId);
     reportsRepo.updateDraft(created.id, {
-      findings: 'X',
-      diagnosis: 'Y',
-      recommendations: 'Z',
-      procedureDetails: 'W',
+      colon: 'X',
+      conclusion: 'Y',
     });
     const row = getDb()
       .prepare(`SELECT procedure_id, doctor_id FROM reports WHERE id = ?`)
@@ -142,15 +145,15 @@ describe('reportsRepo', () => {
     expect(row.doctor_id).toBe(doctorId);
   });
 
-  it('updateFinalized writes the four fields after finalize', async () => {
+  it('updateFinalized writes the boxes after finalize', async () => {
     const { procedureId, doctorId } = await bootstrap();
     const { reportsRepo } = await import('../../../src/main/db/reports-repo');
     const created = reportsRepo.getOrCreate(procedureId, doctorId);
     reportsRepo.finalize(created.id);
     const updated = reportsRepo.updateFinalized(created.id, {
-      findings: 'Corrected findings post-finalize',
+      colon: 'Corrected colon post-finalize',
     });
-    expect(updated.findings).toBe('Corrected findings post-finalize');
+    expect(updated.colon).toBe('Corrected colon post-finalize');
     expect(updated.status).toBe('finalized');
     expect(updated.finalizedAt).not.toBeNull();
   });
@@ -161,7 +164,7 @@ describe('reportsRepo', () => {
     const created = reportsRepo.getOrCreate(procedureId, doctorId);
     let caught: unknown = null;
     try {
-      reportsRepo.updateFinalized(created.id, { findings: 'should fail' });
+      reportsRepo.updateFinalized(created.id, { colon: 'should fail' });
     } catch (err) {
       caught = err;
     }

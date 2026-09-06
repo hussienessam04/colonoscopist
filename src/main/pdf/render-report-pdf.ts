@@ -225,6 +225,20 @@ export async function renderReportPdf(
       }))
     : [];
 
+  // Quick task 20260812-redesign-report — resolve the instrument name
+  // from used_devices.id. Empty string when the doctor hasn't picked
+  // one; the template omits the "Instrument:" line in that case
+  // (matching the premedication pattern). Per-report override falls
+  // back to the profile default.
+  const instrumentLabel =
+    report.instrument !== null
+      ? (usedDevicesRows.find((d) => d.id === report.instrument)?.name ?? '')
+      : '';
+  const premedicationText =
+    report.premedicationOverride !== null && report.premedicationOverride !== ''
+      ? report.premedicationOverride
+      : (profile?.premedication ?? null);
+
   const input: ReportPdfInput = {
     logoBox,
     signatureBox,
@@ -235,7 +249,7 @@ export async function renderReportPdf(
     headerBox,
     footerBox,
     usedDevices: usedDevicesRows,
-    premedication: profile?.premedication ?? null,
+    premedication: premedicationText,
     clinicName: profile?.clinicNameEn ?? 'Clinic',
     doctorName: `Dr. ${doctor.full_name}`,
     procedureDateLabel: new Date(procedure.startedAt).toISOString().slice(0, 10),
@@ -244,9 +258,20 @@ export async function renderReportPdf(
     patientDob: patient.dob,
     patientGender: patient.gender,
     procedureDurationLabel: formatHHMMSS(procedure.durationSeconds),
-    findings: report.findings,
-    diagnosis: report.diagnosis,
-    recommendations: report.recommendations,
+    // Quick task 20260812-redesign-report — procedure-type toggle +
+    // 8 box columns + instrument line. The template renders anatomy
+    // boxes conditional on procedureType + always-on conclusion +
+    // recommendation.
+    procedureType: report.procedureType,
+    instrumentLabel,
+    esophagus: report.esophagus,
+    stomach: report.stomach,
+    pylorus: report.pylorus,
+    duodenum: report.duodenum,
+    colon: report.colon,
+    ileum: report.ileum,
+    conclusion: report.conclusion,
+    recommendation: report.recommendation,
     attachedScreenshots,
     language,
   };

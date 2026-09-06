@@ -23,9 +23,20 @@ import type {
   Screenshot,
 } from '@shared/ipc-contract';
 
+// Quick task 20260812-redesign-report — the editor's editable set is
+// the 8 procedure-type-specific box columns. The renderer only writes
+// the boxes; procedure_type / instrument / premedication_override have
+// dedicated IPC channels with their own guards.
 export type ReportEditableFields = Pick<
   Report,
-  'findings' | 'diagnosis' | 'recommendations' | 'procedureDetails'
+  | 'esophagus'
+  | 'stomach'
+  | 'pylorus'
+  | 'duodenum'
+  | 'colon'
+  | 'ileum'
+  | 'conclusion'
+  | 'recommendation'
 >;
 
 export type UseReportResult = {

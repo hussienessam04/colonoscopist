@@ -154,11 +154,17 @@ describe('0012_revert_report_redesign_drop_columns migration (Plan 15 — G-08-8
 
     // And the getOrCreate path also works.
     const created = reportsRepo.getOrCreate(proc.id, r.userId);
-    expect(created.findings).toBe('');
-    expect(created.diagnosis).toBe('');
-    expect(created.recommendations).toBe('');
-    // repo normalizes procedure_details -> camelCase procedureDetails.
-    expect((created as unknown as { procedureDetails: string }).procedureDetails).toBe('');
+    // Quick task 20260906-finish-report-redesign-integration — the
+    // redesign is fully landed; the repo's rowToReport reads the new
+    // columns. Migration 0012 (which added the old columns back for
+    // any DB that ran 0010 in isolation) is now a no-op for the
+    // report-repo path but stays for any older repo that still touches
+    // the classic columns.
+    expect(created.procedureType).toBe('colon');
+    expect(created.esophagus).toBe('');
+    expect(created.colon).toBe('');
+    expect(created.conclusion).toBe('');
+    expect(created.recommendation).toBe('');
 
     closeDb();
   });

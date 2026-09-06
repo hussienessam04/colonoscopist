@@ -28,10 +28,17 @@ const DRAFT_REPORT: Report = {
   id: '00000000-0000-4000-8000-000000000777',
   procedureId: '00000000-0000-4000-8000-000000000888',
   doctorId: ADMIN_USER.id,
-  findings: '',
-  diagnosis: '',
-  recommendations: '',
-  procedureDetails: '',
+  procedureType: 'colon',
+  instrument: null,
+  premedicationOverride: null,
+  esophagus: '',
+  stomach: '',
+  pylorus: '',
+  duodenum: '',
+  colon: '',
+  ileum: '',
+  conclusion: '',
+  recommendation: '',
   status: 'draft',
   finalizedAt: null,
   pdfPath: null,
@@ -46,10 +53,8 @@ const FINALIZED_REPORT: Report = {
   finalizedAt: 5_000,
   pdfPath: 'data/reports/777.pdf',
   pdfGeneratedAt: 5_000,
-  findings: 'Initial findings text',
-  diagnosis: 'Diagnosis text',
-  recommendations: 'Recs',
-  procedureDetails: 'Details',
+  colon: 'Initial findings text',
+  conclusion: 'Diagnosis text',
   updatedAt: 5_000,
 };
 
@@ -76,19 +81,22 @@ async function renderReportEditor(): Promise<void> {
 }
 
 describe('ReportEditor', () => {
-  // Phase 6 UAT G-06-10 — Recommendations + procedureDetails removed
-  // from the editor. Only Findings + Diagnosis remain.
-  it('renders 2 textareas (Findings + Diagnosis)', async () => {
+  // Quick task 20260812-redesign-report — anatomy boxes switch on
+  // procedureType. With procedureType='colon' the timeline renders
+  // Colon + Ileum + (always-on) Conclusion + Recommendation.
+  it('renders the colon anatomy boxes + conclusion + recommendation when procedureType=colon', async () => {
     const api = getApi();
     api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
     await renderReportEditor();
     await waitFor(() => {
       expect(api.reports.getOrCreate).toHaveBeenCalled();
     });
-    expect(screen.getByTestId('report-editor-findings')).toBeInTheDocument();
-    expect(screen.getByTestId('report-editor-diagnosis')).toBeInTheDocument();
-    expect(screen.queryByTestId('report-editor-recommendations')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('report-editor-procedureDetails')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-editor-colon')).toBeInTheDocument();
+    expect(screen.getByTestId('report-editor-ileum')).toBeInTheDocument();
+    expect(screen.getByTestId('report-editor-conclusion')).toBeInTheDocument();
+    expect(screen.getByTestId('report-editor-recommendation')).toBeInTheDocument();
+    expect(screen.queryByTestId('report-editor-esophagus')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-editor-stomach')).not.toBeInTheDocument();
   });
 
   it('draft textarea change fires api.reports.updateDraft after debounce', async () => {
@@ -96,15 +104,14 @@ describe('ReportEditor', () => {
     api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
     api.reports.updateDraft.mockImplementation(async (input) => ({
       ...DRAFT_REPORT,
-      findings: input.findings ?? '',
-      diagnosis: input.diagnosis ?? '',
+      colon: input.colon ?? '',
     }));
     await renderReportEditor();
-    const findings = await screen.findByTestId('report-editor-findings');
+    const colonBox = await screen.findByTestId('report-editor-colon');
     // fireEvent.change fires React's onChange synchronously; the
     // hook schedules a 300ms debounce, then the wrapped fn runs and
     // calls api.reports.updateDraft.
-    fireEvent.change(findings, { target: { value: 'A polyp was identified' } });
+    fireEvent.change(colonBox, { target: { value: 'A polyp was identified' } });
     await waitFor(
       () => {
         expect(api.reports.updateDraft).toHaveBeenCalled();
@@ -112,9 +119,9 @@ describe('ReportEditor', () => {
       { timeout: 1500 },
     );
     const lastCall = api.reports.updateDraft.mock.calls.at(-1)![0] as {
-      findings?: string;
+      colon?: string;
     };
-    expect(lastCall.findings).toContain('polyp');
+    expect(lastCall.colon).toContain('polyp');
   });
 
   it('after finalize, textarea change fires api.reports.updateFinalized instead', async () => {
@@ -124,13 +131,13 @@ describe('ReportEditor', () => {
     api.reports.getOrCreate.mockResolvedValue(FINALIZED_REPORT);
     api.reports.updateFinalized.mockImplementation(async (input) => ({
       ...FINALIZED_REPORT,
-      findings: input.findings ?? FINALIZED_REPORT.findings,
+      colon: input.colon ?? FINALIZED_REPORT.colon,
     }));
     await renderReportEditor();
     // Wait for the "Finalized" badge so we know status === 'finalized'.
     await screen.findByTestId('report-editor-finalized-badge');
-    const findings = screen.getByTestId('report-editor-findings');
-    fireEvent.change(findings, { target: { value: 'Updated findings after finalize' } });
+    const colonBox = screen.getByTestId('report-editor-colon');
+    fireEvent.change(colonBox, { target: { value: 'Updated colon after finalize' } });
     await waitFor(
       () => {
         expect(api.reports.updateFinalized).toHaveBeenCalled();

@@ -1,31 +1,20 @@
-// ReportEditor — RPT-01..05 + RPT-07.
+// ReportEditor — Quick task 20260812-redesign-report.
 //
-// Phase 6 UAT G-06-12 — editor UI matches the rendered PDF layout. The
-// left column is a 1:1 visual preview of the PDF: header (logo +
-// clinic name | signature + doctor name + date), patient block,
-// procedure block, Findings / Diagnosis sections, attached screenshots
-// grid, footer. Each editable section is a styled `<textarea>` styled
-// to look like the PDF body. The doctor sees exactly what the PDF
-// will look like as they type.
+// Procedure-type toggle + 8 procedure-type-specific boxes (colon/ileum
+// for `colon`; esophagus/stomach/pylorus/duodenum for `upper_gi`) +
+// always-on conclusion + recommendation + instrument picker + per-report
+// premedication override + saved-text-templates picker per box.
 //
-// Phase 6 UAT G-06-10 — Recommendations + procedureDetails fields
-// removed from the editor. Only Findings + Diagnosis remain. The
-// removed fields are still columns in the reports table (no
-// migration) so historical data is preserved.
+// Layout matches the rendered PDF 1:1 (Phase 6 UAT G-06-12) — header
+// (logo + clinic | signature + doctor + date), patient block,
+// procedure block (with instrument + premedication line), anatomy-box
+// sections, attached screenshots grid, footer with signature.
 //
-// Phase 6 UAT G-06-11 — Print button embeds the actual generated PDF
-// in a hidden `<iframe>` and calls `iframe.contentWindow.print()`.
-// The OS print dialog shows the PDF as the print target with a live
-// preview, not the on-screen editor DOM. The iframe is recreated
-// whenever the PDF file changes (after each finalize / re-render).
-//
-// Phase 6 UAT G-06-9 — Finalize auto-triggers a PDF render. The
-// Open PDF / Print / Reveal buttons depend on report.pdfPath being
-// populated, so the regenPdf IPC fires immediately after finalize.
-//
-// Phase 6 UAT G-06-8 — ScreenshotTimeline receives the rich `attached`
-// prop (with sortOrder) so the move buttons can reorder attached
-// thumbnails visibly.
+// Phase 6 UAT G-06-11 — Print button reuses openPdf IPC; the OS PDF
+// viewer's toolbar carries the print affordance.
+// Phase 6 UAT G-06-9 — Finalize auto-triggers PDF regen so
+// Open PDF / Print / Reveal surface immediately.
+// Phase 6 UAT G-08-8 — Save indicator + Finalize button.
 
 import {
   useCallback,
@@ -36,11 +25,14 @@ import {
   type ChangeEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, FileText, FolderOpen, Printer } from 'lucide-react';
+import { ArrowLeft, BookmarkPlus, FileText, FolderOpen, Printer, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
+import { SaveTemplateDialog } from '@/components/SaveTemplateDialog';
+import { TemplatesDialog } from '@/components/TemplatesDialog';
 import {
   useAttachedScreenshots,
   useProcedureScreenshots,
@@ -53,16 +45,38 @@ import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useRoute } from '@/lib/router';
 import { safeInvoke } from '@/lib/ipc-result';
 import EmptyStateCard from '@/components/EmptyStateCard';
+import { isPdfLockedError } from '@/lib/pdf-locked-error';
 import { useSession } from '@/store/session';
-import type { Report } from '@shared/ipc-contract';
+import type {
+  Procedure,
+  Report,
+  ReportTemplate,
+  UsedDevice,
+} from '@shared/ipc-contract';
+
+const ANATOMY_BOXES_BY_TYPE: Record<
+  'colon' | 'upper_gi',
+  ReadonlyArray<keyof ReportEditableFields>
+> = {
+  colon: ['colon', 'ileum'],
+  upper_gi: ['esophagus', 'stomach', 'pylorus', 'duodenum'],
+};
+
+const ALL_BOXES: ReadonlyArray<keyof ReportEditableFields> = [
+  'esophagus',
+  'stomach',
+  'pylorus',
+  'duodenum',
+  'colon',
+  'ileum',
+  'conclusion',
+  'recommendation',
+];
 
 // ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
 // via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
 // the report PDF — it restricts to data/media/patients/ paths). The
-// bytes are wrapped in a Blob + ObjectURL which the iframe loads. The
-// iframe is keyed by the object URL string so re-renders (after a
-// regenPdf round-trip) re-mount the iframe with the new blob URL,
-// bypassing any browser cache.
+// bytes are wrapped in a Blob + ObjectURL which the iframe loads.
 function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | null {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const [src, setSrc] = useState<string | null>(null);
@@ -75,23 +89,16 @@ function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | 
     let objectUrlToRevoke: string | null = null;
     (async (): Promise<void> => {
       try {
-        // Plan 08-10 / G-08-4 — gate may reject. safeInvoke returns
-        // null; we treat null as "no preview" (same as a missing file).
         const result = await safeInvoke(
           window.api.reports?.getPdfBlob?.({ id: reportId }),
         );
         if (cancelled || result === null || result === undefined) return;
-        // Wrap the bytes in a Blob → ObjectURL. The renderer owns the
-        // URL; revoke on unmount or when the PDF changes.
         const blob = new Blob([result.bytes as Uint8Array<ArrayBuffer>], { type: result.mime });
         const url = URL.createObjectURL(blob);
         objectUrlToRevoke = url;
         setSrc(url);
-      } catch (err) {
-        // best-effort — PrintPreview is optional UX
-        if (!cancelled) {
-          console.warn('Failed to load PDF for print preview:', err);
-        }
+      } catch {
+        // best-effort
       }
     })();
     return () => {
@@ -107,10 +114,6 @@ function PrintPreview({ reportId }: { reportId: string | null }): JSX.Element | 
       ref={iframeRef}
       src={src}
       title="PDF preview"
-      // ponytail: keep the iframe loaded so contentWindow.print() works
-      // synchronously on demand. Hidden via inline style (Tailwind's
-      // `hidden` = display:none would prevent print()). 1×1 px at
-      // opacity 0.01 keeps it loaded without occupying space.
       style={{ position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', border: 0, opacity: 0.01 }}
       data-testid="report-editor-pdf-iframe"
     />
@@ -126,14 +129,7 @@ export default function ReportEditor({
 }): JSX.Element {
   const { navigate } = useRoute();
   const route = useRoute().current;
-  // ponytail: visible strings flow through t() per Phase 7 i18n
-  // contract. Sub-components (Badge / ScreenshotTimeline) own their
-  // own translations; this hook only handles the page-level surface.
   const { t } = useTranslation();
-  // ponytail: prefer explicit props (page-composable) over the route
-  // union fields. The ReportEditor accepts both: prop-driven for tests,
-  // route-driven for navigation (Phase 5 ProcedureReview CTA lands the
-  // doctor here with the resolved reportId).
   const routeProcedureId = route.name === 'report-editor' ? route.procedureId : null;
   const routeReportId = route.name === 'report-editor' ? route.reportId : undefined;
   const procedureId = initialProcedureId ?? routeProcedureId ?? null;
@@ -151,16 +147,23 @@ export default function ReportEditor({
     procedureId,
   });
 
-  // Auto-save — only Findings + Diagnosis remain (Phase 6 UAT G-06-10).
+  // Quick task 20260812-redesign-report — auto-save only writes the 8
+  // box fields. procedure_type / instrument / premedication_override
+  // have dedicated IPC channels with their own guards (e.g. setProcedureType
+  // refuses after a box is non-empty).
   const { status, savedAt, trigger } = useAutoSave({
     value: report,
     onSave: async (r) => {
       if (r === null) return;
       const patch: ReportEditableFields = {
-        findings: r.findings,
-        diagnosis: r.diagnosis,
-        recommendations: r.recommendations,
-        procedureDetails: r.procedureDetails,
+        esophagus: r.esophagus,
+        stomach: r.stomach,
+        pylorus: r.pylorus,
+        duodenum: r.duodenum,
+        colon: r.colon,
+        ileum: r.ileum,
+        conclusion: r.conclusion,
+        recommendation: r.recommendation,
       };
       if (r.status === 'finalized') {
         await window.api.reports.updateFinalized({ id: r.id, ...patch });
@@ -176,10 +179,6 @@ export default function ReportEditor({
         const value = e.target.value;
         const patched: Partial<ReportEditableFields> = { [key]: value };
         setLocal(patched);
-        // ponytail: pass the patched report directly so the auto-save
-        // IPC doesn't race the React setState — by the time the
-        // 300ms debounce fires, setLocal has been queued but not yet
-        // flushed, so the hook's closure-captured `value` is stale.
         const next =
           report === null ? null : ({ ...report, ...patched } as Report);
         trigger(next ?? undefined);
@@ -187,14 +186,139 @@ export default function ReportEditor({
     [report, setLocal, trigger],
   );
 
+  // Quick task 20260812-redesign-report — procedure-type toggle.
+  // Disabled (greyed out) once any box is non-empty; the repo's SQL
+  // guard is the second line of defense.
+  const boxesLocked =
+    report !== null &&
+    ALL_BOXES.some((b) => (report[b] ?? '') !== '');
+
+  const handleProcedureTypeChange = useCallback(
+    async (next: 'colon' | 'upper_gi'): Promise<void> => {
+      if (report === null) return;
+      try {
+        const updated = await window.api.reports.setProcedureType({
+          id: report.id,
+          procedureType: next,
+        });
+        setLocal(updated);
+        await refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('report.procedureTypeChangeFailed'));
+      }
+    },
+    [report, refresh, setLocal, t],
+  );
+
+  // Quick task 20260812-redesign-report — instrument picker. List
+  // loaded once from used_devices (per doctor profile). NULL on the
+  // report when nothing picked.
+  const [usedDevices, setUsedDevices] = useState<UsedDevice[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const list = async (): Promise<void> => {
+      const rows = await safeInvoke(window.api.usedDevices?.list?.());
+      if (cancelled) return;
+      setUsedDevices(Array.isArray(rows) ? rows : []);
+    };
+    void list();
+    return () => {
+      cancelled = true;
+    };
+  }, [doctorProfile?.id]);
+
+  const handleInstrumentChange = useCallback(
+    async (e: ChangeEvent<HTMLSelectElement>): Promise<void> => {
+      if (report === null) return;
+      const value = e.target.value;
+      const next = value === '' ? null : value;
+      try {
+        const updated = await window.api.reports.setInstrument({
+          id: report.id,
+          instrument: next,
+        });
+        setLocal(updated);
+        await refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('report.instrumentChangeFailed'));
+      }
+    },
+    [report, refresh, setLocal, t],
+  );
+
+  // Quick task 20260812-redesign-report — per-report premedication
+  // override. Defaults to the profile's premedication when empty.
+  const [premedicationInput, setPremedicationInput] = useState<string>('');
+  useEffect(() => {
+    if (report === null) return;
+    setPremedicationInput(report.premedicationOverride ?? '');
+  }, [report?.premedicationOverride, report?.id]);
+  const premedicationCommitted = useCallback(
+    async (value: string): Promise<void> => {
+      if (report === null) return;
+      const next = value === '' ? null : value;
+      try {
+        const updated = await window.api.reports.setPremedicationOverride({
+          id: report.id,
+          override: next,
+        });
+        setLocal(updated);
+        await refresh();
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : t('report.premedicationChangeFailed'));
+      }
+    },
+    [report, refresh, setLocal, t],
+  );
+
+  // Quick task 20260812-redesign-report — per-box templates picker +
+  // "Save current as template". The dialog state is keyed by scope so
+  // each box has its own dialog.
+  const [templatesDialogScope, setTemplatesDialogScope] = useState<
+    ReportTemplate['scope'] | null
+  >(null);
+  const [saveDialogScope, setSaveDialogScope] = useState<
+    ReportTemplate['scope'] | null
+  >(null);
+
+  const handleInsertTemplate = useCallback(
+    (scope: ReportTemplate['scope']) =>
+      (template: ReportTemplate): void => {
+        if (report === null) return;
+        // Map scope → ReportEditableFields key. They're 1:1 by design.
+        const key = scope as keyof ReportEditableFields;
+        const patched = { [key]: template.body } as Partial<ReportEditableFields>;
+        setLocal(patched);
+        const next = { ...report, ...patched } as Report;
+        trigger(next);
+      },
+    [report, setLocal, trigger],
+  );
+
+  const handleSaveTemplate = useCallback(
+    (scope: ReportTemplate['scope']) =>
+      async (label: string): Promise<void> => {
+        if (report === null) return;
+        const key = scope as keyof ReportEditableFields;
+        const body = report[key] ?? '';
+        if (body.trim() === '') {
+          toast.error(t('report.templateEmptyBody'));
+          return;
+        }
+        try {
+          await window.api.reportTemplates?.add?.({ scope, label, body });
+          toast.success(t('report.templateSaved', { label }));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : t('report.templateSaveFailed'));
+        }
+      },
+    [report, t],
+  );
+
   const handleFinalize = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
       await window.api.reports.finalize({ id: report.id });
-      // Phase 6 UAT G-06-9 — auto-render the PDF after finalize so the
-      // doctor doesn't have to click "Re-render PDF" separately. The
-      // Open PDF / Print / Reveal buttons depend on report.pdfPath
-      // being populated.
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
       toast.success(t('report.reportFinalized'));
@@ -211,7 +335,9 @@ export default function ReportEditor({
       await refresh();
       toast.success(t('report.regenPdfSuccess'));
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('report.regenPdfFailed');
+      const msg = isPdfLockedError(err)
+        ? t('report.pdfLockedError')
+        : (err instanceof Error ? err.message : t('report.regenPdfFailed'));
       toast.error(msg);
     }
   }, [report, refresh, t]);
@@ -221,8 +347,7 @@ export default function ReportEditor({
     try {
       await window.api.reports.openPdf({ id: report.id, reveal: false });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
-      toast.error(msg);
+      toast.error(err instanceof Error ? err.message : t('report.openPdfFailed'));
     }
   }, [report, t]);
 
@@ -231,28 +356,17 @@ export default function ReportEditor({
     try {
       await window.api.reports.openPdf({ id: report.id, reveal: true });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
-      toast.error(msg);
+      toast.error(err instanceof Error ? err.message : t('report.openPdfFailed'));
     }
   }, [report, t]);
 
-  // Phase 6 UAT G-06-11 — print the actual PDF. We open the PDF in the
-  // OS's default PDF viewer (Adobe Reader, Edge, Chrome's built-in,
-  // etc.) which has a built-in print preview + dialog. The user
-  // clicks Print in the viewer toolbar. This is more reliable than
-  // iframe.contentWindow.print() in Electron (the iframe approach hit
-  // several edge cases: blob URL revoke races, sandbox issues,
-  // Chromium-version-specific print bugs).
   const handlePrint = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
-      // Reuse the openPdf IPC — opens the PDF in the OS default
-      // viewer. The print affordance is in the viewer's toolbar.
       await window.api.reports.openPdf({ id: report.id, reveal: false });
       toast.success('PDF opened — use the viewer toolbar to print');
     } catch (err) {
-      const msg = err instanceof Error ? err.message : t('report.openPdfFailed');
-      toast.error(msg);
+      toast.error(err instanceof Error ? err.message : t('report.openPdfFailed'));
     }
   }, [report, t]);
 
@@ -279,8 +393,6 @@ export default function ReportEditor({
     return '';
   }, [status, savedAt, t]);
 
-  // Resolve the patient for the screenshot URL composition + the
-  // patient block in the rendered PDF preview.
   const [patient, setPatient] = useState<{
     id: string;
     fullName: string;
@@ -288,9 +400,6 @@ export default function ReportEditor({
     dob: string;
     gender: string | null;
   } | null>(null);
-  // Plan 08-10 / G-08-4 — gate-rejected flag. When procedures.get or
-  // patients.get returns {ok:false}, render <EmptyStateCard> instead
-  // of crashing on undefined reads.
   const [gated, setGated] = useState(false);
   useEffect(() => {
     if (!procedureId) {
@@ -298,15 +407,12 @@ export default function ReportEditor({
       return;
     }
     let cancelled = false;
-    // ponytail: fetch procedure to get patientId, then fetch patient.
-    // Same pattern as ProcedureReview.
     const procPromise = window.api.procedures?.get?.({ id: procedureId });
     if (!procPromise || typeof procPromise.then !== 'function') {
       return;
     }
     procPromise.then(async (raw) => {
       if (cancelled) return;
-      // Plan 08-10 / G-08-4 — branch on gate rejection before reading.
       const p = await safeInvoke(Promise.resolve(raw));
       if (cancelled) return;
       if (p === null) {
@@ -352,7 +458,6 @@ export default function ReportEditor({
     }
     promise.then(async (raw) => {
       if (cancelled) return;
-      // Plan 08-10 / G-08-4 — branch on gate rejection.
       const p = await safeInvoke(Promise.resolve(raw));
       if (cancelled) return;
       if (p === null) {
@@ -372,25 +477,18 @@ export default function ReportEditor({
   }, [procedureId]);
 
   const isFinalized = report?.status === 'finalized';
+  const procedureType: 'colon' | 'upper_gi' = report?.procedureType ?? 'colon';
+  const anatomyBoxes = ANATOMY_BOXES_BY_TYPE[procedureType];
 
-  // Load the doctor profile's signature + logo as data URLs for the
-  // rendered PDF preview (header logo + signature in footer).
   const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   useEffect(() => {
     void (async (): Promise<void> => {
       try {
         const [sig, logo] = await Promise.all([
-          safeInvoke(
-            window.api.profile?.getAssetDataUrl?.({ kind: 'signature' }),
-          ),
-          safeInvoke(
-            window.api.profile?.getAssetDataUrl?.({ kind: 'logo' }),
-          ),
+          safeInvoke(window.api.profile?.getAssetDataUrl?.({ kind: 'signature' })),
+          safeInvoke(window.api.profile?.getAssetDataUrl?.({ kind: 'logo' })),
         ]);
-        // Plan 08-10 / G-08-4 — null from the gate is the same as
-        // "no preview" — leave the field null. The asset preview is
-        // a visual; missing it isn't gating.
         setSignaturePreview(sig?.dataUrl ?? null);
         setLogoPreview(logo?.dataUrl ?? null);
       } catch {
@@ -415,34 +513,86 @@ export default function ReportEditor({
       : '';
   const procedureDurationLabel =
     procedure !== null ? formatHHMMSS(procedure.durationSeconds * 1000) : '';
+  const instrumentLabel =
+    report?.instrument !== null && report?.instrument !== undefined
+      ? (usedDevices.find((d) => d.id === report.instrument)?.name ?? '')
+      : '';
+  const premedicationDisplay =
+    report?.premedicationOverride !== null && report?.premedicationOverride !== undefined && report.premedicationOverride !== ''
+      ? report.premedicationOverride
+      : (doctorProfile?.premedication ?? '');
+  const scopeLabel = (scope: ReportTemplate['scope']): string =>
+    t(`report.box.${scope}`);
+
+  const renderBox = (
+    key: keyof ReportEditableFields,
+    scope: ReportTemplate['scope'],
+    label: string,
+    rows: number,
+    placeholder: string,
+  ): JSX.Element => (
+    <section className="mb-4" data-testid={`report-editor-section-${scope}`}>
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-sm font-bold text-slate-900">{label}</h2>
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setTemplatesDialogScope(scope)}
+            data-testid={`report-editor-templates-${scope}`}
+            disabled={isFinalized}
+          >
+            <ScrollText className="size-3.5 mr-1" aria-hidden="true" />
+            {t('report.templatesButton')}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setSaveDialogScope(scope)}
+            data-testid={`report-editor-save-template-${scope}`}
+            disabled={isFinalized}
+          >
+            <BookmarkPlus className="size-3.5 mr-1" aria-hidden="true" />
+            {t('report.saveTemplateButton')}
+          </Button>
+        </div>
+      </div>
+      <textarea
+        value={report?.[key] ?? ''}
+        onChange={handleFieldChange(key)}
+        rows={rows}
+        placeholder={placeholder}
+        disabled={isFinalized}
+        className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+        data-testid={`report-editor-${scope}`}
+      />
+    </section>
+  );
 
   return (
     <main className="min-h-screen bg-slate-100 p-6">
-      {/* Phase 6 UAT G-06-11 — hidden iframe hosting the actual PDF for
-          `contentWindow.print()`. Mounted whenever the report has a
-          pdfPath. The PDF bytes are fetched via the new getPdfBlob IPC
-          (the MediaServer doesn't serve the report PDF), wrapped in a
-          Blob ObjectURL, and loaded in the iframe. */}
       <PrintPreview key={report?.pdfPath ?? 'none'} reportId={report?.id ?? null} />
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Report
+              {t('common.report')}
             </p>
             <h1 className="text-2xl font-semibold tracking-tight">
               {isFinalized ? (
                 <span className="flex items-center gap-2">
-                  Findings &amp; diagnosis
+                  {t('report.pageTitle')}
                   <Badge
                     variant="secondary"
                     data-testid="report-editor-finalized-badge"
                   >
-                    Finalized · last edited by {currentUser?.fullName ?? 'doctor'}
+                    {t('report.finalizedBy', { doctor: currentUser?.fullName ?? 'doctor' })}
                   </Badge>
                 </span>
               ) : (
-                <span>Findings &amp; diagnosis (draft)</span>
+                <span>{t('report.pageTitleDraft')}</span>
               )}
             </h1>
           </div>
@@ -457,7 +607,7 @@ export default function ReportEditor({
                   data-testid="report-editor-print"
                 >
                   <Printer className="size-4 mr-1" aria-hidden="true" />
-                  Print (opens PDF)
+                  {t('report.printButton')}
                 </Button>
                 <Button
                   variant="outline"
@@ -467,7 +617,7 @@ export default function ReportEditor({
                   data-testid="report-editor-open-pdf"
                 >
                   <FileText className="size-4 mr-1" aria-hidden="true" />
-                  Open PDF
+                  {t('report.openPdfButton')}
                 </Button>
                 <Button
                   variant="outline"
@@ -477,7 +627,7 @@ export default function ReportEditor({
                   data-testid="report-editor-reveal-pdf"
                 >
                   <FolderOpen className="size-4 mr-1" aria-hidden="true" />
-                  Reveal in Explorer
+                  {t('report.revealPdfButton')}
                 </Button>
                 <Button
                   variant="outline"
@@ -485,7 +635,7 @@ export default function ReportEditor({
                   onClick={() => void handleRegenPdf()}
                   data-testid="report-editor-regen-pdf"
                 >
-                  Re-render PDF
+                  {t('report.regenPdfButton')}
                 </Button>
               </>
             ) : null}
@@ -496,26 +646,23 @@ export default function ReportEditor({
               data-testid="report-editor-back"
             >
               <ArrowLeft aria-hidden="true" />
-              Back
+              {t('common.back')}
             </Button>
           </div>
         </header>
 
-        {/* Phase 6 UAT G-06-12 — editor UI matches the rendered PDF layout.
-            One-column document-style page (max-w-3xl) with header / patient
-            / procedure / Findings / Diagnosis / screenshots / footer. */}
         <div className="mx-auto flex max-w-3xl flex-col gap-5">
           <article
             className="rounded-lg border border-slate-200 bg-white p-8 shadow-sm"
             data-testid="report-editor-document"
           >
             {loading && report === null ? (
-              <p className="text-sm text-slate-500">Loading report…</p>
+              <p className="text-sm text-slate-500">{t('common.loading')}</p>
             ) : null}
 
             {gated ? <EmptyStateCard /> : null}
 
-            {/* Header — mirrors the PDF header (logo + clinic name | signature + doctor + date) */}
+            {/* Header — logo + clinic name | signature + doctor + date */}
             <div className="mb-5 flex items-start justify-between border-b border-slate-200 pb-4">
               <div className="flex max-w-[200px] flex-col gap-1">
                 {logoPreview !== null ? (
@@ -526,9 +673,12 @@ export default function ReportEditor({
                     data-testid="report-editor-logo"
                   />
                 ) : (
-                  <p className="text-xs text-slate-400">[No logo uploaded]</p>
+                  <p className="text-xs text-slate-400">{t('report.noLogo')}</p>
                 )}
-                <p className="text-base font-bold text-slate-900" data-testid="report-editor-clinic-name">
+                <p
+                  className="text-base font-bold text-slate-900"
+                  data-testid="report-editor-clinic-name"
+                >
                   {clinicName}
                 </p>
               </div>
@@ -541,10 +691,16 @@ export default function ReportEditor({
                     data-testid="report-editor-signature"
                   />
                 ) : null}
-                <p className="text-sm text-slate-700" data-testid="report-editor-doctor-name">
+                <p
+                  className="text-sm text-slate-700"
+                  data-testid="report-editor-doctor-name"
+                >
                   {doctorName}
                 </p>
-                <p className="text-xs text-slate-500" data-testid="report-editor-procedure-date">
+                <p
+                  className="text-xs text-slate-500"
+                  data-testid="report-editor-procedure-date"
+                >
                   {procedureDateLabel}
                 </p>
               </div>
@@ -552,55 +708,162 @@ export default function ReportEditor({
 
             {/* Patient block */}
             <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">Patient</h2>
-              <div className="flex flex-wrap gap-x-4 text-sm text-slate-700" data-testid="report-editor-patient-block">
-                <span>Name: <strong>{patient?.fullName ?? '—'}</strong></span>
-                <span>MRN: {patient?.mrn}</span>
-                <span>DOB: {patient?.dob ?? '—'}</span>
-                <span>Gender: {patient?.gender ?? '—'}</span>
+              <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.patient')}</h2>
+              <div
+                className="flex flex-wrap gap-x-4 text-sm text-slate-700"
+                data-testid="report-editor-patient-block"
+              >
+                <span>
+                  {t('common.name')}: <strong>{patient?.fullName ?? '—'}</strong>
+                </span>
+                <span>{t('common.mrn')}: {patient?.mrn}</span>
+                <span>{t('common.dob')}: {patient?.dob ?? '—'}</span>
+                <span>{t('common.gender')}: {patient?.gender ?? '—'}</span>
               </div>
             </section>
 
-            {/* Procedure block */}
+            {/* Procedure block + instrument + premedication */}
             <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">Procedure</h2>
-              <div className="flex flex-col gap-1 text-sm text-slate-700">
-                <span>Date: {procedureDateLabel}</span>
-                <span>Duration: {procedureDurationLabel}</span>
-                <span>Doctor: {doctorName}</span>
+              <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.procedure')}</h2>
+              <div className="flex flex-col gap-2 text-sm text-slate-700">
+                <span>{t('common.date')}: {procedureDateLabel}</span>
+                <span>{t('common.duration')}: {procedureDurationLabel}</span>
+                <span>{t('common.doctor')}: {doctorName}</span>
+              </div>
+
+              {/* Procedure-type toggle */}
+              <div className="mt-4">
+                <label className="mb-1 block text-xs font-medium text-slate-700">
+                  {t('report.procedureTypeLabel')}
+                </label>
+                <div
+                  className="inline-flex rounded border border-slate-300 bg-slate-50"
+                  role="radiogroup"
+                  aria-label={t('report.procedureTypeLabel')}
+                  data-testid="report-editor-procedure-type"
+                >
+                  <button
+                    type="button"
+                    onClick={() => void handleProcedureTypeChange('colon')}
+                    disabled={boxesLocked}
+                    aria-pressed={procedureType === 'colon'}
+                    className={`px-3 py-1.5 text-sm ${
+                      procedureType === 'colon'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-700 hover:bg-slate-100 disabled:text-slate-400'
+                    }`}
+                    data-testid="report-editor-procedure-type-colon"
+                  >
+                    {t('report.procedureTypeColon')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleProcedureTypeChange('upper_gi')}
+                    disabled={boxesLocked}
+                    aria-pressed={procedureType === 'upper_gi'}
+                    className={`px-3 py-1.5 text-sm ${
+                      procedureType === 'upper_gi'
+                        ? 'bg-blue-600 text-white'
+                        : 'text-slate-700 hover:bg-slate-100 disabled:text-slate-400'
+                    }`}
+                    data-testid="report-editor-procedure-type-upper-gi"
+                  >
+                    {t('report.procedureTypeUpperGi')}
+                  </button>
+                </div>
+                {boxesLocked ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {t('report.procedureTypeLockedHint')}
+                  </p>
+                ) : null}
+              </div>
+
+              {/* Instrument picker */}
+              <div className="mt-3">
+                <label
+                  htmlFor="report-editor-instrument"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  {t('report.instrumentLabel')}
+                </label>
+                <select
+                  id="report-editor-instrument"
+                  value={report?.instrument ?? ''}
+                  onChange={(e) => void handleInstrumentChange(e)}
+                  disabled={isFinalized}
+                  className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  data-testid="report-editor-instrument-select"
+                >
+                  <option value="">{t('report.instrumentNone')}</option>
+                  {usedDevices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+                {instrumentLabel === '' && usedDevices.length === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500">
+                    {t('report.instrumentNoneConfigured')}
+                  </p>
+                ) : null}
+              </div>
+
+              {/* Premedication override */}
+              <div className="mt-3">
+                <label
+                  htmlFor="report-editor-premedication"
+                  className="mb-1 block text-xs font-medium text-slate-700"
+                >
+                  {t('report.premedicationLabel')}
+                </label>
+                <Input
+                  id="report-editor-premedication"
+                  value={premedicationInput}
+                  onChange={(e) => setPremedicationInput(e.target.value)}
+                  onBlur={() => void premedicationCommitted(premedicationInput)}
+                  placeholder={premedicationDisplay}
+                  disabled={isFinalized}
+                  data-testid="report-editor-premedication"
+                />
+                <p className="mt-1 text-xs text-slate-500">
+                  {premedicationInput === ''
+                    ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
+                    : t('report.premedicationOverrideActive')}
+                </p>
               </div>
             </section>
 
-            {/* Findings — editable textarea styled to look like PDF body */}
-            <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">Findings</h2>
-              <textarea
-                value={report?.findings ?? ''}
-                onChange={handleFieldChange('findings')}
-                rows={6}
-                placeholder="Document the key findings…"
-                className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
-                data-testid="report-editor-findings"
-              />
-            </section>
+            {/* Anatomy boxes (conditional on procedureType) */}
+            {anatomyBoxes.map((box) =>
+              renderBox(
+                box,
+                box,
+                scopeLabel(box),
+                4,
+                t('report.boxPlaceholder', { scope: scopeLabel(box) }),
+              ),
+            )}
 
-            {/* Diagnosis — editable textarea styled to look like PDF body */}
-            <section className="mb-4">
-              <h2 className="mb-2 text-sm font-bold text-slate-900">Diagnosis</h2>
-              <textarea
-                value={report?.diagnosis ?? ''}
-                onChange={handleFieldChange('diagnosis')}
-                rows={4}
-                placeholder="State the clinical diagnosis…"
-                className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
-                data-testid="report-editor-diagnosis"
-              />
-            </section>
+            {/* Conclusion + recommendation always-on */}
+            {renderBox(
+              'conclusion',
+              'conclusion',
+              scopeLabel('conclusion'),
+              3,
+              t('report.boxPlaceholder', { scope: scopeLabel('conclusion') }),
+            )}
+            {renderBox(
+              'recommendation',
+              'recommendation',
+              scopeLabel('recommendation'),
+              3,
+              t('report.boxPlaceholder', { scope: scopeLabel('recommendation') }),
+            )}
 
-            {/* Attached screenshots — mirrors the PDF inline grid */}
+            {/* Attached screenshots */}
             <section className="mb-4">
               <h2 className="mb-2 text-sm font-bold text-slate-900">
-                Attached screenshots
+                {t('report.attachedScreenshots')}
                 <span className="ml-2 text-xs font-normal text-slate-500">
                   ({attached.length} of {screenshots.length})
                 </span>
@@ -612,11 +875,8 @@ export default function ReportEditor({
                 status="completed"
                 screenshots={screenshots}
                 onSeek={() => {
-                  /* no-op in editor — seeking the video is owned by ProcedureReview */
+                  /* no-op in editor */
                 }}
-                // G-06-6: +Capture button intentionally omitted in editor
-                // G-06-8: pass rich `attached` list with sortOrder so
-                // move buttons reorder attached items visually
                 attached={attached}
                 onToggleAttach={handleToggleAttach}
                 onReorder={reorder}
@@ -624,7 +884,6 @@ export default function ReportEditor({
               />
             </section>
 
-            {/* Footer — mirrors the PDF footer (signature + clinic + page) */}
             <footer className="mt-6 flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500">
               <div className="flex items-center gap-2">
                 {signaturePreview !== null ? (
@@ -637,7 +896,6 @@ export default function ReportEditor({
               </div>
             </footer>
 
-            {/* Save indicator + Finalize button */}
             <p
               className="mt-4 text-xs text-muted-foreground"
               data-testid="report-editor-save-indicator"
@@ -653,12 +911,43 @@ export default function ReportEditor({
                 className="mt-2 self-start"
                 data-testid="report-editor-finalize"
               >
-                Finalize report (auto-generates PDF)
+                {t('report.finalizeButton')}
               </Button>
             ) : null}
           </article>
         </div>
       </div>
+
+      {templatesDialogScope !== null ? (
+        <TemplatesDialog
+          open={true}
+          onOpenChange={(o) => {
+            if (!o) setTemplatesDialogScope(null);
+          }}
+          scope={templatesDialogScope}
+          scopeLabel={scopeLabel(templatesDialogScope)}
+          onInsert={(tpl) => {
+            handleInsertTemplate(templatesDialogScope)(tpl);
+            setTemplatesDialogScope(null);
+          }}
+        />
+      ) : null}
+      {saveDialogScope !== null ? (
+        <SaveTemplateDialog
+          open={true}
+          onOpenChange={(o) => {
+            if (!o) setSaveDialogScope(null);
+          }}
+          scopeLabel={scopeLabel(saveDialogScope)}
+          defaultLabel={(() => {
+            if (report === null) return '';
+            const key = saveDialogScope as keyof ReportEditableFields;
+            const body = report[key] ?? '';
+            return body.split('\n')[0]?.trim().slice(0, 60) ?? '';
+          })()}
+          onSave={handleSaveTemplate(saveDialogScope)}
+        />
+      ) : null}
     </main>
   );
 }
@@ -668,3 +957,9 @@ function formatHHMMSS(ms: number): string {
   const pad = (n: number): string => n.toString().padStart(2, '0');
   return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
+
+// ponytail: Procedure + UsedDevice type imports are pulled in for the
+// local Procedure / UsedDevice stubs. The hook returns Procedure | null
+// but the editor doesn't read procedure fields beyond what's typed
+// above; the import keeps strict TS happy without a `any` cast.
+void (null as unknown as Procedure | null);
