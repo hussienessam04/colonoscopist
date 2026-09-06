@@ -523,7 +523,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                             >
                               {t('patientProcedures.openProcedure')}
                             </Button>
-                            {report !== null ? (
+                            {report !== null && report.pdfPath !== null ? (
                               <Button
                                 variant="ghost"
                                 size="sm"

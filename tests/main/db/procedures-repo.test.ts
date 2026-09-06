@@ -159,6 +159,81 @@ describe('proceduresRepo.updateVideoPath + restoreFromOriginal', () => {
   });
 });
 
+// Quick task 20260906 — `proceduresRepo.insert({ id, ... })` reuses an
+// existing row instead of creating a duplicate when `id` matches. The
+// recorder's start() always passes the canonical id (the same one
+// `procedures.create` minted on ProcedurePreview); previously the
+// repo IGNORED input.id and generated a fresh UUID, which surfaced
+// the duplicate-row bug in PatientProcedures.
+describe('proceduresRepo.insert — id reuse guard', () => {
+  it('insert with existing id populates video_path + video_path_original without creating a duplicate row', async () => {
+    const { procedureId, patientId, doctorId } = await bootstrap();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const { getDb } = await import('../../../src/main/db');
+    const db = getDb();
+
+    // Sanity: bootstrap inserted exactly one row for this procedureId.
+    const before = (db.prepare(
+      `SELECT COUNT(*) AS c FROM procedures WHERE patient_id = ?`,
+    ).get(patientId) as { c: number }).c;
+    expect(before).toBe(1);
+
+    // Re-call insert with the SAME id + a new videoPath (simulating
+    // the recorder's start() re-pointing the row to the canonical
+    // recording mp4).
+    const reused = proceduresRepo.insert({
+      id: procedureId,
+      patientId,
+      doctorId,
+      videoPath: 'video-canonical.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+
+    expect(reused.id).toBe(procedureId);
+    expect(reused.videoPath).toBe('video-canonical.mp4');
+    expect(reused.videoPathOriginal).toBe('video-canonical.mp4');
+
+    // No duplicate row — still exactly one.
+    const after = (db.prepare(
+      `SELECT COUNT(*) AS c FROM procedures WHERE patient_id = ?`,
+    ).get(patientId) as { c: number }).c;
+    expect(after).toBe(1);
+  });
+
+  it('insert WITHOUT an id still generates a fresh UUID (legacy path unchanged)', async () => {
+    const { patientId, doctorId } = await bootstrap();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const row = proceduresRepo.insert({
+      patientId,
+      doctorId,
+      videoPath: 'video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    // UUID-shaped — 36 chars including hyphens.
+    expect(row.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(row.videoPath).toBe('video.mp4');
+  });
+
+  it('insert with a fresh id (not yet in DB) inserts normally — does NOT treat as update', async () => {
+    const { patientId, doctorId } = await bootstrap();
+    const { proceduresRepo } = await import('../../../src/main/db/procedures-repo');
+    const freshId = '00000000-0000-4000-8000-000000000abc';
+    const row = proceduresRepo.insert({
+      id: freshId,
+      patientId,
+      doctorId,
+      videoPath: 'video.mp4',
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+    });
+    expect(row.id).toBe(freshId);
+    expect(row.videoPath).toBe('video.mp4');
+    expect(row.videoPathOriginal).toBeNull();
+  });
+});
+
 // Phase 7 / Plan 07-02 — D-04 verbatim: proceduresRepo.list accepts
 // dateFrom / dateTo / doctorId. Date range applies to procedures.started_at
 // (canonical procedure date per Phase 4 D-10). Empty/missing filters

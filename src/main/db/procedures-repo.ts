@@ -48,6 +48,13 @@ type ProcedureSegmentRow = {
 };
 
 export type ProcedureInsertInput = {
+  // Quick task 20260906 — optional id. When provided AND a row with
+  // this id already exists (e.g. the recorder reuses a row that
+  // `procedures.create` pre-created with an empty videoPath), the
+  // insert is treated as updateVideoPath so no duplicate row is
+  // created. When omitted (legacy `recording.start` path), the repo
+  // generates a fresh UUID as before.
+  id?: string;
   patientId: string;
   doctorId: string;
   videoPath: string;
@@ -245,7 +252,27 @@ const MAX_PAGE_SIZE = 200;
 
 export const proceduresRepo = {
   insert(input: ProcedureInsertInput): Procedure {
-    const id = randomUUID();
+    // Quick task 20260906 — if the caller provides an id AND a row
+    // with that id already exists, populate video_path via
+    // updateVideoPath instead of creating a duplicate. The recorder's
+    // start() always passes the canonical id (the same one
+    // procedures.create generated earlier); previously the repo
+    // IGNORED the input.id and minted a fresh UUID, which is what
+    // surfaced the duplicate row in PatientProcedures.
+    if (input.id !== undefined) {
+      const existing = stmts().getIncludingDeleted.get(input.id) as
+        | ProcedureRow
+        | undefined;
+      if (existing !== undefined) {
+        // updateVideoPath uses COALESCE(video_path_original, ?) so
+        // the original is set to the canonical recording on first
+        // call (NULL → real path) and preserved on subsequent trims.
+        stmts().updateVideoPath.run(input.videoPath, input.videoPath, input.id);
+        const row = stmts().getIncludingDeleted.get(input.id) as ProcedureRow;
+        return rowToProcedure(row);
+      }
+    }
+    const id = input.id ?? randomUUID();
     const now = Date.now();
     try {
       stmts().insert.run({

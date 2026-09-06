@@ -205,6 +205,23 @@ describe('PatientProcedures page', () => {
     expect(api.reports.openPdf).toHaveBeenCalledWith({ id: 'rpt-1', reveal: false });
   });
 
+  // Quick task 20260906 — "Open PDF" must NOT render when the report
+  // exists but the PDF has not been generated yet (draft report with
+  // pdfPath=null). Previously the button was gated only on
+  // `report !== null`, which is true the moment the doctor opens
+  // ReportEditor — clicking it then tried to open a non-existent file.
+  it('"Open PDF" button is hidden when report exists but pdfPath is null (draft report)', async () => {
+    const api = getApi();
+    api.procedures.list.mockResolvedValue({ rows: [PROC_A], total: 1 });
+    api.reports.getByProcedure.mockResolvedValue({ ...REPORT_A, pdfPath: null });
+    render(<PatientProcedures patientId={PATIENT_ID} />);
+    // Row renders, but the Open PDF button does NOT.
+    await screen.findByTestId(`patient-procedure-row-${PROC_A.id}`);
+    expect(
+      screen.queryByTestId(`patient-procedure-open-pdf-${PROC_A.id}`),
+    ).not.toBeInTheDocument();
+  });
+
   it('back button navigates to { name: "patients" }', async () => {
     const api = getApi();
     api.procedures.list.mockResolvedValue({ rows: [], total: 0 });
