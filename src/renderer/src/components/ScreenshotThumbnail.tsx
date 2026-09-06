@@ -107,7 +107,11 @@ function ScreenshotThumbnailImpl({
           frame
         </div>
       )}
-      <span className="absolute inset-x-0 bottom-0 z-10 bg-black/50 px-1 py-0.5 text-xs text-white">
+      {/* Quick task 20260906-screenshot-tile-i18n-and-badge-polish —
+          compact timestamp pill at the bottom-center. Stronger
+          background opacity + mono font so the image's tint doesn't
+          bleed through (was \`bg-black/50\` + plain \`text-xs\`). */}
+      <span className="absolute bottom-1 left-1/2 -translate-x-1/2 rounded bg-black/75 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-white shadow-sm">
         {formatDurationHHMMSS(screenshot.timestampInVideoMs)}
       </span>
       {onDelete ? (

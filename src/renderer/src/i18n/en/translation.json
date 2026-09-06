@@ -37,6 +37,7 @@
     "date": "Date",
     "duration": "Duration",
     "doctor": "Doctor",
+    "attached": "Attached",
     "empty": "—"
   },
   "auth": {

@@ -50,6 +50,7 @@
 import { Button } from '@/components/ui/button';
 import { ScreenshotThumbnail } from '@/components/ScreenshotThumbnail';
 import { screenshotUrl } from '@/lib/screenshot-url';
+import { Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { ProcedureStatus, ReportScreenshot, Screenshot } from '@shared/ipc-contract';
 
@@ -259,16 +260,20 @@ export function ScreenshotTimeline({
                 {isAttached ? '✓' : '+'}
               </button>
             ) : null}
-            {/* Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached —
-                small "Attached" badge at the top-right so the doctor can
-                scan a long timeline and immediately see what's chosen.
-                Sits above the move ‹ › buttons when both are visible. */}
+            {/* Quick task 20260906-screenshot-tile-i18n-and-badge-polish —
+                compact "chosen" mark at the top-right: a small teal
+                circle with a ✓ icon. The `title` attr surfaces the
+                "Attached" label on hover for screen readers + tooltip.
+                Sized so it never overlaps the toggle (+/✓) at the
+                bottom-left or the move ‹ › buttons at the bottom-right. */}
             {isAttached ? (
               <div
-                className="absolute right-1 top-1 z-20 rounded bg-[#0E3A47] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-white shadow"
+                title={t('common.attached')}
+                aria-label={t('common.attached')}
                 data-testid="screenshot-attached-badge"
+                className="absolute right-1 top-1 z-20 flex h-6 w-6 items-center justify-center rounded-full bg-[#0E3A47] text-white shadow-md ring-2 ring-white"
               >
-                {t('common.attached')}
+                <Check className="size-3.5" aria-hidden="true" />
               </div>
             ) : null}
             {/* Phase 6 UAT G-06-5 — small Move-Left / Move-Right buttons
