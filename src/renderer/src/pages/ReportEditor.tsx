@@ -19,7 +19,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useState,
   type ChangeEvent,
 } from "react";
@@ -45,7 +44,10 @@ import {
   useReport,
   type ReportEditableFields,
 } from "@/hooks/useReport";
-import { useAutoSave } from "@/hooks/useAutoSave";
+// Quick task 20260906-remove-autosave — useAutoSave hook dropped.
+// The doctor wants an explicit "Save changes" button at the
+// bottom of the page (final action they trigger), not silent
+// auto-save on every keystroke.
 import { useDoctorProfile } from "@/hooks/useDoctorProfile";
 import { useMediaUrl } from "@/hooks/useMediaUrl";
 import { useRoute } from "@/lib/router";
@@ -55,7 +57,6 @@ import { isPdfLockedError } from "@/lib/pdf-locked-error";
 import { useSession } from "@/store/session";
 import type {
   Procedure,
-  Report,
   ReportTemplate,
   UsedDevice,
 } from "@shared/ipc-contract";
@@ -111,31 +112,19 @@ export default function ReportEditor({
     procedureId,
   });
 
-  // Quick task 20260812-redesign-report — auto-save only writes the 8
-  // box fields. procedure_type / instrument / premedication_override
-  // have dedicated IPC channels with their own guards (e.g. setProcedureType
-  // refuses after a box is non-empty).
-  const { status, savedAt, trigger } = useAutoSave({
-    value: report,
-    onSave: async (r) => {
-      if (r === null) return;
-      const patch: ReportEditableFields = {
-        esophagus: r.esophagus,
-        stomach: r.stomach,
-        pylorus: r.pylorus,
-        duodenum: r.duodenum,
-        colon: r.colon,
-        ileum: r.ileum,
-        conclusion: r.conclusion,
-        recommendation: r.recommendation,
-      };
-      if (r.status === "finalized") {
-        await window.api.reports.updateFinalized({ id: r.id, ...patch });
-      } else {
-        await window.api.reports.updateDraft({ id: r.id, ...patch });
-      }
-    },
-  });
+  // Quick task 20260906-remove-autosave — useAutoSave removed. The
+  // textarea / select / input handlers now only call `setLocal`
+  // (in-memory React state). Box edits persist when the doctor
+  // clicks "Save changes" at the bottom of the page
+  // (handleRegenPdf flushes the current 8 box fields via
+  // updateDraft / updateFinalized BEFORE calling regenPdf).
+  //
+  // procedure_type / instrument / premedication_override still
+  // persist immediately on each change via their dedicated IPC
+  // channels (handleProcedureTypeChange / handleInstrumentChange
+  // / premedicationCommitted) — those don't need Save changes
+  // because each has its own commit action (segmented control
+  // toggle, select onChange, input onBlur).
 
   const handleFieldChange = useCallback(
     (key: keyof ReportEditableFields) =>
@@ -143,11 +132,11 @@ export default function ReportEditor({
         const value = e.target.value;
         const patched: Partial<ReportEditableFields> = { [key]: value };
         setLocal(patched);
-        const next =
-          report === null ? null : ({ ...report, ...patched } as Report);
-        trigger(next ?? undefined);
+        // Quick task 20260906-remove-autosave — no `trigger()`. Box
+        // edits persist via Save changes → handleRegenPdf flushes
+        // the 8 box fields via updateDraft / updateFinalized.
       },
-    [report, setLocal, trigger],
+    [report, setLocal],
   );
 
   // Quick task 20260812-redesign-report — procedure-type toggle.
@@ -266,10 +255,10 @@ export default function ReportEditor({
           [key]: template.body,
         } as Partial<ReportEditableFields>;
         setLocal(patched);
-        const next = { ...report, ...patched } as Report;
-        trigger(next);
+        // Quick task 20260906-remove-autosave — no `trigger()`.
+        // Template-insert edits persist via Save changes.
       },
-    [report, setLocal, trigger],
+    [report, setLocal],
   );
 
   const handleSaveTemplate = useCallback(
@@ -313,10 +302,10 @@ export default function ReportEditor({
         : lines.map((line) => (line === "" ? "" : `• ${line}`)).join("\n");
       const patched = { [key]: next } as Partial<ReportEditableFields>;
       setLocal(patched);
-      const nextReport = { ...report, ...patched } as Report;
-      trigger(nextReport);
+      // Quick task 20260906-remove-autosave — no `trigger()`. Bullet
+      // toggle persists via Save changes.
     },
-    [report, setLocal, trigger],
+    [report, setLocal],
   );
 
   const handleFinalize = useCallback(async (): Promise<void> => {
@@ -333,9 +322,35 @@ export default function ReportEditor({
     }
   }, [report, refresh, t]);
 
+  // Quick task 20260906-remove-autosave — Save changes is the
+  // single place where box edits flush to the DB. Before calling
+  // regenPdf, the current 8 box fields are persisted via
+  // updateDraft (or updateFinalized if the report was already
+  // finalized) so the regenerated PDF reflects the latest edits.
   const handleRegenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
+      const patch: ReportEditableFields = {
+        esophagus: report.esophagus,
+        stomach: report.stomach,
+        pylorus: report.pylorus,
+        duodenum: report.duodenum,
+        colon: report.colon,
+        ileum: report.ileum,
+        conclusion: report.conclusion,
+        recommendation: report.recommendation,
+      };
+      if (report.status === "finalized") {
+        await window.api.reports.updateFinalized({
+          id: report.id,
+          ...patch,
+        });
+      } else {
+        await window.api.reports.updateDraft({
+          id: report.id,
+          ...patch,
+        });
+      }
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
       toast.success(t("report.regenPdfSuccess"));
@@ -394,18 +409,10 @@ export default function ReportEditor({
     [attached, attach, detach],
   );
 
-  const indicatorText = useMemo((): string => {
-    if (status === "saving") return t("common.saving");
-    if (status === "error") return t("common.saveFailedRetry");
-    if (status === "saved" && savedAt !== null) {
-      const d = new Date(savedAt);
-      const pad = (n: number): string => n.toString().padStart(2, "0");
-      return t("common.savedAt", {
-        time: `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`,
-      });
-    }
-    return "";
-  }, [status, savedAt, t]);
+  // Quick task 20260906-remove-autosave — dropped the indicatorText
+  // useMemo + the save-indicator UI line (no auto-save means
+  // nothing to show). The Save changes button at the bottom of
+  // the page now surfaces its own success/error toast.
 
   const [patient, setPatient] = useState<{
     id: string;
@@ -964,15 +971,6 @@ export default function ReportEditor({
                     20260906-report-editor-polish) — the footer signature +
                     clinic name still appear on the rendered PDF, not in
                     the editor preview. */}
-
-                  <p
-                    className="mt-4 text-xs text-[#8C8478]"
-                    data-testid="report-editor-save-indicator"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    {indicatorText}
-                  </p>
                 </div>
 
                 {/* RIGHT — screenshots rail (sticky on scroll, lg+) */}

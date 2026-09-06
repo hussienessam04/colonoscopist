@@ -159,51 +159,78 @@ describe('ReportEditor', () => {
     });
   });
 
-  it('draft textarea change fires api.reports.updateDraft after debounce', async () => {
+  // Quick task 20260906-remove-autosave — typing in a textarea no
+  // longer fires any IPC. The change sits in local React state
+  // only; it persists via the "Save changes" button at the bottom
+  // of the page (handleRegenPdf flushes the 8 box fields via
+  // updateDraft before calling regenPdf).
+  it('typing in a textarea does NOT fire updateDraft / updateFinalized (no autosave)', async () => {
     const api = getApi();
     api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
-    api.reports.updateDraft.mockImplementation(async (input) => ({
-      ...DRAFT_REPORT,
-      colon: input.colon ?? '',
-    }));
     await renderReportEditor();
     const colonBox = await screen.findByTestId('report-editor-colon');
-    // fireEvent.change fires React's onChange synchronously; the
-    // hook schedules a 300ms debounce, then the wrapped fn runs and
-    // calls api.reports.updateDraft.
     fireEvent.change(colonBox, { target: { value: 'A polyp was identified' } });
-    await waitFor(
-      () => {
-        expect(api.reports.updateDraft).toHaveBeenCalled();
-      },
-      { timeout: 1500 },
-    );
-    const lastCall = api.reports.updateDraft.mock.calls.at(-1)![0] as {
-      colon?: string;
-    };
-    expect(lastCall.colon).toContain('polyp');
+    // Give the old debounce a chance to fire if it were going to.
+    await new Promise((r) => setTimeout(r, 400));
+    expect(api.reports.updateDraft).not.toHaveBeenCalled();
+    expect(api.reports.updateFinalized).not.toHaveBeenCalled();
   });
 
-  it('after finalize, textarea change fires api.reports.updateFinalized instead', async () => {
+  // Quick task 20260906-remove-autosave — clicking "Save changes"
+  // (the renamed Re-render PDF button) persists the box edits via
+  // updateDraft / updateFinalized and then regenerates the PDF.
+  // This test uses the FINALIZED_REPORT fixture so the bottom of
+  // the page shows the Save changes button (not Finalize). For a
+  // DRAFT report, the bottom shows Finalize instead.
+  it('Save changes persists box edits + regenerates the PDF', async () => {
     const api = getApi();
-    // Mount with a finalized report so the first fetch lands in
-    // finalized status.
+    // FINALIZED_REPORT has pdfPath='data/reports/777.pdf' so the
+    // page renders the Save changes button at the bottom.
     api.reports.getOrCreate.mockResolvedValue(FINALIZED_REPORT);
     api.reports.updateFinalized.mockImplementation(async (input) => ({
       ...FINALIZED_REPORT,
       colon: input.colon ?? FINALIZED_REPORT.colon,
     }));
+    api.reports.regenPdf.mockResolvedValue({ pdfPath: 'data/reports/777.pdf' });
     await renderReportEditor();
-    // Wait for the "Finalized" badge so we know status === 'finalized'.
+    const colonBox = await screen.findByTestId('report-editor-colon');
+    fireEvent.change(colonBox, { target: { value: 'A polyp was identified' } });
+    // No IPC until Save changes is clicked.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(api.reports.updateFinalized).not.toHaveBeenCalled();
+    expect(api.reports.updateDraft).not.toHaveBeenCalled();
+    // Click Save changes.
+    const saveBtn = await screen.findByTestId('report-editor-regen-pdf');
+    fireEvent.click(saveBtn);
+    await waitFor(() => expect(api.reports.updateFinalized).toHaveBeenCalled());
+    await waitFor(() => expect(api.reports.regenPdf).toHaveBeenCalled());
+    const lastCall = api.reports.updateFinalized.mock.calls.at(-1)![0] as {
+      colon?: string;
+    };
+    expect(lastCall.colon).toContain('polyp');
+  });
+
+  it('Save changes on a finalized report uses updateFinalized', async () => {
+    const api = getApi();
+    api.reports.getOrCreate.mockResolvedValue(FINALIZED_REPORT);
+    api.reports.updateFinalized.mockImplementation(async (input) => ({
+      ...FINALIZED_REPORT,
+      colon: input.colon ?? FINALIZED_REPORT.colon,
+    }));
+    api.reports.regenPdf.mockResolvedValue({ pdfPath: 'data/reports/777.pdf' });
+    await renderReportEditor();
     await screen.findByTestId('report-editor-finalized-badge');
     const colonBox = screen.getByTestId('report-editor-colon');
     fireEvent.change(colonBox, { target: { value: 'Updated colon after finalize' } });
-    await waitFor(
-      () => {
-        expect(api.reports.updateFinalized).toHaveBeenCalled();
-      },
-      { timeout: 1500 },
-    );
+    // No IPC until Save changes is clicked.
+    await new Promise((r) => setTimeout(r, 200));
+    expect(api.reports.updateFinalized).not.toHaveBeenCalled();
+    expect(api.reports.updateDraft).not.toHaveBeenCalled();
+    // Click Save changes.
+    const saveBtn = screen.getByTestId('report-editor-regen-pdf');
+    fireEvent.click(saveBtn);
+    await waitFor(() => expect(api.reports.updateFinalized).toHaveBeenCalled());
+    await waitFor(() => expect(api.reports.regenPdf).toHaveBeenCalled());
     expect(api.reports.updateDraft).not.toHaveBeenCalled();
   });
 
