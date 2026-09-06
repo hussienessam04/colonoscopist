@@ -62,17 +62,6 @@ const ANATOMY_BOXES_BY_TYPE: Record<
   upper_gi: ['esophagus', 'stomach', 'pylorus', 'duodenum'],
 };
 
-const ALL_BOXES: ReadonlyArray<keyof ReportEditableFields> = [
-  'esophagus',
-  'stomach',
-  'pylorus',
-  'duodenum',
-  'colon',
-  'ileum',
-  'conclusion',
-  'recommendation',
-];
-
 // ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
 // via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
 // the report PDF — it restricts to data/media/patients/ paths). The
@@ -187,11 +176,10 @@ export default function ReportEditor({
   );
 
   // Quick task 20260812-redesign-report — procedure-type toggle.
-  // Disabled (greyed out) once any box is non-empty; the repo's SQL
-  // guard is the second line of defense.
-  const boxesLocked =
-    report !== null &&
-    ALL_BOXES.some((b) => (report[b] ?? '') !== '');
+  // Quick task 20260906-report-editor-polish — procedure type is now
+  // free to toggle at any time (re-paints against the new anatomy set).
+  // The previous boxesLocked guard + the repo's empty-state SQL
+  // invariant have both been dropped.
 
   const handleProcedureTypeChange = useCallback(
     async (next: 'colon' | 'upper_gi'): Promise<void> => {
@@ -480,22 +468,11 @@ export default function ReportEditor({
   const procedureType: 'colon' | 'upper_gi' = report?.procedureType ?? 'colon';
   const anatomyBoxes = ANATOMY_BOXES_BY_TYPE[procedureType];
 
-  const [signaturePreview, setSignaturePreview] = useState<string | null>(null);
-  const [logoPreview, setLogoPreview] = useState<string | null>(null);
-  useEffect(() => {
-    void (async (): Promise<void> => {
-      try {
-        const [sig, logo] = await Promise.all([
-          safeInvoke(window.api.profile?.getAssetDataUrl?.({ kind: 'signature' })),
-          safeInvoke(window.api.profile?.getAssetDataUrl?.({ kind: 'logo' })),
-        ]);
-        setSignaturePreview(sig?.dataUrl ?? null);
-        setLogoPreview(logo?.dataUrl ?? null);
-      } catch {
-        // best-effort
-      }
-    })();
-  }, [doctorProfile?.signaturePath, doctorProfile?.logoPath]);
+  // ponytail: the editor dropped its logo + signature preview (quick
+  // task 20260906 — those previews only matter on the rendered PDF).
+  // The profile-asset fetch is also dropped; the doctor verifies
+  // their logo / signature in Settings → Profile or by generating
+  // a PDF.
 
   if (procedureId === null) {
     return (
@@ -505,7 +482,6 @@ export default function ReportEditor({
     );
   }
 
-  const clinicName = doctorProfile?.clinicNameEn ?? '';
   const doctorName = currentUser?.fullName ?? 'Doctor';
   const procedureDateLabel =
     procedure !== null
@@ -541,7 +517,6 @@ export default function ReportEditor({
             size="sm"
             onClick={() => setTemplatesDialogScope(scope)}
             data-testid={`report-editor-templates-${scope}`}
-            disabled={isFinalized}
           >
             <ScrollText className="size-3.5 mr-1" aria-hidden="true" />
             {t('report.templatesButton')}
@@ -552,7 +527,6 @@ export default function ReportEditor({
             size="sm"
             onClick={() => setSaveDialogScope(scope)}
             data-testid={`report-editor-save-template-${scope}`}
-            disabled={isFinalized}
           >
             <BookmarkPlus className="size-3.5 mr-1" aria-hidden="true" />
             {t('report.saveTemplateButton')}
@@ -564,8 +538,7 @@ export default function ReportEditor({
         onChange={handleFieldChange(key)}
         rows={rows}
         placeholder={placeholder}
-        disabled={isFinalized}
-        className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+        className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
         data-testid={`report-editor-${scope}`}
       />
     </section>
@@ -662,51 +635,11 @@ export default function ReportEditor({
 
             {gated ? <EmptyStateCard /> : null}
 
-            {/* Header — logo + clinic name | signature + doctor + date */}
-            <div className="mb-5 flex items-start justify-between border-b border-slate-200 pb-4">
-              <div className="flex max-w-[200px] flex-col gap-1">
-                {logoPreview !== null ? (
-                  <img
-                    src={logoPreview}
-                    alt="Clinic logo"
-                    className="max-h-[60px] max-w-[200px] object-contain"
-                    data-testid="report-editor-logo"
-                  />
-                ) : (
-                  <p className="text-xs text-slate-400">{t('report.noLogo')}</p>
-                )}
-                <p
-                  className="text-base font-bold text-slate-900"
-                  data-testid="report-editor-clinic-name"
-                >
-                  {clinicName}
-                </p>
-              </div>
-              <div className="flex max-w-[220px] flex-col items-end gap-1">
-                {signaturePreview !== null ? (
-                  <img
-                    src={signaturePreview}
-                    alt="Signature"
-                    className="max-h-[40px] max-w-[120px] object-contain"
-                    data-testid="report-editor-signature"
-                  />
-                ) : null}
-                <p
-                  className="text-sm text-slate-700"
-                  data-testid="report-editor-doctor-name"
-                >
-                  {doctorName}
-                </p>
-                <p
-                  className="text-xs text-slate-500"
-                  data-testid="report-editor-procedure-date"
-                >
-                  {procedureDateLabel}
-                </p>
-              </div>
-            </div>
-
-            {/* Patient block */}
+            {/* Patient block — quick task 20260906 dropped the logo + */}
+            {/* signature header band at the top of the editor (it only */}
+            {/* matters on the rendered PDF). The page-level "Report */}
+            {/* editor" h1 + finalized badge above still surface the */}
+            {/* context. */}
             <section className="mb-4">
               <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.patient')}</h2>
               <div
@@ -745,12 +678,11 @@ export default function ReportEditor({
                   <button
                     type="button"
                     onClick={() => void handleProcedureTypeChange('colon')}
-                    disabled={boxesLocked}
                     aria-pressed={procedureType === 'colon'}
                     className={`px-3 py-1.5 text-sm ${
                       procedureType === 'colon'
                         ? 'bg-blue-600 text-white'
-                        : 'text-slate-700 hover:bg-slate-100 disabled:text-slate-400'
+                        : 'text-slate-700 hover:bg-slate-100'
                     }`}
                     data-testid="report-editor-procedure-type-colon"
                   >
@@ -759,23 +691,17 @@ export default function ReportEditor({
                   <button
                     type="button"
                     onClick={() => void handleProcedureTypeChange('upper_gi')}
-                    disabled={boxesLocked}
                     aria-pressed={procedureType === 'upper_gi'}
                     className={`px-3 py-1.5 text-sm ${
                       procedureType === 'upper_gi'
                         ? 'bg-blue-600 text-white'
-                        : 'text-slate-700 hover:bg-slate-100 disabled:text-slate-400'
+                        : 'text-slate-700 hover:bg-slate-100'
                     }`}
                     data-testid="report-editor-procedure-type-upper-gi"
                   >
                     {t('report.procedureTypeUpperGi')}
                   </button>
                 </div>
-                {boxesLocked ? (
-                  <p className="mt-1 text-xs text-slate-500">
-                    {t('report.procedureTypeLockedHint')}
-                  </p>
-                ) : null}
               </div>
 
               {/* Instrument picker */}
@@ -790,8 +716,7 @@ export default function ReportEditor({
                   id="report-editor-instrument"
                   value={report?.instrument ?? ''}
                   onChange={(e) => void handleInstrumentChange(e)}
-                  disabled={isFinalized}
-                  className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm disabled:bg-slate-50 disabled:text-slate-500"
+                  className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm"
                   data-testid="report-editor-instrument-select"
                 >
                   <option value="">{t('report.instrumentNone')}</option>
@@ -822,7 +747,6 @@ export default function ReportEditor({
                   onChange={(e) => setPremedicationInput(e.target.value)}
                   onBlur={() => void premedicationCommitted(premedicationInput)}
                   placeholder={premedicationDisplay}
-                  disabled={isFinalized}
                   data-testid="report-editor-premedication"
                 />
                 <p className="mt-1 text-xs text-slate-500">
@@ -833,16 +757,24 @@ export default function ReportEditor({
               </div>
             </section>
 
-            {/* Anatomy boxes (conditional on procedureType) */}
-            {anatomyBoxes.map((box) =>
-              renderBox(
-                box,
-                box,
-                scopeLabel(box),
-                4,
-                t('report.boxPlaceholder', { scope: scopeLabel(box) }),
-              ),
-            )}
+            {/* Anatomy boxes (conditional on procedureType) — quick
+                task 20260906 lays them out in a 2-column grid so the
+                page fits more on screen without scrolling. Conclusion +
+                recommendation stay full-width below. */}
+            <div
+              className="grid grid-cols-1 gap-x-4 md:grid-cols-2"
+              data-testid="report-editor-anatomy-grid"
+            >
+              {anatomyBoxes.map((box) =>
+                renderBox(
+                  box,
+                  box,
+                  scopeLabel(box),
+                  4,
+                  t('report.boxPlaceholder', { scope: scopeLabel(box) }),
+                ),
+              )}
+            </div>
 
             {/* Conclusion + recommendation always-on */}
             {renderBox(
@@ -884,17 +816,9 @@ export default function ReportEditor({
               />
             </section>
 
-            <footer className="mt-6 flex items-center justify-between border-t border-slate-200 pt-3 text-xs text-slate-500">
-              <div className="flex items-center gap-2">
-                {signaturePreview !== null ? (
-                  <img src={signaturePreview} alt="Signature" className="h-5 w-[60px] object-contain" />
-                ) : null}
-                <span>{doctorName}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span>{clinicName}</span>
-              </div>
-            </footer>
+            {/* Footer dropped alongside the top logo band (quick task
+                20260906) — the footer signature + clinic name still
+                appear on the rendered PDF, not in the editor preview. */}
 
             <p
               className="mt-4 text-xs text-muted-foreground"

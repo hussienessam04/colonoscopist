@@ -26,7 +26,18 @@
     "of": "من",
     "minimize": "تصغير",
     "settings": "الإعدادات",
-    "workspace": "مساحة العمل"
+    "workspace": "مساحة العمل",
+    "report": "تقرير",
+    "patient": "المريض",
+    "procedure": "الإجراء",
+    "name": "الاسم",
+    "mrn": "الملف",
+    "dob": "تاريخ الميلاد",
+    "gender": "الجنس",
+    "date": "التاريخ",
+    "duration": "المدة",
+    "doctor": "الطبيب",
+    "empty": "—"
   },
   "auth": {
     "signIn": "تسجيل الدخول",

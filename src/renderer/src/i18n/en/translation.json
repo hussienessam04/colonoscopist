@@ -26,7 +26,18 @@
     "of": "of",
     "minimize": "Minimize",
     "settings": "Settings",
-    "workspace": "Workspace"
+    "workspace": "Workspace",
+    "report": "Report",
+    "patient": "Patient",
+    "procedure": "Procedure",
+    "name": "Name",
+    "mrn": "MRN",
+    "dob": "DOB",
+    "gender": "Gender",
+    "date": "Date",
+    "duration": "Duration",
+    "doctor": "Doctor",
+    "empty": "—"
   },
   "auth": {
     "signIn": "Sign in",

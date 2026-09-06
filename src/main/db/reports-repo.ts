@@ -32,9 +32,6 @@ const BOX_FIELDS = [
 ] as const;
 type BoxField = (typeof BOX_FIELDS)[number];
 
-const EMPTY_BOX_GUARD =
-  "esophagus = '' AND stomach = '' AND pylorus = '' AND duodenum = '' AND colon = '' AND ileum = '' AND conclusion = '' AND recommendation = ''";
-
 export type ReportRow = {
   id: string;
   procedure_id: string;
@@ -142,12 +139,13 @@ function stmts(): NonNullable<typeof cached> {
     // Quick task 20260812-redesign-report — procedure_type is set ONCE
     // on first edit. The empty-state invariant (procedure_type still
     // 'colon' AND every box = '') makes the UPDATE a no-op once the
-    // doctor has typed anything; the renderer also disables the
-    // segmented control once a box is non-empty. SQL is the second
-    // line of defense.
+    // Quick task 20260906-report-editor-polish — the procedure-type
+    // toggle is now free (no SQL guard). The doctor can flip the
+    // type at any time, even after typing in boxes; the renderer
+    // re-renders against the new anatomy set on the next paint.
     setProcedureType: db.prepare(
       `UPDATE reports SET procedure_type = @procedure_type, updated_at = @now
-       WHERE id = @id AND procedure_type = 'colon' AND ${EMPTY_BOX_GUARD}`,
+       WHERE id = @id`,
     ),
     setInstrument: db.prepare(
       `UPDATE reports SET instrument = @instrument, updated_at = @now
@@ -316,10 +314,10 @@ export const reportsRepo = {
 
   // Quick task 20260812-redesign-report — procedure_type is set ONCE.
   // SQL guard: succeeds only if procedure_type is still 'colon' AND
-  // every box is empty. The renderer also disables the segmented
-  // control once a box is non-empty, so this is the second line of
-  // defense. Throws IPC_VALIDATION if the doctor tries to toggle
-  // after they've started typing.
+  // Quick task 20260906-report-editor-polish — procedure type is
+  // free to toggle at any time. No SQL guard, no IPC_VALIDATION
+  // throw. If the row doesn't exist, the UPDATE is a no-op (info.changes === 0)
+  // and we throw IPC_NOT_FOUND for the caller's benefit.
   setProcedureType(id: string, procedureType: 'colon' | 'upper_gi'): Report {
     const info = stmts().setProcedureType.run({
       id,
@@ -328,10 +326,7 @@ export const reportsRepo = {
     });
     if (info.changes === 0) {
       throw new IpcErrorException(
-        ipcError(
-          'IPC_VALIDATION',
-          'procedure_type is locked once a report box has been filled in',
-        ),
+        ipcError('IPC_NOT_FOUND', `Report ${id} not found`),
       );
     }
     return rowToReport(stmts().getById.get(id) as ReportRow);
