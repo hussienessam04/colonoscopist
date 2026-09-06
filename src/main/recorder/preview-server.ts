@@ -460,7 +460,17 @@ export class MediaServer {
       return;
     }
     const url = req.url ?? '/';
-    const match = MEDIA_ROUTE_RE.exec(url);
+    // ponytail: drop the query string before regex matching. The
+    // MEDIA_ROUTE_RE anchors with `$` — adding `?v=<nonce>` for a
+    // cache-bust (Phase 8 / Plan 17 follow-up, used by the
+    // ScreenshotTimeline thumbnails so they rebind to freshly-cropped
+    // JPEG bytes without the doctor leaving + re-entering the
+    // procedure) would otherwise 404. Stripping `?…` is safe because
+    // the regex already constrains every URL segment; we don't read
+    // any query parameter on the server side, so dropping it loses
+    // nothing. Hash fragments (`#…`) are never sent to the server.
+    const pathOnly = url.split('?', 1)[0] ?? '/';
+    const match = MEDIA_ROUTE_RE.exec(pathOnly);
     if (!match) {
       res.statusCode = 404;
       res.end('Not Found');

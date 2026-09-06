@@ -535,6 +535,23 @@ describe('MediaServer', () => {
     );
     expect(response.status).toBe(404);
   });
+
+  // Phase 8 / Plan 17 follow-up — ScreenshotTimeline appends `?v=<nonce>`
+  // to thumbnail URLs so the browser refetches freshly-cropped JPEG
+  // bytes (crop overwrites the file at the same path). The MEDIA_ROUTE_RE
+  // anchors with `$`; without stripping the query string, every busted
+  // URL would 404 and the thumbnails would error out. Hash fragments
+  // (`#…`) are never sent to the server, only `?…` is.
+  it('strips the query string before regex matching — `?v=<bust>` still serves the file (Plan 17 follow-up)', async () => {
+    writeMp4('data/media/patients/p1/proc1/screenshots/5000.jpg', 1024);
+    const handle = await server.start();
+    const response = await rawHttpRequest(
+      handle.httpPort,
+      '/media/p1/proc1/screenshots/5000.jpg?v=1700000000000',
+    );
+    expect(response.status).toBe(200);
+    expect(response.body.length).toBe(1024);
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
