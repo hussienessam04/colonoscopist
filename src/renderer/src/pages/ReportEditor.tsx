@@ -512,8 +512,13 @@ export default function ReportEditor({
     procedure !== null
       ? new Date(procedure.startedAt).toISOString().slice(0, 10)
       : '';
+  // Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+  // duration formatter is now timezone-independent (pure seconds →
+  // HH:MM:SS, no Date math). Previously `new Date(ms).getHours()`
+  // returned local time, which drifted by UTC offset (e.g. 2h
+  // procedure showed `05:00:00` in UTC+9).
   const procedureDurationLabel =
-    procedure !== null ? formatHHMMSS(procedure.durationSeconds * 1000) : '';
+    procedure !== null ? formatDuration(procedure.durationSeconds) : '';
   const instrumentLabel =
     report?.instrument !== null && report?.instrument !== undefined
       ? (usedDevices.find((d) => d.id === report.instrument)?.name ?? '')
@@ -533,20 +538,15 @@ export default function ReportEditor({
     placeholder: string,
   ): JSX.Element => (
     <section className="mb-4" data-testid={`report-editor-section-${scope}`}>
+      {/* Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+          Templates / Save template stay in the heading row (doctor
+          reaches them most often). Bullet moves into the box itself
+          as a small icon button anchored at the top-right of the
+          textarea; the hint copy is shown as a thin line under the
+          textarea so the doctor knows what the button does. */}
       <div className="mb-2 flex items-center justify-between">
         <h2 className="text-sm font-bold text-slate-900">{label}</h2>
         <div className="flex items-center gap-1">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => handleBullet(key)()}
-            data-testid={`report-editor-bullet-${scope}`}
-            title={t('report.addBulletHint')}
-          >
-            <span className="mr-1">•</span>
-            {t('report.bullet')}
-          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -569,14 +569,29 @@ export default function ReportEditor({
           </Button>
         </div>
       </div>
-      <textarea
-        value={report?.[key] ?? ''}
-        onChange={handleFieldChange(key)}
-        rows={rows}
-        placeholder={placeholder}
-        className="w-full resize-y rounded border border-slate-200 bg-white p-3 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
-        data-testid={`report-editor-${scope}`}
-      />
+      <div className="relative">
+        <textarea
+          value={report?.[key] ?? ''}
+          onChange={handleFieldChange(key)}
+          rows={rows}
+          placeholder={placeholder}
+          className="w-full resize-y rounded border border-slate-200 bg-white p-3 pb-7 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
+          data-testid={`report-editor-${scope}`}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => handleBullet(key)()}
+          className="absolute bottom-1 right-1 h-6 px-2 text-xs"
+          data-testid={`report-editor-bullet-${scope}`}
+          title={t('report.addBulletHint')}
+        >
+          <span className="mr-1">•</span>
+          {t('report.bullet')}
+        </Button>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">{t('report.addBulletHint')}</p>
     </section>
   );
 
@@ -700,10 +715,36 @@ export default function ReportEditor({
                 {/* Procedure block + instrument + premedication */}
                 <section className="mb-4">
                   <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.procedure')}</h2>
-                  <div className="flex flex-col gap-2 text-sm text-slate-700">
-                    <span>{t('common.date')}: {procedureDateLabel}</span>
-                    <span>{t('common.duration')}: {procedureDurationLabel}</span>
-                    <span>{t('common.doctor')}: {doctorName}</span>
+                  {/* Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+                      Date / Duration / Doctor on a single row with small caps labels. */}
+                  <div
+                    className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm text-slate-700"
+                    data-testid="report-editor-procedure-meta"
+                  >
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                        {t('common.date')}
+                      </p>
+                      <p className="font-medium" data-testid="report-editor-procedure-date-value">
+                        {procedureDateLabel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                        {t('common.duration')}
+                      </p>
+                      <p className="font-medium" data-testid="report-editor-procedure-duration-value">
+                        {procedureDurationLabel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                        {t('common.doctor')}
+                      </p>
+                      <p className="font-medium truncate" title={doctorName}>
+                        {doctorName}
+                      </p>
+                    </div>
                   </div>
 
                   {/* Procedure-type toggle */}
@@ -885,6 +926,10 @@ export default function ReportEditor({
                     onToggleAttach={handleToggleAttach}
                     onReorder={reorder}
                     testId="report-editor-screenshot-timeline"
+                    // Quick task 20260906 — 2-column vertical grid for the
+                    // narrow right rail so the thumbnails fill the
+                    // available height (was overflow-x-auto before).
+                    layout="grid"
                   />
                 </div>
               </aside>
@@ -927,10 +972,16 @@ export default function ReportEditor({
   );
 }
 
-function formatHHMMSS(ms: number): string {
-  const d = new Date(ms);
+// Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+// pure-seconds → HH:MM:SS formatter, timezone-independent. No Date
+// math (which would drift by UTC offset).
+function formatDuration(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hh = Math.floor(safe / 3600);
+  const mm = Math.floor((safe % 3600) / 60);
+  const ss = safe % 60;
   const pad = (n: number): string => n.toString().padStart(2, '0');
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
 }
 
 // ponytail: Procedure + UsedDevice type imports are pulled in for the

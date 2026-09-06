@@ -99,6 +99,37 @@ describe('ReportEditor', () => {
     expect(screen.queryByTestId('report-editor-stomach')).not.toBeInTheDocument();
   });
 
+  // Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+  // the procedure meta row carries Date / Duration / Doctor on a single
+  // line via grid-cols-3, and the duration value uses the timezone-free
+  // formatDuration (no Date math that drifts by UTC offset).
+  it('procedure meta row is 3 columns with a timezone-free duration value', async () => {
+    const api = getApi();
+    api.reports.getOrCreate.mockResolvedValue(DRAFT_REPORT);
+    api.procedures.get.mockResolvedValue({
+      id: '00000000-0000-4000-8000-000000000888',
+      patientId: '00000000-0000-4000-8000-000000000001',
+      doctorId: ADMIN_USER.id,
+      startedAt: Date.UTC(2026, 8, 6, 10, 0, 0),
+      endedAt: Date.UTC(2026, 8, 6, 12, 5, 30),
+      // 2h 5m 30s = 7530s
+      durationSeconds: 7530,
+      status: 'completed',
+      videoPath: 'video.mp4',
+      videoPathOriginal: null,
+      presetSummary: { kind: 'sd', resolution: '720x480', framerate: 30, bitrate: '4M' },
+      audioDeviceName: null,
+      createdAt: Date.now(),
+    });
+    await renderReportEditor();
+    const meta = await screen.findByTestId('report-editor-procedure-meta');
+    expect(meta.className).toContain('grid-cols-3');
+    // 2h 5m 30s = 02:05:30. Timezone-free, so this is the same in any UTC offset.
+    expect(
+      screen.getByTestId('report-editor-procedure-duration-value'),
+    ).toHaveTextContent('02:05:30');
+  });
+
   // Quick task 20260906-report-editor-layout-and-bullets — the bullet
   // button prefixes every non-empty line of the box with `"• "`. The
   // contract is symmetric: clicking again un-bullets every line.

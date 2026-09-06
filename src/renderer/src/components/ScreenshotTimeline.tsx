@@ -101,6 +101,13 @@ export type ScreenshotTimelineProps = {
   // the browser's HTTP cache, which is the only thing that matters.
   mediaCacheBuster?: number;
   testId?: string;
+  // Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
+  // layout switch. `'row'` (default) keeps the horizontal-scroll
+  // behavior used by ProcedureReview + the report editor (when the
+  // rail is wider than ~600px). `'grid'` lays thumbnails out in a
+  // 2-column vertical grid that fills the available height — used
+  // by the report editor's narrow right rail.
+  layout?: 'row' | 'grid';
 };
 
 function captureAllowed(status: ProcedureStatus | undefined): boolean {
@@ -129,6 +136,7 @@ export function ScreenshotTimeline({
   onReorder,
   mediaCacheBuster,
   testId,
+  layout = 'row',
 }: ScreenshotTimelineProps): JSX.Element {
   const canCapture = captureAllowed(status) && onCapture !== undefined;
   // ponytail: prefer the rich `attached` prop (with sortOrder) for
@@ -196,7 +204,15 @@ export function ScreenshotTimeline({
 
   return (
     <div
-      className="flex items-center gap-2 overflow-x-auto pb-2"
+      className={
+        // Quick task 20260906 — `'grid'` renders a 2-column vertical
+        // grid that fills the available height; `'row'` keeps the
+        // horizontal scroll (the timeline's original layout used by
+        // ProcedureReview + the wider report editor surface).
+        layout === 'grid'
+          ? 'grid grid-cols-2 gap-2 content-start overflow-y-auto pb-2'
+          : 'flex items-center gap-2 overflow-x-auto pb-2'
+      }
       data-testid={testId ?? 'screenshot-timeline'}
       data-procedure-id={procedureId}
       role="list"
