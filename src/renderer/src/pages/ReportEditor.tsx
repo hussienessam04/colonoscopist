@@ -543,9 +543,14 @@ export default function ReportEditor({
           reaches them most often). Bullet moves into the box itself
           as a small icon button anchored at the top-right of the
           textarea; the hint copy is shown as a thin line under the
-          textarea so the doctor knows what the button does. */}
-      <div className="mb-2 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-slate-900">{label}</h2>
+          textarea so the doctor knows what the button does.
+          Quick task 20260906-report-editor-clinical-refresh —
+          small-caps clinical label on the heading, hairline rule
+          between the heading and the textarea. */}
+      <div className="mb-2 flex items-center justify-between border-b border-[#E0D9C6] pb-2">
+        <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+          {label}
+        </h2>
         <div className="flex items-center gap-1">
           <Button
             type="button"
@@ -553,6 +558,7 @@ export default function ReportEditor({
             size="sm"
             onClick={() => setTemplatesDialogScope(scope)}
             data-testid={`report-editor-templates-${scope}`}
+            className="text-[#5C6770] hover:bg-[#F0EBDE] hover:text-[#0E3A47]"
           >
             <ScrollText className="size-3.5 mr-1" aria-hidden="true" />
             {t('report.templatesButton')}
@@ -563,6 +569,7 @@ export default function ReportEditor({
             size="sm"
             onClick={() => setSaveDialogScope(scope)}
             data-testid={`report-editor-save-template-${scope}`}
+            className="text-[#5C6770] hover:bg-[#F0EBDE] hover:text-[#0E3A47]"
           >
             <BookmarkPlus className="size-3.5 mr-1" aria-hidden="true" />
             {t('report.saveTemplateButton')}
@@ -575,7 +582,11 @@ export default function ReportEditor({
           onChange={handleFieldChange(key)}
           rows={rows}
           placeholder={placeholder}
-          className="w-full resize-y rounded border border-slate-200 bg-white p-3 pb-7 text-sm leading-relaxed text-slate-800 focus:border-blue-400 focus:outline-none"
+          // Quick task 20260906-report-editor-clinical-refresh — clinical
+          // field treatment. Soft ivory tint, hairline rule, teal accent
+          // on focus (matches the document's signature accent). pb-7
+          // leaves room for the bullet button at the bottom-right.
+          className="w-full resize-y rounded border border-[#E0D9C6] bg-[#FBF7EE] p-3 pb-7 text-sm leading-relaxed text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
           data-testid={`report-editor-${scope}`}
         />
         <Button
@@ -583,7 +594,7 @@ export default function ReportEditor({
           variant="outline"
           size="sm"
           onClick={() => handleBullet(key)()}
-          className="absolute bottom-1 right-1 h-6 px-2 text-xs"
+          className="absolute bottom-1 right-1 h-6 border-[#E0D9C6] bg-white px-2 text-xs text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
           data-testid={`report-editor-bullet-${scope}`}
           title={t('report.addBulletHint')}
         >
@@ -591,26 +602,30 @@ export default function ReportEditor({
           {t('report.bullet')}
         </Button>
       </div>
-      <p className="mt-1 text-xs text-slate-500">{t('report.addBulletHint')}</p>
     </section>
   );
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
+    // Quick task 20260906-report-editor-clinical-refresh — clinical
+    // workstation palette. Warm ivory background (clinic-bg
+    // #F7F1E6) instead of slate-100 — feels like a clinical chart
+    // resting on a desk, not a SaaS dashboard.
+    <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
       <PrintPreview key={report?.pdfPath ?? 'none'} reportId={report?.id ?? null} />
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="text-[11px] font-medium uppercase tracking-[0.22em] text-[#8C8478]">
               {t('common.report')}
             </p>
-            <h1 className="text-2xl font-semibold tracking-tight">
+            <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
               {isFinalized ? (
-                <span className="flex items-center gap-2">
+                <span className="flex items-center gap-3">
                   {t('report.pageTitle')}
                   <Badge
                     variant="secondary"
                     data-testid="report-editor-finalized-badge"
+                    className="bg-[#E6EFF1] text-[#0E3A47] hover:bg-[#D6E4E8]"
                   >
                     {t('report.finalizedBy', { doctor: currentUser?.fullName ?? 'doctor' })}
                   </Badge>
@@ -629,6 +644,7 @@ export default function ReportEditor({
                   onClick={() => void handlePrint()}
                   disabled={report?.pdfPath === null}
                   data-testid="report-editor-print"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   <Printer className="size-4 mr-1" aria-hidden="true" />
                   {t('report.printButton')}
@@ -639,6 +655,7 @@ export default function ReportEditor({
                   onClick={() => void handleOpenPdf()}
                   disabled={report?.pdfPath === null}
                   data-testid="report-editor-open-pdf"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   <FileText className="size-4 mr-1" aria-hidden="true" />
                   {t('report.openPdfButton')}
@@ -649,6 +666,7 @@ export default function ReportEditor({
                   onClick={() => void handleRevealPdf()}
                   disabled={report?.pdfPath === null}
                   data-testid="report-editor-reveal-pdf"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   <FolderOpen className="size-4 mr-1" aria-hidden="true" />
                   {t('report.revealPdfButton')}
@@ -658,6 +676,7 @@ export default function ReportEditor({
                   size="sm"
                   onClick={() => void handleRegenPdf()}
                   data-testid="report-editor-regen-pdf"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   {t('report.regenPdfButton')}
                 </Button>
@@ -668,6 +687,7 @@ export default function ReportEditor({
               size="sm"
               onClick={() => navigate({ name: 'procedure-review', procedureId })}
               data-testid="report-editor-back"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               <ArrowLeft aria-hidden="true" />
               {t('common.back')}
@@ -679,12 +699,24 @@ export default function ReportEditor({
             page width. The two-column layout (boxes left, screenshots
             right) lives inside the document <article>. */}
         <div className="mx-auto w-full max-w-7xl px-2">
+          {/* Quick task 20260906-report-editor-clinical-refresh — the
+              article is the report "document". White surface on the
+              warm-ivory background reads like a printed chart. The
+              4px teal stripe on the left edge is the page's signature
+              accent — same hue as the procedure-type toggle's active
+              state so the two visual anchors rhyme. */}
           <article
-            className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm"
+            className="relative overflow-hidden rounded-lg border border-[#E0D9C6] bg-white p-8 shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]"
             data-testid="report-editor-document"
           >
+            {/* Signature teal stripe */}
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 w-1 bg-[#0E3A47]"
+            />
+            <div className="pl-4">
             {loading && report === null ? (
-              <p className="text-sm text-slate-500">{t('common.loading')}</p>
+              <p className="text-sm text-[#5C6770]">{t('common.loading')}</p>
             ) : null}
 
             {gated ? <EmptyStateCard /> : null}
@@ -697,63 +729,89 @@ export default function ReportEditor({
                 {/* matters on the rendered PDF). The page-level "Report */}
                 {/* editor" h1 + finalized badge above still surface the */}
                 {/* context. */}
-                <section className="mb-4">
-                  <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.patient')}</h2>
+                <section className="mb-6">
+                  <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+                    {t('common.patient')}
+                  </h2>
                   <div
-                    className="flex flex-wrap gap-x-4 text-sm text-slate-700"
+                    className="flex flex-wrap gap-x-6 text-sm text-[#13202E]"
                     data-testid="report-editor-patient-block"
                   >
                     <span>
-                      {t('common.name')}: <strong>{patient?.fullName ?? '—'}</strong>
+                      <span className="text-[#8C8478]">{t('common.name')}: </span>
+                      <strong>{patient?.fullName ?? '—'}</strong>
                     </span>
-                    <span>{t('common.mrn')}: {patient?.mrn}</span>
-                    <span>{t('common.dob')}: {patient?.dob ?? '—'}</span>
-                    <span>{t('common.gender')}: {patient?.gender ?? '—'}</span>
+                    <span>
+                      <span className="text-[#8C8478]">{t('common.mrn')}: </span>
+                      {patient?.mrn}
+                    </span>
+                    <span>
+                      <span className="text-[#8C8478]">{t('common.dob')}: </span>
+                      {patient?.dob ?? '—'}
+                    </span>
+                    <span>
+                      <span className="text-[#8C8478]">{t('common.gender')}: </span>
+                      {patient?.gender ?? '—'}
+                    </span>
                   </div>
                 </section>
 
                 {/* Procedure block + instrument + premedication */}
-                <section className="mb-4">
-                  <h2 className="mb-2 text-sm font-bold text-slate-900">{t('common.procedure')}</h2>
+                <section className="mb-6">
+                  <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+                    {t('common.procedure')}
+                  </h2>
                   {/* Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
                       Date / Duration / Doctor on a single row with small caps labels. */}
                   <div
-                    className="grid grid-cols-3 gap-x-4 gap-y-1 text-sm text-slate-700"
+                    className="grid grid-cols-3 gap-x-6 gap-y-1 text-sm text-[#13202E]"
                     data-testid="report-editor-procedure-meta"
                   >
                     <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
                         {t('common.date')}
                       </p>
-                      <p className="font-medium" data-testid="report-editor-procedure-date-value">
+                      <p
+                        className="mt-0.5 font-mono text-sm text-[#13202E]"
+                        data-testid="report-editor-procedure-date-value"
+                      >
                         {procedureDateLabel}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
                         {t('common.duration')}
                       </p>
-                      <p className="font-medium" data-testid="report-editor-procedure-duration-value">
+                      <p
+                        className="mt-0.5 font-mono text-sm text-[#13202E]"
+                        data-testid="report-editor-procedure-duration-value"
+                      >
                         {procedureDurationLabel}
                       </p>
                     </div>
                     <div>
-                      <p className="text-xs uppercase tracking-wider text-slate-500">
+                      <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
                         {t('common.doctor')}
                       </p>
-                      <p className="font-medium truncate" title={doctorName}>
+                      <p
+                        className="mt-0.5 truncate text-sm text-[#13202E]"
+                        title={doctorName}
+                      >
                         {doctorName}
                       </p>
                     </div>
                   </div>
 
-                  {/* Procedure-type toggle */}
+                  {/* Procedure-type toggle — quick task
+                      20260906-report-editor-clinical-refresh: teal accent
+                      on the active state (matches the document's
+                      signature stripe). */}
                   <div className="mt-4">
-                    <label className="mb-1 block text-xs font-medium text-slate-700">
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]">
                       {t('report.procedureTypeLabel')}
                     </label>
                     <div
-                      className="inline-flex rounded border border-slate-300 bg-slate-50"
+                      className="inline-flex rounded border border-[#E0D9C6] bg-[#FBF7EE]"
                       role="radiogroup"
                       aria-label={t('report.procedureTypeLabel')}
                       data-testid="report-editor-procedure-type"
@@ -762,10 +820,10 @@ export default function ReportEditor({
                         type="button"
                         onClick={() => void handleProcedureTypeChange('colon')}
                         aria-pressed={procedureType === 'colon'}
-                        className={`px-3 py-1.5 text-sm ${
+                        className={`px-4 py-1.5 text-sm transition-colors ${
                           procedureType === 'colon'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-700 hover:bg-slate-100'
+                            ? 'bg-[#0E3A47] text-white shadow-inner'
+                            : 'text-[#5C6770] hover:bg-[#F0EBDE] hover:text-[#13202E]'
                         }`}
                         data-testid="report-editor-procedure-type-colon"
                       >
@@ -775,10 +833,10 @@ export default function ReportEditor({
                         type="button"
                         onClick={() => void handleProcedureTypeChange('upper_gi')}
                         aria-pressed={procedureType === 'upper_gi'}
-                        className={`px-3 py-1.5 text-sm ${
+                        className={`px-4 py-1.5 text-sm transition-colors ${
                           procedureType === 'upper_gi'
-                            ? 'bg-blue-600 text-white'
-                            : 'text-slate-700 hover:bg-slate-100'
+                            ? 'bg-[#0E3A47] text-white shadow-inner'
+                            : 'text-[#5C6770] hover:bg-[#F0EBDE] hover:text-[#13202E]'
                         }`}
                         data-testid="report-editor-procedure-type-upper-gi"
                       >
@@ -787,66 +845,69 @@ export default function ReportEditor({
                     </div>
                   </div>
 
-                  {/* Instrument picker */}
-                  <div className="mt-3">
-                    <label
-                      htmlFor="report-editor-instrument"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      {t('report.instrumentLabel')}
-                    </label>
-                    <select
-                      id="report-editor-instrument"
-                      value={report?.instrument ?? ''}
-                      onChange={(e) => void handleInstrumentChange(e)}
-                      className="block w-full rounded border border-slate-300 bg-white px-3 py-1.5 text-sm"
-                      data-testid="report-editor-instrument-select"
-                    >
-                      <option value="">{t('report.instrumentNone')}</option>
-                      {usedDevices.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name}
-                        </option>
-                      ))}
-                    </select>
-                    {instrumentLabel === '' && usedDevices.length === 0 ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        {t('report.instrumentNoneConfigured')}
-                      </p>
-                    ) : null}
-                  </div>
+                  {/* Instrument picker + Premedication override —
+                      quick task 20260906-report-editor-clinical-refresh:
+                      same row in a 2-col grid so they read as a single
+                      instrument-config block. */}
+                  <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <div>
+                      <label
+                        htmlFor="report-editor-instrument"
+                        className="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]"
+                      >
+                        {t('report.instrumentLabel')}
+                      </label>
+                      <select
+                        id="report-editor-instrument"
+                        value={report?.instrument ?? ''}
+                        onChange={(e) => void handleInstrumentChange(e)}
+                        className="block w-full rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-1.5 text-sm text-[#13202E] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
+                        data-testid="report-editor-instrument-select"
+                      >
+                        <option value="">{t('report.instrumentNone')}</option>
+                        {usedDevices.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.name}
+                          </option>
+                        ))}
+                      </select>
+                      {instrumentLabel === '' && usedDevices.length === 0 ? (
+                        <p className="mt-1 text-xs text-[#8C8478]">
+                          {t('report.instrumentNoneConfigured')}
+                        </p>
+                      ) : null}
+                    </div>
 
-                  {/* Premedication override */}
-                  <div className="mt-3">
-                    <label
-                      htmlFor="report-editor-premedication"
-                      className="mb-1 block text-xs font-medium text-slate-700"
-                    >
-                      {t('report.premedicationLabel')}
-                    </label>
-                    <Input
-                      id="report-editor-premedication"
-                      value={premedicationInput}
-                      onChange={(e) => setPremedicationInput(e.target.value)}
-                      onBlur={() => void premedicationCommitted(premedicationInput)}
-                      placeholder={premedicationDisplay}
-                      data-testid="report-editor-premedication"
-                    />
-                    <p className="mt-1 text-xs text-slate-500">
-                      {premedicationInput === ''
-                        ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
-                        : t('report.premedicationOverrideActive')}
-                    </p>
+                    <div>
+                      <label
+                        htmlFor="report-editor-premedication"
+                        className="mb-1 block text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]"
+                      >
+                        {t('report.premedicationLabel')}
+                      </label>
+                      <Input
+                        id="report-editor-premedication"
+                        value={premedicationInput}
+                        onChange={(e) => setPremedicationInput(e.target.value)}
+                        onBlur={() => void premedicationCommitted(premedicationInput)}
+                        placeholder={premedicationDisplay}
+                        className="border-[#E0D9C6] bg-[#FBF7EE] text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white"
+                        data-testid="report-editor-premedication"
+                      />
+                      <p className="mt-1 text-xs text-[#8C8478]">
+                        {premedicationInput === ''
+                          ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
+                          : t('report.premedicationOverrideActive')}
+                      </p>
+                    </div>
                   </div>
                 </section>
 
-                {/* Anatomy boxes (conditional on procedureType) — quick
-                    task 20260906-report-editor-polish lays them out in a
-                    2-column grid so the page fits more on screen without
-                    scrolling. Conclusion + recommendation stay full-width
-                    below. */}
+                {/* Anatomy boxes + always-on Conclusion + Recommendation —
+                    quick task 20260906-report-editor-clinical-refresh:
+                    all 8 boxes sit in the same 2-col grid. */}
                 <div
-                  className="grid grid-cols-1 gap-x-4 md:grid-cols-2"
+                  className="grid grid-cols-1 gap-4 md:grid-cols-2"
                   data-testid="report-editor-anatomy-grid"
                 >
                   {anatomyBoxes.map((box) =>
@@ -858,23 +919,21 @@ export default function ReportEditor({
                       t('report.boxPlaceholder', { scope: scopeLabel(box) }),
                     ),
                   )}
+                  {renderBox(
+                    'conclusion',
+                    'conclusion',
+                    scopeLabel('conclusion'),
+                    3,
+                    t('report.boxPlaceholder', { scope: scopeLabel('conclusion') }),
+                  )}
+                  {renderBox(
+                    'recommendation',
+                    'recommendation',
+                    scopeLabel('recommendation'),
+                    3,
+                    t('report.boxPlaceholder', { scope: scopeLabel('recommendation') }),
+                  )}
                 </div>
-
-                {/* Conclusion + recommendation always-on */}
-                {renderBox(
-                  'conclusion',
-                  'conclusion',
-                  scopeLabel('conclusion'),
-                  3,
-                  t('report.boxPlaceholder', { scope: scopeLabel('conclusion') }),
-                )}
-                {renderBox(
-                  'recommendation',
-                  'recommendation',
-                  scopeLabel('recommendation'),
-                  3,
-                  t('report.boxPlaceholder', { scope: scopeLabel('recommendation') }),
-                )}
 
                 {/* Footer dropped alongside the top logo band (quick task
                     20260906-report-editor-polish) — the footer signature +
@@ -882,7 +941,7 @@ export default function ReportEditor({
                     the editor preview. */}
 
                 <p
-                  className="mt-4 text-xs text-muted-foreground"
+                  className="mt-4 text-xs text-[#8C8478]"
                   data-testid="report-editor-save-indicator"
                   role="status"
                   aria-live="polite"
@@ -893,7 +952,10 @@ export default function ReportEditor({
                   <Button
                     onClick={() => void handleFinalize()}
                     disabled={report === null}
-                    className="mt-2 self-start"
+                    // Quick task 20260906-report-editor-clinical-refresh —
+                    // warm coral accent on the primary action; reads
+                    // as the only "loud" button on the page.
+                    className="mt-3 self-start bg-[#C66B4D] px-5 text-white hover:bg-[#B05C40] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
                     data-testid="report-editor-finalize"
                   >
                     {t('report.finalizeButton')}
@@ -906,10 +968,10 @@ export default function ReportEditor({
                 className="min-w-0"
                 data-testid="report-editor-screenshots-rail"
               >
-                <div className="lg:sticky lg:top-4">
-                  <h2 className="mb-2 text-sm font-bold text-slate-900">
+                <div className="rounded-lg border border-[#E0D9C6] bg-[#EFEAE0] p-3 lg:sticky lg:top-4">
+                  <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
                     {t('report.attachedScreenshots')}
-                    <span className="ml-2 text-xs font-normal text-slate-500">
+                    <span className="ml-2 text-[10px] font-normal normal-case tracking-normal text-[#5C6770]">
                       ({attached.length} of {screenshots.length})
                     </span>
                   </h2>
@@ -933,6 +995,7 @@ export default function ReportEditor({
                   />
                 </div>
               </aside>
+            </div>
             </div>
           </article>
         </div>
