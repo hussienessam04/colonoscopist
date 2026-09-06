@@ -329,10 +329,12 @@ describe('ScreenshotTimeline', () => {
   // timeline thumbnail kept showing the pre-crop image until the
   // doctor left and re-entered the procedure page. The fix: the parent
   // passes a `mediaCacheBuster` (Date.now() on each crop) and the
-  // timeline appends `?v=<bust>` to each MediaServer URL. This guards
-  // the contract so a future regression that drops the bust returns
-  // to the silent-stale-thumbnail bug.
-  it('appends ?v=<bust> to every thumbnail <img> src when mediaCacheBuster is supplied', () => {
+  // timeline appends `#v=<bust>` to each MediaServer URL. The hash
+  // fragment is never sent to the server so no main-process change is
+  // needed; the browser sees a new URL and refetches. This guards the
+  // contract so a future regression that drops the bust returns to the
+  // silent-stale-thumbnail bug.
+  it('appends #v=<bust> to every thumbnail <img> src when mediaCacheBuster is supplied', () => {
     const { rerender } = render(
       <ScreenshotTimeline
         procedureId="p1"
@@ -352,8 +354,9 @@ describe('ScreenshotTimeline', () => {
     expect(beforeImgs[1]!.getAttribute('src')).toBe(
       'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg',
     );
-    // With the bust, every src carries the same ?v= (the URL becomes
-    // unique, the browser refetches).
+    // With the bust, every src carries the same #v= (the URL becomes
+    // unique to the browser cache, the browser refetches — the
+    // fragment is never sent to the server).
     rerender(
       <ScreenshotTimeline
         procedureId="p1"
@@ -368,10 +371,10 @@ describe('ScreenshotTimeline', () => {
     );
     const afterImgs = screen.getAllByTestId('screenshot-thumbnail-img');
     expect(afterImgs[0]!.getAttribute('src')).toBe(
-      'http://127.0.0.1:51731/media/p1/p1/screenshots/5000.jpg?v=1700000000000',
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/5000.jpg#v=1700000000000',
     );
     expect(afterImgs[1]!.getAttribute('src')).toBe(
-      'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg?v=1700000000000',
+      'http://127.0.0.1:51731/media/p1/p1/screenshots/10000.jpg#v=1700000000000',
     );
   });
 });

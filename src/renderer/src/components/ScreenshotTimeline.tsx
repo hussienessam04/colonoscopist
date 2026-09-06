@@ -93,10 +93,12 @@ export type ScreenshotTimelineProps = {
   onReorder?: (orderedIds: number[]) => void;
   // ponytail: shared cache-buster for the MediaServer-backed thumbnail
   // URLs. The parent bumps this on every crop (lightbox onCropped
-  // callback); the timeline appends `?v=<value>` to each thumbnail URL
-  // so the browser refetches the freshly-cropped JPEG bytes. Localhost
-  // MediaServer has no intermediary cache so `?v=` is sufficient
-  // (unlike the lightbox which needs a `blob:` URL because Plan 17).
+  // callback); the timeline appends `#v=<value>` to each thumbnail URL
+  // so the browser refetches the freshly-cropped JPEG bytes. Hash
+  // fragments (`#…`) are never sent to the server — the MediaServer
+  // regex never sees them — so no main-process change is needed and a
+  // stale dev build still works. The fragment makes the URL unique to
+  // the browser's HTTP cache, which is the only thing that matters.
   mediaCacheBuster?: number;
   testId?: string;
 };
@@ -283,7 +285,7 @@ export function ScreenshotTimeline({
                 });
                 if (base === null) return undefined;
                 return mediaCacheBuster !== undefined
-                  ? `${base}?v=${mediaCacheBuster}`
+                  ? `${base}#v=${mediaCacheBuster}`
                   : base;
               })()}
               onSeek={onSeek}
