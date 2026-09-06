@@ -125,6 +125,7 @@ export const IPC = {
   REPORT_TEMPLATES_ADD: 'report-templates:add',
   REPORT_TEMPLATES_REMOVE: 'report-templates:remove',
   REPORTS_OPEN_PDF: 'reports:open-pdf',
+  REPORTS_PRINT: 'reports:print',
   REPORTS_REGEN_PDF: 'reports:regen-pdf',
   REPORTS_ATTACH_SCREENSHOT: 'reports:attach-screenshot',
   REPORTS_DETACH_SCREENSHOT: 'reports:detach-screenshot',
@@ -799,6 +800,13 @@ export interface IpcContract {
     // Default (omit / false) preserves the "open in default viewer"
     // behavior so existing callers keep working.
     openPdf: (input: { id: string; reveal?: boolean }) => Promise<{ opened: true }>;
+    // Quick task 20260906-print-via-webcontents-save-changes-at-end —
+    // routes the OS print dialog through Electron's
+    // `webContents.print({ silent: false, printBackground: true })`.
+    // Reliable PDF preview (Chromium's iframe-based `window.print()`
+    // path surfaces "This app doesn't support print preview"
+    // for blob: URLs containing PDFs).
+    print: (input: { id: string }) => Promise<{ ok: true }>;
     // Phase 6 UAT G-06-11 — returns the raw PDF bytes for the
     // print-preview iframe. The renderer wraps the bytes in a blob: URL
     // and loads it in a hidden iframe so `contentWindow.print()` opens

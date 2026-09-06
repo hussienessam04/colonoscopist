@@ -19,8 +19,9 @@
 // renderReportPdf orchestrator writes the pdf_path + pdf_generated_at
 // + emits report.pdf_generated (see pdf/render-report-pdf.ts).
 
-import { ipcMain, shell, app } from 'electron';
+import { ipcMain, shell, app, BrowserWindow } from 'electron';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 import { z } from 'zod';
 import {
@@ -460,6 +461,68 @@ export function registerReportsIpc(): void {
         metadata: { pdfPath: report.pdfPath, reveal: reveal === true },
       });
       return { opened: true } as const;
+    } catch (err) {
+      throw asIpcError(err);
+    }
+  }));
+
+  // Quick task 20260906-print-via-webcontents-save-changes-at-end —
+  // route the OS print dialog through Electron's `webContents.print`
+  // instead of the iframe `contentWindow.print()` path. The iframe
+  // approach surfaces "This app doesn't support print preview" for
+  // PDF blob: URLs in Electron; `webContents.print` uses the OS-native
+  // print pipeline with full preview.
+  ipcMain.handle(IPC.REPORTS_PRINT, licenseGated(IPC.REPORTS_PRINT, async (_e, raw) => {
+    try {
+      const userId = requireSession();
+      const { id } = safeParse(reportIdSchema, raw, 'id');
+      const report = reportsRepo.getById(id);
+      if (!report || !report.pdfPath) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf not generated yet'),
+        );
+      }
+      const abs = reportPdfPath(id);
+      if (!existsSync(abs)) {
+        throw new IpcErrorException(
+          ipcError('IPC_NOT_FOUND', 'pdf file missing on disk'),
+        );
+      }
+      // Open the PDF in a hidden BrowserWindow so the OS print dialog
+      // has a real PDF document to preview + print. The window is
+      // `show: false` (hidden from the user) + `webPreferences.offscreen`
+      // would be heavier than necessary — a hidden window with the
+      // default Chromium PDF viewer is enough.
+      const printWin = new BrowserWindow({
+        show: false,
+        webPreferences: {
+          plugins: true, // Chromium PDF viewer
+          contextIsolation: true,
+          nodeIntegration: false,
+          sandbox: true,
+        },
+      });
+      try {
+        await printWin.loadURL(pathToFileURL(abs).toString());
+        // webContents.print returns a callback that fires when the
+        // dialog closes (success = true / failure = false).
+        const printed: boolean = await new Promise<boolean>((resolve) => {
+          printWin.webContents.print(
+            { silent: false, printBackground: true, pageSize: 'Letter' },
+            (success: boolean) => resolve(success),
+          );
+        });
+        audit({
+          action: 'report.pdf_printed',
+          entityType: 'report',
+          entityId: id,
+          userId,
+          metadata: { pdfPath: report.pdfPath, success: printed },
+        });
+        return { ok: true } as const;
+      } finally {
+        if (!printWin.isDestroyed()) printWin.destroy();
+      }
     } catch (err) {
       throw asIpcError(err);
     }

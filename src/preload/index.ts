@@ -155,6 +155,7 @@ const api: IpcContract = {
     finalize: (input) => ipcRenderer.invoke(IPC.REPORTS_FINALIZE, input),
     regenPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_REGEN_PDF, input),
     openPdf: (input) => ipcRenderer.invoke(IPC.REPORTS_OPEN_PDF, input),
+    print: (input) => ipcRenderer.invoke(IPC.REPORTS_PRINT, input),
     getPdfBlob: (input) => ipcRenderer.invoke(IPC.REPORTS_GET_PDF_BLOB, input),
     attachScreenshot: (input) =>
       ipcRenderer.invoke(IPC.REPORTS_ATTACH_SCREENSHOT, input),

@@ -17,12 +17,9 @@
 // Phase 6 UAT G-08-8 — Save indicator + Finalize button.
 
 import {
-  forwardRef,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useMemo,
-  useRef,
   useState,
   type ChangeEvent,
 } from 'react';
@@ -71,107 +68,12 @@ const ANATOMY_BOXES_BY_TYPE: Record<
 const FIELD_CLASS =
   'block w-full rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-2 text-sm text-[#13202E] placeholder:text-[#A39A86] transition-colors hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30';
 
-// ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
-// via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
-// the report PDF — it restricts to data/media/patients/ paths). The
-// bytes are wrapped in a Blob + ObjectURL which the iframe loads.
-//
-// Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
-// Print button actually triggers the OS print dialog by calling
-// `iframe.contentWindow.print()` once the PDF blob is loaded. The
-// forwardRef + useImperativeHandle pattern lets the parent invoke
-// `print()` from a click handler.
-export type PrintPreviewHandle = {
-  print: () => Promise<boolean>;
-};
-const PrintPreview = forwardRef<PrintPreviewHandle, { reportId: string | null }>(
-  function PrintPreviewImpl({ reportId }, ref): JSX.Element | null {
-    const iframeRef = useRef<HTMLIFrameElement | null>(null);
-    const [src, setSrc] = useState<string | null>(null);
-    // Resolves when the iframe's `load` event fires (or the
-    // 4-second safety timeout). Stored in a ref so the imperative
-    // `print()` method can `await` it without re-creating the
-    // promise on every render.
-    const loadPromiseRef = useRef<Promise<void>>(Promise.resolve());
-    const resolveLoadRef = useRef<(() => void) | null>(null);
-    useEffect(() => {
-      if (reportId === null) {
-        setSrc(null);
-        return;
-      }
-      let cancelled = false;
-      let objectUrlToRevoke: string | null = null;
-      loadPromiseRef.current = new Promise<void>((resolve) => {
-        resolveLoadRef.current = resolve;
-      });
-      (async (): Promise<void> => {
-        try {
-          const result = await safeInvoke(
-            window.api.reports?.getPdfBlob?.({ id: reportId }),
-          );
-          if (cancelled || result === null || result === undefined) return;
-          const blob = new Blob(
-            [result.bytes as Uint8Array<ArrayBuffer>],
-            { type: result.mime },
-          );
-          const url = URL.createObjectURL(blob);
-          objectUrlToRevoke = url;
-          setSrc(url);
-        } catch {
-          // best-effort — leave the load promise unresolved; the
-          // 4s timeout in `print()` caps the wait.
-        }
-      })();
-      return () => {
-        cancelled = true;
-        if (objectUrlToRevoke !== null) {
-          URL.revokeObjectURL(objectUrlToRevoke);
-        }
-      };
-    }, [reportId]);
-    useImperativeHandle(
-      ref,
-      () => ({
-        print: async (): Promise<boolean> => {
-          const iframe = iframeRef.current;
-          if (iframe === null) return false;
-          const win = iframe.contentWindow;
-          if (win === null) return false;
-          // Wait for the iframe to finish loading the PDF before
-          // firing print(); Chromium refuses to print a half-loaded
-          // document. Cap the wait so a stuck iframe doesn't hang
-          // the doctor's workflow.
-          await Promise.race([
-            loadPromiseRef.current,
-            new Promise<void>((resolve) => setTimeout(resolve, 4000)),
-          ]);
-          win.focus();
-          win.print();
-          return true;
-        },
-      }),
-      [],
-    );
-    if (src === null) return null;
-    return (
-      <iframe
-        ref={iframeRef}
-        src={src}
-        title="PDF preview"
-        // Quick task 20260906-print-preview-and-input-unify — full-viewport
-        // size but invisible + non-interactive so the OS print dialog
-        // can preview the PDF. The previous 1×1 px iframe was too small
-        // for Chromium to render a preview, surfacing "This app
-        // doesn't support print preview".
-        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', border: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}
-        data-testid="report-editor-pdf-iframe"
-        onLoad={() => {
-          resolveLoadRef.current?.();
-        }}
-      />
-    );
-  },
-);
+// Quick task 20260906-print-via-webcontents-save-changes-at-end —
+// the iframe-based PrintPreview is gone. The OS print dialog is now
+// driven by Electron's `webContents.print` (REPORTS_PRINT IPC, main
+// process loads the PDF in a hidden BrowserWindow + calls print).
+// Reliable PDF preview; the iframe path surfaced "This app doesn't
+// support print preview" for blob: URLs containing PDFs.
 
 export default function ReportEditor({
   procedureId: initialProcedureId,
@@ -439,16 +341,14 @@ export default function ReportEditor({
 
   const handlePrint = useCallback(async (): Promise<void> => {
     if (report === null) return;
-    // Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
-    // Print button now triggers the OS print dialog directly via the
-    // hidden iframe (PrintPreview). Falls back to opening the PDF in
-    // the OS viewer if the iframe hasn't loaded yet (e.g. the report
-    // has no PDF path yet).
-    const ok = await printIframeRef.current?.print();
-    if (ok === true) return;
+    // Quick task 20260906-print-via-webcontents-save-changes-at-end —
+    // route the OS print dialog through Electron's
+    // `webContents.print` (loaded in a hidden BrowserWindow with the
+    // Chromium PDF viewer). Reliable PDF preview; the previous
+    // iframe `contentWindow.print()` path surfaced "This app doesn't
+    // support print preview" for blob: URLs containing PDFs.
     try {
-      await window.api.reports.openPdf({ id: report.id, reveal: false });
-      toast.success('PDF opened — use the viewer toolbar to print');
+      await window.api.reports.print({ id: report.id });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : t('report.openPdfFailed'));
     }
@@ -559,12 +459,6 @@ export default function ReportEditor({
       cancelled = true;
     };
   }, [procedureId]);
-
-  // Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
-  // imperative handle to the hidden PDF iframe (PrintPreview).
-  // handlePrint() calls `.print()` to trigger the OS print dialog
-  // without bouncing through the PDF viewer first.
-  const printIframeRef = useRef<PrintPreviewHandle | null>(null);
 
   const isFinalized = report?.status === 'finalized';
   const procedureType: 'colon' | 'upper_gi' = report?.procedureType ?? 'colon';
@@ -691,11 +585,6 @@ export default function ReportEditor({
     // #F7F1E6) instead of slate-100 — feels like a clinical chart
     // resting on a desk, not a SaaS dashboard.
     <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
-      <PrintPreview
-        key={report?.pdfPath ?? 'none'}
-        reportId={report?.id ?? null}
-        ref={printIframeRef}
-      />
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-4">
           <div>
@@ -993,11 +882,11 @@ export default function ReportEditor({
                         className={FIELD_CLASS}
                         data-testid="report-editor-premedication"
                       />
-                      <p className="mt-1 text-xs text-[#8C8478]">
-                        {premedicationInput === ''
-                          ? t('report.premedicationFallsBack', { value: premedicationDisplay || t('common.empty') })
-                          : t('report.premedicationOverrideActive')}
-                      </p>
+                      {/* Quick task 20260906-print-via-webcontents-save-changes-at-end —
+                          drop the "Empty falls back to clinic default: …" hint line.
+                          The input's `placeholder` already shows the
+                          clinic default; whether the doctor overrode it
+                          is implicit from the value (empty vs not). */}
                     </div>
                   </div>
                 </section>
@@ -1094,26 +983,31 @@ export default function ReportEditor({
                     // available height (was overflow-x-auto before).
                     layout="grid"
                   />
-                  {/* Quick task 20260906-print-preview-and-input-unify —
-                      Re-render PDF moved into the screenshots rail so
-                      PDF controls + screenshots sit together as one
-                      "report assets" cluster. Teal-accented primary
-                      button so the doctor reads it as the natural
-                      next action after toggling the procedure type or
-                      editing boxes. */}
-                  <Button
-                    onClick={() => void handleRegenPdf()}
-                    data-testid="report-editor-regen-pdf"
-                    className="mt-3 w-full bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
-                  >
-                    {t('report.regenPdfButton')}
-                  </Button>
                 </div>
               </aside>
             </div>
             </div>
+                    {/* Quick task 20260906-print-via-webcontents-save-changes-at-end —
+            Save changes button lives at the very end of the page
+            (outside the document, under the screenshots rail). The
+            doctor reads it as "save my work to disk" — which
+            actually does both: persists any pending auto-save
+            (the doctor's last keystroke triggers useAutoSave's
+            debounce) + re-renders the PDF. Teal-accented so it
+            reads as a primary action without competing with the
+            coral Finalize button. */}
+        <div className=" flex max-w-7xl justify-end px-2">
+          <Button
+            onClick={() => void handleRegenPdf()}
+            data-testid="report-editor-regen-pdf"
+            className="bg-[#0E3A47] px-5 text-white hover:bg-[#0B2C36]"
+          >
+            {t('report.regenPdfButton')}
+          </Button>
+        </div>
           </article>
         </div>
+
       </div>
 
       {templatesDialogScope !== null ? (
