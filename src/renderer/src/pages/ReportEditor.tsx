@@ -936,21 +936,6 @@ export default function ReportEditor({
                 >
                   {indicatorText}
                 </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {!isFinalized ? (
-                    <Button
-                      onClick={() => void handleFinalize()}
-                      disabled={report === null}
-                      // Quick task 20260906-report-editor-clinical-refresh —
-                      // warm coral accent on the primary action; reads
-                      // as the only "loud" button on the page.
-                      className="bg-[#C66B4D] px-5 text-white hover:bg-[#B05C40] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
-                      data-testid="report-editor-finalize"
-                    >
-                      {t('report.finalizeButton')}
-                    </Button>
-                  ) : null}
-                </div>
               </div>
 
               {/* RIGHT — screenshots rail (sticky on scroll, lg+) */}
@@ -987,25 +972,36 @@ export default function ReportEditor({
               </aside>
             </div>
             </div>
-                    {/* Quick task 20260906-print-via-webcontents-save-changes-at-end —
-            Save changes button lives at the very end of the page
-            (outside the document, under the screenshots rail). The
-            doctor reads it as "save my work to disk" — which
-            actually does both: persists any pending auto-save
-            (the doctor's last keystroke triggers useAutoSave's
-            debounce) + re-renders the PDF. Teal-accented so it
-            reads as a primary action without competing with the
-            coral Finalize button. */}
-        <div className=" flex max-w-7xl justify-end px-2">
-          <Button
-            onClick={() => void handleRegenPdf()}
-            data-testid="report-editor-regen-pdf"
-            className="bg-[#0E3A47] px-5 text-white hover:bg-[#0B2C36]"
-          >
-            {t('report.regenPdfButton')}
-          </Button>
-        </div>
           </article>
+        </div>
+        {/* Quick task 20260906-save-changes-vs-finalize-and-rail-max-height —
+            one primary action at the very end of the page:
+              - No PDF yet → "Finalize report" (creates the report row +
+                locks the procedure status + generates the first PDF).
+              - PDF exists  → "Save changes" (regenerates the PDF with
+                any post-finalize edits).
+            Coral vs teal keeps the "this is the irreversible state
+            transition" visual cue distinct from the "save my edits"
+            cue. */}
+        <div className="mx-auto flex max-w-7xl justify-end px-2">
+          {report?.pdfPath === null ? (
+            <Button
+              onClick={() => void handleFinalize()}
+              disabled={report === null}
+              className="bg-[#C66B4D] px-5 text-white hover:bg-[#B05C40] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
+              data-testid="report-editor-finalize"
+            >
+              {t('report.finalizeButton')}
+            </Button>
+          ) : (
+            <Button
+              onClick={() => void handleRegenPdf()}
+              data-testid="report-editor-regen-pdf"
+              className="bg-[#0E3A47] px-5 text-white hover:bg-[#0B2C36]"
+            >
+              {t('report.regenPdfButton')}
+            </Button>
+          )}
         </div>
 
       </div>

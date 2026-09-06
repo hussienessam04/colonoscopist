@@ -208,12 +208,16 @@ export function ScreenshotTimeline({
   return (
     <div
       className={
+        // Quick task 20260906-save-changes-vs-finalize-and-rail-max-height —
+        // the rail was growing unbounded with many screenshots;
+        // cap at 60vh + overflow-y-auto so the rail stays inside the
+        // viewport on tall pages.
         // Quick task 20260906 — `'grid'` renders a 2-column vertical
         // grid that fills the available height; `'row'` keeps the
         // horizontal scroll (the timeline's original layout used by
         // ProcedureReview + the wider report editor surface).
         layout === 'grid'
-          ? 'grid grid-cols-2 gap-2 content-start overflow-y-auto pb-2'
+          ? 'grid max-h-[60vh] grid-cols-2 gap-2 content-start overflow-y-auto pb-2'
           : 'flex items-center gap-2 overflow-x-auto pb-2'
       }
       data-testid={testId ?? 'screenshot-timeline'}
