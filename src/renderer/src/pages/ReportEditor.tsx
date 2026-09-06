@@ -64,6 +64,13 @@ const ANATOMY_BOXES_BY_TYPE: Record<
   upper_gi: ['esophagus', 'stomach', 'pylorus', 'duodenum'],
 };
 
+// Quick task 20260906-print-preview-and-input-unify — unified
+// input field treatment. Every <select> + <input> + <textarea>
+// in the document shares the same border + bg + padding +
+// focus state so the page reads as a single form language.
+const FIELD_CLASS =
+  'block w-full rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-2 text-sm text-[#13202E] placeholder:text-[#A39A86] transition-colors hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30';
+
 // ponytail: Phase 6 UAT G-06-11 — print preview. The PDF is fetched
 // via `api.reports.getPdfBlob({ id })` (the MediaServer does NOT serve
 // the report PDF — it restricts to data/media/patients/ paths). The
@@ -151,7 +158,12 @@ const PrintPreview = forwardRef<PrintPreviewHandle, { reportId: string | null }>
         ref={iframeRef}
         src={src}
         title="PDF preview"
-        style={{ position: 'fixed', top: 0, left: 0, width: '1px', height: '1px', border: 0, opacity: 0.01 }}
+        // Quick task 20260906-print-preview-and-input-unify — full-viewport
+        // size but invisible + non-interactive so the OS print dialog
+        // can preview the PDF. The previous 1×1 px iframe was too small
+        // for Chromium to render a preview, surfacing "This app
+        // doesn't support print preview".
+        style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', border: 0, opacity: 0, pointerEvents: 'none', zIndex: -1 }}
         data-testid="report-editor-pdf-iframe"
         onLoad={() => {
           resolveLoadRef.current?.();
@@ -651,7 +663,7 @@ export default function ReportEditor({
           // field treatment. Soft ivory tint, hairline rule, teal accent
           // on focus (matches the document's signature accent). pb-9
           // leaves room for the bullet button at the bottom-right.
-          className="w-full resize-y rounded border border-[#E0D9C6] bg-[#FBF7EE] p-3 pb-9 text-sm leading-relaxed text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
+          className="block w-full resize-y rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-2 pb-9 text-sm leading-relaxed text-[#13202E] placeholder:text-[#A39A86] transition-colors hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
           data-testid={`report-editor-${scope}`}
         />
         {/* Quick task 20260906-report-editor-unify-patient-procedure-bullet-attached —
@@ -948,7 +960,7 @@ export default function ReportEditor({
                         id="report-editor-instrument"
                         value={report?.instrument ?? ''}
                         onChange={(e) => void handleInstrumentChange(e)}
-                        className="block w-full rounded border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-1.5 text-sm text-[#13202E] focus:border-[#0E3A47] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#0E3A47]/30"
+                        className={FIELD_CLASS}
                         data-testid="report-editor-instrument-select"
                       >
                         <option value="">{t('report.instrumentNone')}</option>
@@ -978,7 +990,7 @@ export default function ReportEditor({
                         onChange={(e) => setPremedicationInput(e.target.value)}
                         onBlur={() => void premedicationCommitted(premedicationInput)}
                         placeholder={premedicationDisplay}
-                        className="border-[#E0D9C6] bg-[#FBF7EE] text-[#13202E] placeholder:text-[#A39A86] focus:border-[#0E3A47] focus:bg-white"
+                        className={FIELD_CLASS}
                         data-testid="report-editor-premedication"
                       />
                       <p className="mt-1 text-xs text-[#8C8478]">
@@ -1049,17 +1061,6 @@ export default function ReportEditor({
                       {t('report.finalizeButton')}
                     </Button>
                   ) : null}
-                  {/* Quick task 20260906-report-editor-procedure-center-print-regen-thumbnails —
-                      Re-render PDF moved to the end of the document so
-                      the natural workflow reads fill → finalize →
-                      re-render → print. */}
-                  <Button
-                    onClick={() => void handleRegenPdf()}
-                    data-testid="report-editor-regen-pdf"
-                    className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
-                  >
-                    {t('report.regenPdfButton')}
-                  </Button>
                 </div>
               </div>
 
@@ -1093,6 +1094,20 @@ export default function ReportEditor({
                     // available height (was overflow-x-auto before).
                     layout="grid"
                   />
+                  {/* Quick task 20260906-print-preview-and-input-unify —
+                      Re-render PDF moved into the screenshots rail so
+                      PDF controls + screenshots sit together as one
+                      "report assets" cluster. Teal-accented primary
+                      button so the doctor reads it as the natural
+                      next action after toggling the procedure type or
+                      editing boxes. */}
+                  <Button
+                    onClick={() => void handleRegenPdf()}
+                    data-testid="report-editor-regen-pdf"
+                    className="mt-3 w-full bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
+                  >
+                    {t('report.regenPdfButton')}
+                  </Button>
                 </div>
               </aside>
             </div>
