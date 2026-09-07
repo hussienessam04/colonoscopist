@@ -102,11 +102,18 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
 
   const [patient, setPatient] = useState<Patient | null>(null);
   const [rows, setRows] = useState<ProcedureWithReport[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   // Plan 08-10 / G-08-4 — gate-rejected flag. When the patients.get or
   // procedures.list IPC returns {ok:false}, render the empty state
   // card instead of crashing on undefined destructure below.
   const [gated, setGated] = useState(false);
+
+  // Real pagination (was: pageSize=200 once, no Next/Previous — silent
+  // data loss above 200 procedures per patient).
+  // ponytail: pageSize is a constant — no PageSizeSelector on this page.
+  const PAGE_SIZE = 25;
+  const [page, setPage] = useState(1);
 
   // Filter state — pending inputs are committed to "applied" only on Apply.
   const [pendingSearch, setPendingSearch] = useState('');
@@ -134,13 +141,12 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
           return;
         }
         setPatient(p);
-        // pageSize: 200 — keeps the surface scroll-free for any realistic
-        // clinic year; matches the existing patients.list default-ish
-        // shape (per plan: "use existing API").
+        // Real pagination — procedures.list already accepts page + pageSize.
         const procs = await safeInvoke(
           window.api.procedures.list({
             patientId,
-            pageSize: 200,
+            page,
+            pageSize: PAGE_SIZE,
           }),
         );
         if (cancelled) return;
@@ -163,6 +169,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
             report: reports[idx] ?? null,
           })),
         );
+        setTotal(procs.total);
         setGated(false);
       } catch (err) {
         const msg = err instanceof Error ? err.message : 'Failed to load';
@@ -174,7 +181,19 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
     return () => {
       cancelled = true;
     };
-  }, [patientId, navigate, t]);
+  }, [patientId, page, PAGE_SIZE, navigate, t]);
+
+  // Auto-clamp the page when total shrinks below the current page
+  // (e.g. after deleting the last procedure on page 5).
+  useEffect(() => {
+    if (total === 0 && page !== 1) {
+      setPage(1);
+      return;
+    }
+    if (total > 0 && page > Math.ceil(total / PAGE_SIZE)) {
+      setPage(Math.ceil(total / PAGE_SIZE));
+    }
+  }, [total, page]);
 
   const filteredRows = useMemo(() => {
     const searchTrim = appliedSearch.trim().toLowerCase();
@@ -246,6 +265,12 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
   }
 
   const initials = patient !== null ? deriveInitials(patient.fullName) : '';
+
+  // ponytail: empty results collapse to 0 pages instead of the misleading
+  // "Page 1 of 1" — the range footer falls back to "No procedures" copy.
+  const totalPages = total === 0 ? 0 : Math.ceil(total / PAGE_SIZE);
+  const rangeStart = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
@@ -544,6 +569,43 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
             </div>
           </CardContent>
         </Card>
+
+        <div className="flex items-center justify-between text-sm">
+          <span
+            className="text-muted-foreground"
+            data-testid="patient-procedures-pagination-range"
+          >
+            {total === 0
+              ? t('patientProcedures.paginationRangeEmpty')
+              : total === 1
+                ? t('patientProcedures.paginationRangeOne')
+                : t('patientProcedures.paginationRange', {
+                    start: rangeStart,
+                    end: rangeEnd,
+                    total,
+                  })}
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page <= 1}
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              data-testid="patient-procedures-prev"
+            >
+              {t('common.previous')}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={page >= totalPages}
+              onClick={() => setPage((p) => p + 1)}
+              data-testid="patient-procedures-next"
+            >
+              {t('common.next')}
+            </Button>
+          </div>
+        </div>
       </div>
     </main>
   );

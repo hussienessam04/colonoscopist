@@ -8,12 +8,11 @@
 // calls `window.api.audit.list({ ...filters, page, pageSize })` — the
 // IPC contract from Plan 07-01.
 //
-// ponytail: the params (filters + page + pageSize) are captured via
-// refs so the refresh callback identity stays stable across renders.
-// The parent (Audit page) rebuilds the `filters` object every render
-// — using `filters` as a `useEffect` dep would create a re-fire loop.
-// Lazy ref access keeps the callback identity stable while still
-// reading the latest values on each call.
+// ponytail: `filters` is captured via a ref (parent rebuilds the object
+// every render — using it as a direct useEffect dep would cause a
+// re-fire loop). `page` + `pageSize` are stable primitives so they go
+// straight into the useEffect deps array — without that, prev/next
+// clicks would update React state but the IPC would never re-fire.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AuditEntry } from '@shared/ipc-contract';
@@ -49,17 +48,10 @@ export function useAudit({ filters, page, pageSize = 100 }: UseAuditOptions): Us
   // calls (e.g. fast double-click on Apply). The second awaits the
   // first so the local state stays consistent.
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
-  // Lazy refs — the parent passes a fresh `filters` object every render.
-  // Without these refs, useCallback's [filters, page, pageSize] deps
-  // would rebuild the callback every render, and the [refresh] useEffect
-  // would re-fire on every render → infinite loop. The refs let the
-  // stable refresh callback read the latest values on each call.
+  // Lazy ref for `filters` only — the parent passes a fresh object
+  // every render. page + pageSize are primitives, no ref needed.
   const filtersRef = useRef(filters);
   filtersRef.current = filters;
-  const pageRef = useRef(page);
-  pageRef.current = page;
-  const pageSizeRef = useRef(pageSize);
-  pageSizeRef.current = pageSize;
 
   const refresh = useCallback(async (): Promise<void> => {
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
@@ -69,8 +61,8 @@ export function useAudit({ filters, page, pageSize = 100 }: UseAuditOptions): Us
       try {
         const res = await window.api.audit.list({
           ...filtersRef.current,
-          page: pageRef.current,
-          pageSize: pageSizeRef.current,
+          page,
+          pageSize,
         });
         setRows(res.rows);
         setTotal(res.total);
@@ -85,9 +77,13 @@ export function useAudit({ filters, page, pageSize = 100 }: UseAuditOptions): Us
     return promise;
   }, []);
 
+  // ponytail: refresh identity stays stable, but `page` and `pageSize`
+  // are direct deps so the IPC refetches when the user clicks prev/next
+  // (regression fix — without these deps, the hook never re-fetched on
+  // page changes; the lazy-ref pattern was hiding the bug).
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, page, pageSize]);
 
   return { rows, total, loading, error, refresh };
 }

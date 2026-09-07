@@ -192,6 +192,20 @@ export default function Audit(): JSX.Element {
     return () => clearTimeout(handle);
   }, []);
 
+  // Auto-clamp the page when total shrinks below the current page.
+  // The useAudit hook refetches on filter changes which already reset
+  // page to 1, so this only matters if rows were deleted between two
+  // fetches with the same filters (rare in practice — defense in depth).
+  useEffect(() => {
+    if (total === 0 && page !== 1) {
+      setPage(1);
+      return;
+    }
+    if (total > 0 && page > Math.ceil(total / DEFAULT_PAGE_SIZE)) {
+      setPage(Math.ceil(total / DEFAULT_PAGE_SIZE));
+    }
+  }, [total, page]);
+
   // Detail dialog state — the AuditEntry the operator clicked (null
   // when the dialog is closed).
   const [detail, setDetail] = useState<AuditEntry | null>(null);
@@ -230,7 +244,9 @@ export default function Audit(): JSX.Element {
     setPage(1);
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_SIZE));
+  // ponytail: empty results collapse to 0 pages instead of the misleading
+  // "Page 1 of 1" — the footer falls back to a "No events" copy.
+  const totalPages = total === 0 ? 0 : Math.ceil(total / DEFAULT_PAGE_SIZE);
   const fallbackUserName = currentUser?.fullName ?? 'unknown';
 
   return (
@@ -464,7 +480,9 @@ export default function Audit(): JSX.Element {
 
       <div className="flex items-center justify-between text-sm">
             <span className="text-[#5C6770]" data-testid="audit-pagination">
-              {t('audit.pageInfo', { page, totalPages })}
+              {total === 0
+                ? t('audit.paginationEmpty')
+                : t('audit.pageInfo', { page, totalPages })}
             </span>
             <div className="flex gap-2">
               <Button

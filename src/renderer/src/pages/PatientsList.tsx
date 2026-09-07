@@ -81,6 +81,19 @@ export default function PatientsList(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, mrn, includeDeleted, page, pageSize]);
 
+  // Auto-clamp the page when total shrinks below the current page
+  // (e.g. after deleting the last patient on page 5). Without this,
+  // the table is empty and Previous is the only way out.
+  useEffect(() => {
+    if (total === 0 && page !== 1) {
+      setPage(1);
+      return;
+    }
+    if (total > 0 && page > Math.ceil(total / pageSize)) {
+      setPage(Math.ceil(total / pageSize));
+    }
+  }, [total, pageSize, page]);
+
   async function refetch(): Promise<void> {
     setLoading(true);
     const res = await safeInvoke(
@@ -143,7 +156,9 @@ export default function PatientsList(): JSX.Element {
     navigate({ name: 'patient-edit', id: patient.id });
   }
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  // ponytail: empty results collapse to 0 pages instead of the misleading
+  // "Page 1 of 1" — the range footer falls back to "No patients" copy.
+  const totalPages = total === 0 ? 0 : Math.ceil(total / pageSize);
   const canRestore = currentUser?.isFirstAdmin ?? false;
   // ponytail: pagination range math collapses to "Showing 1 of 1" when
   // there's a single row — keeps the footer one-liner readable.
@@ -379,13 +394,15 @@ export default function PatientsList(): JSX.Element {
             className="text-muted-foreground"
             data-testid="pagination-range"
           >
-            {total === 1
-              ? t('patient.paginationRangeOne')
-              : t('patient.paginationRange', {
-                  start: rangeStart,
-                  end: rangeEnd,
-                  total,
-                })}
+            {total === 0
+              ? t('patient.paginationRangeEmpty')
+              : total === 1
+                ? t('patient.paginationRangeOne')
+                : t('patient.paginationRange', {
+                    start: rangeStart,
+                    end: rangeEnd,
+                    total,
+                  })}
           </span>
           <div className="flex gap-2">
             <Button
