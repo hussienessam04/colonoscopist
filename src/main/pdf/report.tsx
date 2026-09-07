@@ -60,28 +60,30 @@ import type { ImageBox } from './embed-image';
 // + a fixed min height; the <Image> only renders when the buffer
 // is available. ponytail: @react-pdf/renderer's `backgroundColor`
 // accepts hex strings, the same palette as our UI tokens.
+//
+// Quick task 20260907-pdf-multipage-fixes — bands stretch edge-to-
+// edge across the page (`left: 0, right: 0`, `width: '100%'`) so
+// the image fills the full width. Both bands are pinned via
+// `position: 'absolute'` + `fixed: true` (set at the render call
+// site, not in this style) so they appear on EVERY page of a
+// multi-page report.
 const HEADER_BAND_STYLE = {
+  position: 'absolute' as const,
+  top: 0,
+  left: 0,
+  right: 0,
   width: '100%',
   height: 80,
   backgroundColor: '#E6EFF1',
-  marginBottom: 6,
-  padding: 4,
 };
-// Quick task 20260907-pdf-report-editor-fixes — footer pinned to
-// the bottom of every page via `fixed: true` + `position:
-// 'absolute', bottom: 0` + the page's paddingBottom is bumped to
-// leave room (see pageStyle / pageRtl below). The band still
-// reserves its 80px height when no image is uploaded (matches the
-// always-render behavior from the previous task).
 const FOOTER_BAND_STYLE = {
   position: 'absolute' as const,
-  bottom: 32,
-  left: 32,
-  right: 32,
-  width: 'auto',
+  bottom: 0,
+  left: 0,
+  right: 0,
+  width: '100%',
   height: 80,
   backgroundColor: '#E6EFF1',
-  padding: 4,
 };
 // ponytail: when the band has an actual image, the image fills the
 // band with `objectFit: 'contain'` so the original aspect ratio is
@@ -175,13 +177,17 @@ let _memoisedStyles: ReturnType<PdfPrimitives['StyleSheet']['create']> | null = 
 function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['create']> {
   if (_memoisedStyles) return _memoisedStyles;
   _memoisedStyles = P.StyleSheet.create({
-    // Quick task 20260907-pdf-report-editor-fixes — paddingBottom
-    // bumped from 32 to 32 + 80 (footer band height) + 12 (small
-    // gap) = 124 so the body content doesn't slide under the
-    // pinned footer. Same for the RTL page.
+    // Quick task 20260907-pdf-multipage-fixes — paddingTop +
+    // paddingBottom bumped to 96 (band 80 + 16 gap) on BOTH sides so
+    // body content fits inside the pinned header + footer bands on
+    // every page of a multi-page report. The bands themselves are
+    // edge-to-edge (`left: 0, right: 0`); the page padding only
+    // affects the body content area.
     page: {
-      padding: 32,
-      paddingBottom: 124,
+      paddingTop: 96,
+      paddingBottom: 96,
+      paddingLeft: 32,
+      paddingRight: 32,
       fontSize: 11,
       fontFamily: 'Helvetica',
       color: '#0f172a',
@@ -189,8 +195,8 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     pageRtl: {
       // ponytail: AR mode flips the page padding so the bound edge sits
       // on the right (where Arabic readers expect the spine).
-      paddingTop: 32,
-      paddingBottom: 124,
+      paddingTop: 96,
+      paddingBottom: 96,
       paddingLeft: 32,
       paddingRight: 32,
       fontSize: 11,
@@ -304,37 +310,32 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: EXTRA_THUMB_HEIGHT,
       objectFit: 'contain' as const,
     },
-    // Signature block — image on the left, "Signature:" label +
-    // signature line + printed doctor name on the right.
+    // Signature block — image on top (row 1), printed doctor
+    // name on the bottom (row 2). No "Signature:" label, no
+    // underline — the signature image IS the signature.
     //
-    // Quick task 20260907-pdf-report-editor-fixes — borderTop
-    // dropped (no line between screenshots and signature). The
-    // signatureLine child keeps its own borderTop for the
-    // underline where the doctor signs.
+    // Quick task 20260907-pdf-multipage-fixes — restructured
+    // from a single row to two rows: signature image (line 1)
+    // + doctor name (line 2). Also dropped the
+    // `signatureLine` + `signatureLabel` styles entirely (no
+    // black underline between the boxes and the signature
+    // anymore — that was the "still the black line" the
+    // doctor reported).
     signatureBlock: {
-      flexDirection: 'row',
-      alignItems: 'flex-end',
+      flexDirection: 'column',
+      alignItems: 'flex-start',
+      marginTop: 8,
       marginBottom: 6,
-      paddingTop: 6,
-      paddingBottom: 6,
-    },
-    signatureLabel: {
-      fontSize: 10,
-      fontWeight: 'bold',
-      marginRight: 6,
     },
     signatureImage: {
       width: 120,
       height: 40,
-      marginRight: 12,
+      marginBottom: 4,
       objectFit: 'contain' as const,
     },
-    signatureLine: {
-      flex: 1,
-      borderTopWidth: 1,
-      borderColor: '#0f172a',
-      paddingTop: 2,
+    signatureName: {
       fontSize: 10,
+      fontWeight: 'bold',
     },
   });
   return _memoisedStyles;
@@ -479,9 +480,17 @@ export function createReportPdfElement(
       //    the <Image> sits inside when the doctor has uploaded a
       //    header image. When no image is uploaded, the band shows
       //    a thin tinted strip (backgroundColor on the wrap).
+      //    Quick task 20260907-pdf-multipage-fixes — `fixed: true`
+      //    makes the band appear on EVERY page of a multi-page
+      //    report (not just page 1). The body's paddingTop (96)
+      //    leaves room so content doesn't slide under the band.
       React.createElement(
         P.View,
-        { style: HEADER_BAND_STYLE, 'data-testid': 'report-pdf-header-band' },
+        {
+          style: HEADER_BAND_STYLE,
+          fixed: true,
+          'data-testid': 'report-pdf-header-band',
+        },
         headerBox !== null
           ? React.createElement(P.Image, {
               src: headerBox.buffer,
@@ -578,46 +587,38 @@ export function createReportPdfElement(
             'التوصيات',
             recommendation,
           ),
-          // Signature block — image (left) + "Signature:" label +
-          // signature line + printed doctor name (right). Sits at
-          // the bottom of the same left column as the anatomy boxes.
+          // Signature block — image on row 1, printed doctor name
+          // on row 2. Sits at the bottom of the same left column
+          // as the anatomy boxes.
           React.createElement(
             P.View,
             {
               style: styles.signatureBlock,
               'data-testid': 'report-pdf-signature',
             },
+            // Row 1 — the doctor's actual signature (image).
+            // Null when no signature has been uploaded in Profile;
+            // the block just shows the printed name on row 2.
             signatureBox !== null
               ? React.createElement(P.Image, {
                   src: signatureBox.buffer,
                   style: styles.signatureImage,
                 })
               : null,
-            // ponytail: "Signature:" label is bold so the section is
-            // self-describing (quick task 20260907-pdf-report-editor-fixes).
-            // AR label flows RTL via the existing isAr branch.
+            // Row 2 — the printed doctor name. Bold so it reads
+            // as a signature line. AR flows RTL via the existing
+            // isAr branch.
             isAr
               ? React.createElement(
                   P.Text,
-                  { style: { ...styles.signatureLabel, direction: 'rtl' } },
-                  'التوقيع: ',
+                  { style: { ...styles.signatureName, direction: 'rtl' } },
+                  doctorName,
                 )
               : React.createElement(
                   P.Text,
-                  { style: styles.signatureLabel },
-                  'Signature: ',
+                  { style: styles.signatureName },
+                  doctorName,
                 ),
-            React.createElement(
-              P.View,
-              { style: styles.signatureLine },
-              isAr
-                ? React.createElement(
-                    P.Text,
-                    { style: { direction: 'rtl' } },
-                    doctorName,
-                  )
-                : React.createElement(P.Text, null, doctorName),
-            ),
           ),
         ),
         React.createElement(
