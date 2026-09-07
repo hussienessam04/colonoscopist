@@ -117,17 +117,20 @@ const FOOTER_BAND_IMAGE_STYLE = {
 // `RIGHT_COL_THUMB_COUNT = 5`. The doctor wants max 5
 // screenshots stacked vertically in the right column; the
 // rest render in a horizontal wrap row below the signature.
-// The 5-cap is generous enough for typical reports (a
-// 4-anatomy-box page leaves ~440pt of vertical space in the
-// right column → ~5 thumbnails at 88pt each fit); any
-// overflow falls through to the `extraThumbs` wrap row
-// where `flexWrap: 'wrap'` + `flexDirection: 'row'` handle
-// pagination across multiple lines.
+//
+// Quick task 20260907-extra-screenshots-pack — shrunk
+// `EXTRA_THUMB_WIDTH` + `EXTRA_THUMB_HEIGHT` to match the
+// right column (110 × 88) instead of 120 × 100. The smaller
+// thumbnails make the wrap row more compact vertically
+// (~88pt instead of 100pt per row of extras), which lets a
+// typical row fit on page 1 alongside the main row content.
+// @react-pdf/renderer paginates any remaining overflow to
+// page 2.
 const RIGHT_COL_THUMB_WIDTH = 110;
 const RIGHT_COL_THUMB_HEIGHT = 88;
 const RIGHT_COL_THUMB_COUNT = 5;
-const EXTRA_THUMB_WIDTH = 120;
-const EXTRA_THUMB_HEIGHT = 100;
+const EXTRA_THUMB_WIDTH = 110;
+const EXTRA_THUMB_HEIGHT = 88;
 
 export type AttachedScreenshot = {
   screenshotId: number;

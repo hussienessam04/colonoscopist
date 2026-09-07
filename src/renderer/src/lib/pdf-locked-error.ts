@@ -10,19 +10,20 @@
 // the destination's previous handle.
 //
 // Without this check, the renderer surfaces the raw OS message
-// ("EPERM: operation not permitted, rename ...tmp -> ...pdf"),
-// which is unhelpful — the doctor doesn't know the viewer is the
-// problem. The friendly message tells them to close the PDF
-// window + retry.
+// ("Error invoking remote method 'reports:regen-pdf': Error:
+// EBUSY: resource busy or locked, open 'C:\...\.pdf'"), which is
+// unhelpful — the doctor doesn't know the viewer is the problem.
+// The friendly message tells them to close the PDF window +
+// retry.
 //
 // `err` shape: Node's `fs.promises.rename` rejects with an Error
 // whose `.code` is one of the three lock codes on Windows. The IPC
 // layer (`asIpcError` in `src/main/ipc/reports.ts`) returns a new
-// `Error` whose `.message` starts with that same OS code — `.code`
-// itself is NOT preserved across the boundary, so we fall back to
-// message-text matching. The message text is stable across Node
-// versions (it comes from libuv's string table, not the doctor's
-// locale).
+// `Error` whose `.message` wraps the original. The Electron IPC
+// transport further wraps it as `Error invoking remote method
+// '<channel>': Error: <original>`. We match the OS code ANYWHERE
+// in the message (libuv's string table is stable across Node
+// versions and unaffected by locale).
 export function isPdfLockedError(err: unknown): boolean {
   if (err instanceof Error) {
     // Some errors keep their `.code` (regular Node Error thrown
@@ -31,11 +32,15 @@ export function isPdfLockedError(err: unknown): boolean {
     // call site.
     const code = (err as { code?: unknown }).code;
     if (code === 'EBUSY' || code === 'EPERM' || code === 'EACCES') return true;
-    // IPC boundary: asIpcError returns a fresh Error with the OS
-    // code embedded in the message prefix. Node's libuv
-    // stringifies these as `EBUSY: ...` / `EPERM: ...` /
-    // `EACCES: ...` regardless of the doctor's locale.
-    if (/^EBUSY:|^EPERM:|^EACCES:/i.test(err.message)) return true;
+    // ponytail: match the OS code ANYWHERE in the message, not
+    // just at the start. The IPC boundary + Electron transport
+    // both wrap the original error with prefixes like `Error
+    // invoking remote method 'reports:regen-pdf': Error: EBUSY:
+    // resource busy or locked, open 'C:\\...\\...pdf'`. The
+    // libuv OS-code token is stable, so a substring match on
+    // `/^(?:.+:\s+)?(?:EBUSY|EPERM|EACCES):/i` covers both the
+    // bare-error case + the wrapped case.
+    if (/(?:^|\s)(EBUSY|EPERM|EACCES):/i.test(err.message)) return true;
   }
   return false;
 }
