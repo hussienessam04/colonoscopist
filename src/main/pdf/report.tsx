@@ -67,6 +67,14 @@ import type { ImageBox } from './embed-image';
 // `position: 'absolute'` + `fixed: true` (set at the render call
 // site, not in this style) so they appear on EVERY page of a
 // multi-page report.
+//
+// Quick task 20260907-pdf-screenshot-pagination-fix — restore
+// `padding: 4` on both bands so the image is inset 4px from
+// the band edges (matches the reference image where the band
+// has a tinted margin around the actual image). The image's
+// `width: '100%'` + `height: '100%'` fills the band's content
+// area; `objectFit: 'contain'` preserves the source aspect
+// ratio inside.
 const HEADER_BAND_STYLE = {
   position: 'absolute' as const,
   top: 0,
@@ -75,6 +83,7 @@ const HEADER_BAND_STYLE = {
   width: '100%',
   height: 80,
   backgroundColor: '#E6EFF1',
+  padding: 4,
 };
 const FOOTER_BAND_STYLE = {
   position: 'absolute' as const,
@@ -84,6 +93,7 @@ const FOOTER_BAND_STYLE = {
   width: '100%',
   height: 80,
   backgroundColor: '#E6EFF1',
+  padding: 4,
 };
 // ponytail: when the band has an actual image, the image fills the
 // band with `objectFit: 'contain'` so the original aspect ratio is
@@ -101,16 +111,17 @@ const FOOTER_BAND_IMAGE_STYLE = {
 };
 
 // Quick task 20260907-redesign-pdf-layout — the right-column
-// thumbnail size fits 4 stacked in a US Letter page (after the
-// header band + 2 info boxes + 4 anatomy boxes + recommendation +
-// signature + footer band leave ~22pt of vertical room per row of
-// the right column at 11pt body). Width matches the column share.
+// thumbnail size. Each thumbnail is 110pt wide × 88pt tall.
+// `RIGHT_COL_THUMB_COUNT` was previously hard-capped at 4, but
+// the doctor wants all screenshots stacked vertically in the
+// right column when there's room (no 4-limit) — the constraint
+// now comes from the page height itself (~88pt per thumbnail,
+// ~440pt available body height → ~5 fit; the rest spill into
+// the wrap row below the signature).
 const RIGHT_COL_THUMB_WIDTH = 110;
 const RIGHT_COL_THUMB_HEIGHT = 88;
 const EXTRA_THUMB_WIDTH = 120;
 const EXTRA_THUMB_HEIGHT = 100;
-// ponytail: only 4 screenshots on the right; the rest go below.
-const RIGHT_COL_THUMB_COUNT = 4;
 
 export type AttachedScreenshot = {
   screenshotId: number;
@@ -277,10 +288,6 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       direction: 'rtl' as const,
     },
     // Right-column screenshot thumbnail.
-    //
-    // Quick task 20260907-pdf-polish-recommendation-borders — dropped
-    // the border (the reference image shows screenshots on the right
-    // column with no border around each one).
     rightThumbWrap: {
       width: RIGHT_COL_THUMB_WIDTH,
       height: RIGHT_COL_THUMB_HEIGHT,
@@ -291,7 +298,12 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: RIGHT_COL_THUMB_HEIGHT,
       objectFit: 'contain' as const,
     },
-    // Extra-screenshots row (5+) — wrap-row below the signature.
+    // Screenshots wrap row — overflow thumbnails (those that
+    // didn't fit in the right column above) render as a
+    // horizontal wrap row below the signature block.
+    // `flexWrap: 'wrap'` lets the thumbnails flow onto
+    // multiple lines; @react-pdf/renderer paginates any
+    // further overflow to the next page.
     extraRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -310,22 +322,27 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: EXTRA_THUMB_HEIGHT,
       objectFit: 'contain' as const,
     },
-    // Signature block — image on top (row 1), printed doctor
-    // name on the bottom (row 2). No "Signature:" label, no
-    // underline — the signature image IS the signature.
+    // Signature block — "Signature:" label centered (row 1),
+    // signature image (row 2), printed doctor name on the
+    // bottom (row 3). The block uses `flexDirection: 'column'`
+    // + `alignItems: 'center'` so everything stacks + centers
+    // horizontally. The `signatureLabel` is bold + a little
+    // larger so it reads as the section title.
     //
-    // Quick task 20260907-pdf-multipage-fixes — restructured
-    // from a single row to two rows: signature image (line 1)
-    // + doctor name (line 2). Also dropped the
-    // `signatureLine` + `signatureLabel` styles entirely (no
-    // black underline between the boxes and the signature
-    // anymore — that was the "still the black line" the
-    // doctor reported).
+    // Quick task 20260907-pdf-screenshot-pagination-fix —
+    // restored the "Signature:" label that the doctor asked
+    // for back. The previous round dropped it; the doctor
+    // wanted it back AND centered.
     signatureBlock: {
       flexDirection: 'column',
-      alignItems: 'flex-start',
+      alignItems: 'center',
       marginTop: 8,
       marginBottom: 6,
+    },
+    signatureLabel: {
+      fontSize: 11,
+      fontWeight: 'bold',
+      marginBottom: 4,
     },
     signatureImage: {
       width: 120,
@@ -467,8 +484,19 @@ export function createReportPdfElement(
   // Quick task 20260907-redesign-pdf-layout — first 4 screenshots
   // go on the right column (stacked vertically); the rest go below
   // the signature in a wrap-row. Same source list — split here.
-  const rightThumbs = attachedScreenshots.slice(0, RIGHT_COL_THUMB_COUNT);
-  const extraThumbs = attachedScreenshots.slice(RIGHT_COL_THUMB_COUNT);
+  // Quick task 20260907-pdf-screenshot-pagination-fix — the
+  // 4-thumbnail right-column cap was lifted. All attached
+  // screenshots render in the right column (stacked
+  // vertically). When the right column would overflow the
+  // body's available vertical space, @react-pdf/renderer
+  // paginates the overflow onto the next page (the right
+  // column continues there). `extraThumbs` stays as a
+  // defensive fallback for cases where the doctor attached
+  // an unusually large screenshot batch — the wrap row can
+  // still pick up the overflow if the right column itself
+  // hits the page-break mid-batch.
+  const rightThumbs = attachedScreenshots;
+  const extraThumbs: AttachedScreenshot[] = [];
 
   return React.createElement(
     P.Document,
@@ -596,16 +624,43 @@ export function createReportPdfElement(
               style: styles.signatureBlock,
               'data-testid': 'report-pdf-signature',
             },
-            // Row 1 — the doctor's actual signature (image).
+            // Row 1 — "Signature:" label, centered (EN + AR).
+            // Quick task 20260907-pdf-screenshot-pagination-fix —
+            // restored the "Signature:" label that was dropped in
+            // the previous round, plus centered alignment per the
+            // doctor's request.
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  {
+                    style: {
+                      ...styles.signatureLabel,
+                      direction: 'rtl',
+                      alignSelf: 'center',
+                    },
+                  },
+                  'التوقيع: ',
+                )
+              : React.createElement(
+                  P.Text,
+                  {
+                    style: {
+                      ...styles.signatureLabel,
+                      alignSelf: 'center',
+                    },
+                  },
+                  'Signature: ',
+                ),
+            // Row 2 — the doctor's actual signature (image).
             // Null when no signature has been uploaded in Profile;
-            // the block just shows the printed name on row 2.
+            // the block just shows the printed name on row 3.
             signatureBox !== null
               ? React.createElement(P.Image, {
                   src: signatureBox.buffer,
                   style: styles.signatureImage,
                 })
               : null,
-            // Row 2 — the printed doctor name. Bold so it reads
+            // Row 3 — the printed doctor name. Bold so it reads
             // as a signature line. AR flows RTL via the existing
             // isAr branch.
             isAr
