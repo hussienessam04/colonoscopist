@@ -169,7 +169,18 @@ export default function ReportEditor({
   // Quick task 20260812-redesign-report — instrument picker. List
   // loaded once from used_devices (per doctor profile). NULL on the
   // report when nothing picked.
+  //
+  // Quick task 20260907-pdf-report-editor-fixes — default the
+  // picker to the FIRST used-device when the report has no
+  // instrument yet. The doctor usually picks the same scope / endoscope
+  // for every report in a session; defaulting saves them the
+  // step. Auto-save the default once per report (the local React
+  // state holds the picked id; the DB only sees the explicit
+  // `setInstrument` IPC call so a render reading from the DB
+  // still gets the default without us having to special-case
+  // `null` in the PDF orchestrator).
   const [usedDevices, setUsedDevices] = useState<UsedDevice[]>([]);
+  const [instrumentAutoSaved, setInstrumentAutoSaved] = useState(false);
   useEffect(() => {
     let cancelled = false;
     const list = async (): Promise<void> => {
@@ -182,6 +193,31 @@ export default function ReportEditor({
       cancelled = true;
     };
   }, [doctorProfile?.id]);
+  // Auto-save the first used-device as the report's instrument
+  // when no instrument is set yet. Runs once per report.
+  useEffect(() => {
+    if (report === null) return;
+    if (instrumentAutoSaved) return;
+    if (report.instrument !== null) {
+      setInstrumentAutoSaved(true);
+      return;
+    }
+    if (usedDevices.length === 0) {
+      setInstrumentAutoSaved(true);
+      return;
+    }
+    setInstrumentAutoSaved(true);
+    const firstId = usedDevices[0].id;
+    void window.api.reports
+      .setInstrument({ id: report.id, instrument: firstId })
+      .then(() => refresh())
+      .catch(() => {
+        // ponytail: non-fatal — the picker still shows the
+        // first device via the `value` fallback below; the PDF
+        // just won't have an instrument label until the doctor
+        // explicitly picks one.
+      });
+  }, [report, usedDevices, instrumentAutoSaved, refresh]);
 
   const handleInstrumentChange = useCallback(
     async (e: ChangeEvent<HTMLSelectElement>): Promise<void> => {
@@ -208,11 +244,50 @@ export default function ReportEditor({
 
   // Quick task 20260812-redesign-report — per-report premedication
   // override. Defaults to the profile's premedication when empty.
+  //
+  // Quick task 20260907-pdf-report-editor-fixes — input pre-fills
+  // with the profile's premedication when the report has no
+  // override yet (so a freshly-finalized report's PDF shows the
+  // doctor's clinic default without forcing them to retype it
+  // every time). On first display the override is auto-saved to
+  // the DB so subsequent PDF renders don't fall back through the
+  // profile-resolver path (defense in depth; the render already
+  // handles the `null` case via `report.premedicationOverride ??
+  // profile.premedication`).
   const [premedicationInput, setPremedicationInput] = useState<string>("");
+  const [premedicationAutoSaved, setPremedicationAutoSaved] = useState(false);
   useEffect(() => {
     if (report === null) return;
-    setPremedicationInput(report.premedicationOverride ?? "");
-  }, [report?.premedicationOverride, report?.id]);
+    const initial =
+      report.premedicationOverride ?? doctorProfile?.premedication ?? "";
+    setPremedicationInput(initial);
+  }, [report?.premedicationOverride, report?.id, doctorProfile?.premedication]);
+  // Auto-save the default once. Re-runs when `report.id` changes
+  // (i.e. new procedure) so each new report gets its override
+  // committed on first render. Skip when the report already has
+  // an explicit override (no point overwriting the doctor's
+  // previous choice with the profile default).
+  useEffect(() => {
+    if (report === null) return;
+    if (premedicationAutoSaved) return;
+    if (report.premedicationOverride !== null) {
+      setPremedicationAutoSaved(true);
+      return;
+    }
+    const defaultValue = doctorProfile?.premedication ?? "";
+    if (defaultValue === "") {
+      setPremedicationAutoSaved(true);
+      return;
+    }
+    setPremedicationAutoSaved(true);
+    void window.api.reports
+      .setPremedicationOverride({ id: report.id, override: defaultValue })
+      .then(() => refresh())
+      .catch(() => {
+        // ponytail: non-fatal — the input is still pre-filled;
+        // the PDF falls back to the profile value on render.
+      });
+  }, [report, doctorProfile?.premedication, premedicationAutoSaved, refresh]);
   const premedicationCommitted = useCallback(
     async (value: string): Promise<void> => {
       if (report === null) return;
@@ -289,6 +364,14 @@ export default function ReportEditor({
   // bullets instead (idempotent). Triggered by the small "• Bullet"
   // button next to Templates / Save template. Per-line selection is
   // out of scope; the textarea-level state is the source of truth.
+  //
+  // Quick task 20260907-pdf-report-editor-fixes — the add branch
+  // previously double-bulleted existing bulleted lines (when the
+  // textarea had a MIX of bulleted and non-bulleted lines,
+  // `allBulleted` was false → the toggle went to the add branch →
+  // every non-empty line got a fresh `• ` prefix, producing
+  // `• • foo` for lines that were already `• foo`). Skip lines
+  // that already match `/^\s*•\s*/` so we never double-bullet.
   const handleBullet = useCallback(
     (key: keyof ReportEditableFields) => (): void => {
       if (report === null) return;
@@ -299,7 +382,13 @@ export default function ReportEditor({
       );
       const next = allBulleted
         ? lines.map((line) => line.replace(/^\s*•\s*/, "")).join("\n")
-        : lines.map((line) => (line === "" ? "" : `• ${line}`)).join("\n");
+        : lines
+            .map((line) => {
+              if (line === "") return "";
+              if (/^\s*•\s*/.test(line)) return line;
+              return `• ${line}`;
+            })
+            .join("\n");
       const patched = { [key]: next } as Partial<ReportEditableFields>;
       setLocal(patched);
       // Quick task 20260906-remove-autosave — no `trigger()`. Bullet
@@ -308,9 +397,46 @@ export default function ReportEditor({
     [report, setLocal],
   );
 
+  // Quick task 20260907-pdf-report-editor-fixes — flush the 8
+  // box-field edits to the DB via `updateDraft` (when still a
+  // draft) or `updateFinalized` (post-finalize). Both
+  // `handleFinalize` and `handleRegenPdf` need this so the local
+  // React state (which holds the doctor's typed text) reaches the
+  // DB before `regenPdf` reads from it. Without the flush,
+  // typing in a textbox and clicking "Finalize report" produced
+  // a PDF with empty box fields — the typed text was lost.
+  const flushBoxEdits = useCallback(async (): Promise<void> => {
+    if (report === null) return;
+    const patch: ReportEditableFields = {
+      esophagus: report.esophagus,
+      stomach: report.stomach,
+      pylorus: report.pylorus,
+      duodenum: report.duodenum,
+      colon: report.colon,
+      ileum: report.ileum,
+      conclusion: report.conclusion,
+      recommendation: report.recommendation,
+    };
+    if (report.status === "finalized") {
+      await window.api.reports.updateFinalized({
+        id: report.id,
+        ...patch,
+      });
+    } else {
+      await window.api.reports.updateDraft({
+        id: report.id,
+        ...patch,
+      });
+    }
+  }, [report]);
+
   const handleFinalize = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
+      // Flush the local box-field edits to the DB BEFORE
+      // finalize + regenPdf. `regenPdf` reads from the DB; without
+      // the flush the doctor's typed text vanishes from the PDF.
+      await flushBoxEdits();
       await window.api.reports.finalize({ id: report.id });
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
@@ -320,37 +446,22 @@ export default function ReportEditor({
         err instanceof Error ? err.message : t("procedure.finalizeFailed");
       toast.error(msg);
     }
-  }, [report, refresh, t]);
+  }, [report, refresh, flushBoxEdits, t]);
 
   // Quick task 20260906-remove-autosave — Save changes is the
   // single place where box edits flush to the DB. Before calling
   // regenPdf, the current 8 box fields are persisted via
   // updateDraft (or updateFinalized if the report was already
   // finalized) so the regenerated PDF reflects the latest edits.
+  //
+  // Quick task 20260907-pdf-report-editor-fixes — extracted the
+  // box-edit flush into the `flushBoxEdits` helper above; both
+  // `handleFinalize` and `handleRegenPdf` now call it before
+  // `regenPdf` so the typed text reaches the DB.
   const handleRegenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
     try {
-      const patch: ReportEditableFields = {
-        esophagus: report.esophagus,
-        stomach: report.stomach,
-        pylorus: report.pylorus,
-        duodenum: report.duodenum,
-        colon: report.colon,
-        ileum: report.ileum,
-        conclusion: report.conclusion,
-        recommendation: report.recommendation,
-      };
-      if (report.status === "finalized") {
-        await window.api.reports.updateFinalized({
-          id: report.id,
-          ...patch,
-        });
-      } else {
-        await window.api.reports.updateDraft({
-          id: report.id,
-          ...patch,
-        });
-      }
+      await flushBoxEdits();
       await window.api.reports.regenPdf({ id: report.id });
       await refresh();
       toast.success(t("report.regenPdfSuccess"));
@@ -362,7 +473,7 @@ export default function ReportEditor({
           : t("report.regenPdfFailed");
       toast.error(msg);
     }
-  }, [report, refresh, t]);
+  }, [report, refresh, flushBoxEdits, t]);
 
   const handleOpenPdf = useCallback(async (): Promise<void> => {
     if (report === null) return;
@@ -853,7 +964,17 @@ export default function ReportEditor({
                         </label>
                         <select
                           id="report-editor-instrument"
-                          value={report?.instrument ?? ""}
+                          // Quick task 20260907-pdf-report-editor-fixes
+                          // — default to the first used-device when the
+                          // report has no explicit instrument yet (the
+                          // auto-save useEffect above commits the
+                          // default to the DB on first render; this
+                          // fallback keeps the picker visually-correct
+                          // before that IPC round-trip lands).
+                          value={
+                            report?.instrument ??
+                            (usedDevices.length > 0 ? usedDevices[0].id : "")
+                          }
                           onChange={(e) => void handleInstrumentChange(e)}
                           className={FIELD_CLASS}
                           data-testid="report-editor-instrument-select"

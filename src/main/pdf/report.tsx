@@ -67,11 +67,20 @@ const HEADER_BAND_STYLE = {
   marginBottom: 6,
   padding: 4,
 };
+// Quick task 20260907-pdf-report-editor-fixes — footer pinned to
+// the bottom of every page via `fixed: true` + `position:
+// 'absolute', bottom: 0` + the page's paddingBottom is bumped to
+// leave room (see pageStyle / pageRtl below). The band still
+// reserves its 80px height when no image is uploaded (matches the
+// always-render behavior from the previous task).
 const FOOTER_BAND_STYLE = {
-  width: '100%',
+  position: 'absolute' as const,
+  bottom: 32,
+  left: 32,
+  right: 32,
+  width: 'auto',
   height: 80,
   backgroundColor: '#E6EFF1',
-  marginTop: 6,
   padding: 4,
 };
 // ponytail: when the band has an actual image, the image fills the
@@ -166,8 +175,13 @@ let _memoisedStyles: ReturnType<PdfPrimitives['StyleSheet']['create']> | null = 
 function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['create']> {
   if (_memoisedStyles) return _memoisedStyles;
   _memoisedStyles = P.StyleSheet.create({
+    // Quick task 20260907-pdf-report-editor-fixes — paddingBottom
+    // bumped from 32 to 32 + 80 (footer band height) + 12 (small
+    // gap) = 124 so the body content doesn't slide under the
+    // pinned footer. Same for the RTL page.
     page: {
       padding: 32,
+      paddingBottom: 124,
       fontSize: 11,
       fontFamily: 'Helvetica',
       color: '#0f172a',
@@ -176,7 +190,7 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       // ponytail: AR mode flips the page padding so the bound edge sits
       // on the right (where Arabic readers expect the spine).
       paddingTop: 32,
-      paddingBottom: 32,
+      paddingBottom: 124,
       paddingLeft: 32,
       paddingRight: 32,
       fontSize: 11,
@@ -235,9 +249,12 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       flexDirection: 'column',
     },
     // Single anatomy / conclusion / recommendation box.
+    //
+    // Quick task 20260907-pdf-report-editor-fixes — border dropped
+    // (matches the reference image where the boxes are separated
+    // by gaps, not lines). The padding + marginBottom spacing
+    // remain so the boxes stay visually distinct.
     anatomyBox: {
-      borderWidth: 1,
-      borderColor: '#94a3b8',
       padding: 6,
       marginBottom: 4,
     },
@@ -287,15 +304,24 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: EXTRA_THUMB_HEIGHT,
       objectFit: 'contain' as const,
     },
-    // Signature block — image on the left, printed name on the right.
+    // Signature block — image on the left, "Signature:" label +
+    // signature line + printed doctor name on the right.
+    //
+    // Quick task 20260907-pdf-report-editor-fixes — borderTop
+    // dropped (no line between screenshots and signature). The
+    // signatureLine child keeps its own borderTop for the
+    // underline where the doctor signs.
     signatureBlock: {
       flexDirection: 'row',
       alignItems: 'flex-end',
       marginBottom: 6,
       paddingTop: 6,
       paddingBottom: 6,
-      borderTopWidth: 1,
-      borderColor: '#cbd5e1',
+    },
+    signatureLabel: {
+      fontSize: 10,
+      fontWeight: 'bold',
+      marginRight: 6,
     },
     signatureImage: {
       width: 120,
@@ -552,9 +578,9 @@ export function createReportPdfElement(
             'التوصيات',
             recommendation,
           ),
-          // Signature block — image (left) + signature line + printed
-          // doctor name (right). Sits at the bottom of the same left
-          // column as the anatomy boxes (matches the reference image).
+          // Signature block — image (left) + "Signature:" label +
+          // signature line + printed doctor name (right). Sits at
+          // the bottom of the same left column as the anatomy boxes.
           React.createElement(
             P.View,
             {
@@ -567,6 +593,20 @@ export function createReportPdfElement(
                   style: styles.signatureImage,
                 })
               : null,
+            // ponytail: "Signature:" label is bold so the section is
+            // self-describing (quick task 20260907-pdf-report-editor-fixes).
+            // AR label flows RTL via the existing isAr branch.
+            isAr
+              ? React.createElement(
+                  P.Text,
+                  { style: { ...styles.signatureLabel, direction: 'rtl' } },
+                  'التوقيع: ',
+                )
+              : React.createElement(
+                  P.Text,
+                  { style: styles.signatureLabel },
+                  'Signature: ',
+                ),
             React.createElement(
               P.View,
               { style: styles.signatureLine },
@@ -620,11 +660,18 @@ export function createReportPdfElement(
           )
         : null,
 
-      // 6. Bottom band — same shape as the top band: always
-      //    renders so the page layout is stable.
+      // 6. Bottom band — pinned to the bottom of every page via
+      //    `fixed: true`. Same shape as the top band: always
+      //    renders so the page layout is stable. The body
+      //    content's paddingBottom (124) leaves room for the
+      //    80px band + a 12pt gap.
       React.createElement(
         P.View,
-        { style: FOOTER_BAND_STYLE, 'data-testid': 'report-pdf-footer-band' },
+        {
+          style: FOOTER_BAND_STYLE,
+          fixed: true,
+          'data-testid': 'report-pdf-footer-band',
+        },
         footerBox !== null
           ? React.createElement(P.Image, {
               src: footerBox.buffer,

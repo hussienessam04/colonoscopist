@@ -37,7 +37,7 @@ import { session } from '../auth/session';
 import { patientRepo } from '../db/patients';
 import { reportScreenshotsRepo } from '../db/report-screenshots-repo';
 import { screenshotsRepo } from '../db/screenshots-repo';
-import { reportPdfPath, reportsDir, profileAssetPath, screenshotAbsPath } from '../paths';
+import { reportPdfPath, reportsDir, screenshotAbsPath } from '../paths';
 import { ipcError } from '@shared/errors';
 
 import {
@@ -192,14 +192,29 @@ export async function renderReportPdf(
   // into the body (between the recommendation and the extra
   // screenshots). LOGO_BOX is gone — the header band IS the page
   // header now, no logo + clinic-name row beneath it.
+  //
+  // Quick task 20260907-pdf-report-editor-fixes — the DB columns
+  // store the FULL userData-relative path (e.g.
+  // `data/profiles/<userId>/signature.png`), not just a filename.
+  // `profileAssetPath` expects a filename, so using it here
+  // produced a nested path that never resolved. Match the
+  // resolution pattern from `PROFILE_GET_ASSET_DATA_URL`:
+  // `path.join(userData, relPath.split('/').join(path.sep))`.
+  // `userData` is declared further down (just before the pdfPath
+  // writeback); function-scoped `const` allows the closure to
+  // capture it once declared. To keep call ordering simple,
+  // declare it up-front here and reuse.
+  const userData = app.getPath('userData');
+  const resolveAsset = (rel: string): string =>
+    path.join(userData, rel.split('/').join(path.sep));
   const signatureBox = profile?.signaturePath
-    ? readImageBox(profileAssetPath(report.doctorId, profile.signaturePath), SIGNATURE_BOX)
+    ? readImageBox(resolveAsset(profile.signaturePath), SIGNATURE_BOX)
     : null;
   const headerBox = profile?.headerImagePath
-    ? readImageBox(profileAssetPath(report.doctorId, profile.headerImagePath), { widthPx: 0, heightPx: 0 })
+    ? readImageBox(resolveAsset(profile.headerImagePath), { widthPx: 0, heightPx: 0 })
     : null;
   const footerBox = profile?.footerImagePath
-    ? readImageBox(profileAssetPath(report.doctorId, profile.footerImagePath), { widthPx: 0, heightPx: 0 })
+    ? readImageBox(resolveAsset(profile.footerImagePath), { widthPx: 0, heightPx: 0 })
     : null;
 
   // Load attached screenshots one-per-page, ordered by sort_order
@@ -351,7 +366,8 @@ export async function renderReportPdf(
   }
 
   // Store userData-relative path on the reports row (Anti-Pattern 2).
-  const userData = app.getPath('userData');
+  // (`userData` was declared earlier in this function for
+  // `resolveAsset`.)
   const relPdfPath = path.relative(userData, pdfPath).split(path.sep).join('/');
   reportsRepo.setPdfPath(reportId, relPdfPath);
 
