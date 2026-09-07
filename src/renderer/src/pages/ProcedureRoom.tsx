@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Video } from 'lucide-react';
+import { ArrowLeft, NotebookPen, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
@@ -18,6 +18,22 @@ import { screenshotToastStore } from '@/store/screenshot-toast';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 import { safeInvoke } from '@/lib/ipc-result';
 import type { QualityPreset, Screenshot } from '@shared/ipc-contract';
+
+// Quick task 20260907-procedure-room-ui-enhance — design tokens
+// lifted verbatim from ProcedureReview.tsx so the two pages
+// share the "clinical workstation" palette + chrome. Kept inline
+// rather than promoted to a shared module (small surface; a
+// future design-system pass would extract).
+const CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-white shadow-sm";
+const RAIL_CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-[#E6EFF1] p-4 shadow-sm transition-colors hover:border-[#A8C5B5]";
+const SMALL_CAPS_LABEL =
+  "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]";
+const SMALL_CAPS_FIELD =
+  "text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]";
+const SECONDARY_OUTLINE_BUTTON =
+  "border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]";
 
 export default function ProcedureRoom(): JSX.Element {
   const routeState = useRoute();
@@ -300,47 +316,80 @@ export default function ProcedureRoom(): JSX.Element {
   const canRecord = !!(procedureId && selectedCanonical && preset);
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="min-h-screen bg-slate-50 p-6">
+      {/* Quick task 20260907-procedure-room-ui-enhance —
+          dropped `mx-auto max-w-7xl` so the page spans full
+          width (matches ProcedureReview + the Report Editor). */}
+      <div className="flex flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Procedure Room
+            {/* Quick task 20260907-procedure-room-ui-enhance —
+                kicker text ("Studio") is intentionally distinct
+                from the h1 ("Procedure Room") so existing
+                tests that search for /procedure room/i resolve
+                to the h1 uniquely. */}
+            <p className={SMALL_CAPS_FIELD}>Studio</p>
+            <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
+              {isRecording ? "Recording procedure" : "Procedure Room"}
+              {patientIdFromRoute ? (
+                <span className="ml-2 font-sans text-base font-normal text-[#5C6770]">
+                  · {procedureIdFromRoute.slice(0, 8)}
+                </span>
+              ) : null}
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Record, pause, and review the colonoscopy procedure.
-            </p>
           </div>
-          {!isRecording ? (
-            <Button
-              variant="outline"
-              onClick={() =>
-                navigate({
-                  name: 'procedure-preview',
-                  patientId: patientIdFromRoute,
-                  procedureId: procedureId ?? undefined,
-                })
-              }
+          <div className="flex items-center gap-3">
+            {/* Quick task 20260907-procedure-room-ui-enhance —
+                live mono elapsed timer (signature element).
+                Shows the recording elapsed time in the header
+                so the doctor sees it without looking at the
+                preview pane. Clinical-instrumentation feel. */}
+            <span
+              data-testid="procedure-room-elapsed-timer"
+              className="font-mono text-sm tabular-nums text-[#0E3A47]"
             >
-              <ArrowLeft aria-hidden="true" />
-              Back to Preview
-            </Button>
-          ) : (
-            <span className="text-xs text-muted-foreground" aria-live="polite">
-              Shortcuts: <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
-              pause/resume · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
-              stop · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">R</kbd>{' '}
-              record · <kbd className="rounded border bg-muted px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
-              screenshot
+              {timerLabel}
             </span>
-          )}
+            {!isRecording ? (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() =>
+                  navigate({
+                    name: 'procedure-preview',
+                    patientId: patientIdFromRoute,
+                    procedureId: procedureId ?? undefined,
+                  })
+                }
+                data-testid="procedure-room-back"
+                className={SECONDARY_OUTLINE_BUTTON}
+              >
+                <ArrowLeft aria-hidden="true" />
+                Back to Preview
+              </Button>
+            ) : (
+              <span className="text-xs text-[#5C6770]" aria-live="polite">
+                Shortcuts: <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
+                pause/resume · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
+                stop · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">R</kbd>{' '}
+                record · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
+                screenshot
+              </span>
+            )}
+          </div>
         </header>
 
         <section
           className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'}`}
         >
-          <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
-            <div className="relative aspect-video">
+          {/* Quick task 20260907-procedure-room-ui-enhance —
+              live preview card uses the same warm-ivory
+              CARD_CHROME as the rest of the surface. The
+              dark `bg-slate-900` stays for the video frame
+              itself — Chromium native controls need the
+              dark backdrop. */}
+          <div className={`overflow-hidden ${CARD_CHROME}`}>
+            <div className="relative aspect-video bg-slate-900">
               {isRecording && previewUrl ? (
                 <img
                   ref={previewImgRef}
@@ -406,16 +455,18 @@ export default function ProcedureRoom(): JSX.Element {
           </div>
 
           {!notesCollapsed ? (
-            <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm">
+            <aside className={`flex flex-col gap-4 ${RAIL_CARD_CHROME}`}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Side panel
-                </p>
+                <div className="flex items-center gap-2">
+                  <NotebookPen className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
+                  <p className={SMALL_CAPS_LABEL}>Notes</p>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setNotesCollapsed(true)}
                   aria-label="Collapse notes panel"
+                  className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   Hide notes
                 </Button>
@@ -433,6 +484,7 @@ export default function ProcedureRoom(): JSX.Element {
                 size="sm"
                 onClick={() => setNotesCollapsed(false)}
                 aria-label="Show notes panel"
+                className={SECONDARY_OUTLINE_BUTTON}
               >
                 Show notes
               </Button>
@@ -448,21 +500,24 @@ export default function ProcedureRoom(): JSX.Element {
           // not passed (annotations are review-only). The +Capture button
           // reuses the room's handleScreenshotCapture so the S hotkey and
           // the timeline button are interchangeable.
+          //
+          // Quick task 20260907-procedure-room-ui-enhance —
+          // gallery card uses the warm-ivory CARD_CHROME + a
+          // small-caps teal header + a mono count badge.
           <section
-            className="rounded-xl border bg-card p-5 shadow-sm"
+            className={`${CARD_CHROME} p-4`}
             data-testid="procedure-room-gallery-section"
           >
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-                Captured screenshots
-              </h2>
-              <span
-                className="text-xs text-muted-foreground"
-                data-testid="procedure-room-gallery-count"
-              >
-                {screenshotIntake.screenshots.length} capture
-                {screenshotIntake.screenshots.length === 1 ? '' : 's'}
-              </span>
+              <div className="flex items-center gap-2">
+                <p className={SMALL_CAPS_LABEL}>Captured screenshots</p>
+                <span
+                  className="font-mono text-xs tabular-nums text-[#5C6770]"
+                  data-testid="procedure-room-gallery-count"
+                >
+                  {screenshotIntake.screenshots.length}
+                </span>
+              </div>
             </div>
             <ScreenshotTimeline
               procedureId={procedureId ?? ''}
@@ -476,6 +531,7 @@ export default function ProcedureRoom(): JSX.Element {
               }}
               onDelete={handleScreenshotDelete}
               testId="procedure-room-gallery"
+              layout="row"
             />
           </section>
         ) : null}
