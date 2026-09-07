@@ -442,8 +442,16 @@ export default function ReportEditor({
       await refresh();
       toast.success(t("report.reportFinalized"));
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : t("procedure.finalizeFailed");
+      // ponytail: route EBUSY/EPERM/EACCES (Windows file-lock
+      // errors when the doctor has the rendered PDF open in
+      // Edge / Adobe Reader) through the same friendly
+      // translation `handleRegenPdf` uses — without this
+      // branch the user sees the raw stack-trace string.
+      const msg = isPdfLockedError(err)
+        ? t("report.pdfLockedError")
+        : err instanceof Error
+          ? err.message
+          : t("procedure.finalizeFailed");
       toast.error(msg);
     }
   }, [report, refresh, flushBoxEdits, t]);

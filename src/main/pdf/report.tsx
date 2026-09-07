@@ -102,24 +102,30 @@ const FOOTER_BAND_STYLE = {
 const HEADER_BAND_IMAGE_STYLE = {
   width: '100%',
   height: '100%',
-  objectFit: 'contain' as const,
+  objectFit: "cover" as const,
 };
 const FOOTER_BAND_IMAGE_STYLE = {
   width: '100%',
   height: '100%',
-  objectFit: 'contain' as const,
+  objectFit: 'cover' as const,
 };
 
 // Quick task 20260907-redesign-pdf-layout — the right-column
 // thumbnail size. Each thumbnail is 110pt wide × 88pt tall.
-// `RIGHT_COL_THUMB_COUNT` was previously hard-capped at 4, but
-// the doctor wants all screenshots stacked vertically in the
-// right column when there's room (no 4-limit) — the constraint
-// now comes from the page height itself (~88pt per thumbnail,
-// ~440pt available body height → ~5 fit; the rest spill into
-// the wrap row below the signature).
+//
+// Quick task 20260907-pdf-5-screenshots-locked-toast —
+// `RIGHT_COL_THUMB_COUNT = 5`. The doctor wants max 5
+// screenshots stacked vertically in the right column; the
+// rest render in a horizontal wrap row below the signature.
+// The 5-cap is generous enough for typical reports (a
+// 4-anatomy-box page leaves ~440pt of vertical space in the
+// right column → ~5 thumbnails at 88pt each fit); any
+// overflow falls through to the `extraThumbs` wrap row
+// where `flexWrap: 'wrap'` + `flexDirection: 'row'` handle
+// pagination across multiple lines.
 const RIGHT_COL_THUMB_WIDTH = 110;
 const RIGHT_COL_THUMB_HEIGHT = 88;
+const RIGHT_COL_THUMB_COUNT = 5;
 const EXTRA_THUMB_WIDTH = 120;
 const EXTRA_THUMB_HEIGHT = 100;
 
@@ -485,18 +491,24 @@ export function createReportPdfElement(
   // go on the right column (stacked vertically); the rest go below
   // the signature in a wrap-row. Same source list — split here.
   // Quick task 20260907-pdf-screenshot-pagination-fix — the
-  // 4-thumbnail right-column cap was lifted. All attached
-  // screenshots render in the right column (stacked
-  // vertically). When the right column would overflow the
-  // body's available vertical space, @react-pdf/renderer
-  // paginates the overflow onto the next page (the right
-  // column continues there). `extraThumbs` stays as a
-  // defensive fallback for cases where the doctor attached
-  // an unusually large screenshot batch — the wrap row can
-  // still pick up the overflow if the right column itself
-  // hits the page-break mid-batch.
-  const rightThumbs = attachedScreenshots;
-  const extraThumbs: AttachedScreenshot[] = [];
+  // right column has the first 5 screenshots stacked
+  // vertically; the rest render in the `extraRow` wrap row
+  // below the signature.
+  //
+  // Quick task 20260907-pdf-5-screenshots-locked-toast —
+  // hard-capped at 5 (RIGHT_COL_THUMB_COUNT) per the doctor's
+  // request: max 5 vertical, rest horizontal wrap row. The
+  // right column's max height on a typical page (info boxes
+  // + 4 anatomy boxes = ~440pt) fits exactly 5 thumbnails
+  // at 88pt each — going higher produces the awkward page-1 +
+  // page-2 split the doctor reported.
+  const rightThumbs = attachedScreenshots.slice(
+    0,
+    RIGHT_COL_THUMB_COUNT,
+  );
+  const extraThumbs = attachedScreenshots.slice(
+    RIGHT_COL_THUMB_COUNT,
+  );
 
   return React.createElement(
     P.Document,
