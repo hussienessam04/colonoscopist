@@ -53,17 +53,40 @@ import type { ImageBox } from './embed-image';
 // inside the page padding so the natural aspect ratio fits without
 // overflowing. `objectFit: 'contain'` semantics on the
 // @react-pdf/renderer <Image> preserves the actual image aspect.
+//
+// Quick task 20260907-pdf-polish-recommendation-borders — the band
+// containers always render (even when no image is uploaded) so the
+// page layout is stable. The wrap View carries the background tint
+// + a fixed min height; the <Image> only renders when the buffer
+// is available. ponytail: @react-pdf/renderer's `backgroundColor`
+// accepts hex strings, the same palette as our UI tokens.
 const HEADER_BAND_STYLE = {
   width: '100%',
-  maxHeight: 80,
-  objectFit: 'contain' as const,
+  height: 80,
+  backgroundColor: '#E6EFF1',
   marginBottom: 6,
+  padding: 4,
 };
 const FOOTER_BAND_STYLE = {
   width: '100%',
-  maxHeight: 80,
-  objectFit: 'contain' as const,
+  height: 80,
+  backgroundColor: '#E6EFF1',
   marginTop: 6,
+  padding: 4,
+};
+// ponytail: when the band has an actual image, the image fills the
+// band with `objectFit: 'contain'` so the original aspect ratio is
+// preserved. The band wrap keeps the tinted background visible
+// around the image (or empty when no image).
+const HEADER_BAND_IMAGE_STYLE = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain' as const,
+};
+const FOOTER_BAND_IMAGE_STYLE = {
+  width: '100%',
+  height: '100%',
+  objectFit: 'contain' as const,
 };
 
 // Quick task 20260907-redesign-pdf-layout — the right-column
@@ -231,15 +254,14 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       direction: 'rtl' as const,
     },
     // Right-column screenshot thumbnail.
+    //
+    // Quick task 20260907-pdf-polish-recommendation-borders — dropped
+    // the border (the reference image shows screenshots on the right
+    // column with no border around each one).
     rightThumbWrap: {
       width: RIGHT_COL_THUMB_WIDTH,
       height: RIGHT_COL_THUMB_HEIGHT,
       marginBottom: 4,
-      borderWidth: 1,
-      borderColor: '#cbd5e1',
-      // ponytail: overflow hidden so JPEGs that are taller than the
-      // box don't bleed; @react-pdf/renderer treats them as a fixed
-      // box with objectFit semantics (contain).
     },
     rightThumb: {
       width: RIGHT_COL_THUMB_WIDTH,
@@ -257,8 +279,8 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       height: EXTRA_THUMB_HEIGHT,
       marginRight: 6,
       marginBottom: 6,
-      borderWidth: 1,
-      borderColor: '#cbd5e1',
+      // Quick task 20260907-pdf-polish-recommendation-borders —
+      // border dropped (matches the reference image).
     },
     extraThumb: {
       width: EXTRA_THUMB_WIDTH,
@@ -427,17 +449,21 @@ export function createReportPdfElement(
     React.createElement(
       P.Page,
       { size: 'LETTER', style: pageStyle },
-      // 1. Top band — profile header image.
-      headerBox !== null
-        ? React.createElement(
-            P.Image,
-            {
+      // 1. Top band — always renders so the page layout is stable;
+      //    the <Image> sits inside when the doctor has uploaded a
+      //    header image. When no image is uploaded, the band shows
+      //    a thin tinted strip (backgroundColor on the wrap).
+      React.createElement(
+        P.View,
+        { style: HEADER_BAND_STYLE, 'data-testid': 'report-pdf-header-band' },
+        headerBox !== null
+          ? React.createElement(P.Image, {
               src: headerBox.buffer,
-              style: HEADER_BAND_STYLE,
+              style: HEADER_BAND_IMAGE_STYLE,
               'data-testid': 'report-pdf-header-image',
-            },
-          )
-        : null,
+            })
+          : null,
+      ),
 
       // 2. Info box 1 — Instrument | Pre-medication (2 columns).
       React.createElement(
@@ -483,7 +509,15 @@ export function createReportPdfElement(
         field('date', 'Date: ', 'التاريخ: ', procedureDateLabel, true, true),
       ),
 
-      // 4. Main row — anatomy boxes (left) + first 4 screenshots (right).
+      // 4. Main row — text column (left) + first 4 screenshots (right).
+      //
+      //    Quick task 20260907-pdf-polish-recommendation-borders —
+      //    the recommendation box + signature block moved from the
+      //    page-level flow into the LEFT column of this row. The
+      //    reference image shows the doctor's clinical text
+      //    (anatomy + conclusion + recommendation + signature) as
+      //    one stacked flow on the left, with screenshots on the
+      //    right.
       React.createElement(
         P.View,
         {
@@ -494,12 +528,7 @@ export function createReportPdfElement(
           P.View,
           { style: styles.textColumn },
           procedureType === 'upper_gi'
-            ? anatomy(
-                'esophagus',
-                'Esophagus',
-                'المريء',
-                esophagus,
-              )
+            ? anatomy('esophagus', 'Esophagus', 'المريء', esophagus)
             : null,
           procedureType === 'upper_gi'
             ? anatomy('stomach', 'Stomach', 'المعدة', stomach)
@@ -517,6 +546,39 @@ export function createReportPdfElement(
             ? anatomy('ileum', 'Ileum', 'اللفائفي', ileum)
             : null,
           anatomy('conclusion', 'Conclusion', 'الخلاصة', conclusion),
+          anatomy(
+            'recommendation',
+            'Recommendation',
+            'التوصيات',
+            recommendation,
+          ),
+          // Signature block — image (left) + signature line + printed
+          // doctor name (right). Sits at the bottom of the same left
+          // column as the anatomy boxes (matches the reference image).
+          React.createElement(
+            P.View,
+            {
+              style: styles.signatureBlock,
+              'data-testid': 'report-pdf-signature',
+            },
+            signatureBox !== null
+              ? React.createElement(P.Image, {
+                  src: signatureBox.buffer,
+                  style: styles.signatureImage,
+                })
+              : null,
+            React.createElement(
+              P.View,
+              { style: styles.signatureLine },
+              isAr
+                ? React.createElement(
+                    P.Text,
+                    { style: { direction: 'rtl' } },
+                    doctorName,
+                  )
+                : React.createElement(P.Text, null, doctorName),
+            ),
+          ),
         ),
         React.createElement(
           P.View,
@@ -537,43 +599,7 @@ export function createReportPdfElement(
         ),
       ),
 
-      // 5. Recommendation (bordered, full width).
-      anatomy(
-        'recommendation',
-        'Recommendation',
-        'التوصيات',
-        recommendation,
-      ),
-
-      // 6. Signature block — image (left) + signature line + printed
-      // doctor name (right). Sits between the recommendation and
-      // any extra screenshots.
-      React.createElement(
-        P.View,
-        {
-          style: styles.signatureBlock,
-          'data-testid': 'report-pdf-signature',
-        },
-        signatureBox !== null
-          ? React.createElement(P.Image, {
-              src: signatureBox.buffer,
-              style: styles.signatureImage,
-            })
-          : null,
-        React.createElement(
-          P.View,
-          { style: styles.signatureLine },
-          isAr
-            ? React.createElement(
-                P.Text,
-                { style: { direction: 'rtl' } },
-                doctorName,
-              )
-            : React.createElement(P.Text, null, doctorName),
-        ),
-      ),
-
-      // 7. Extra screenshots (5+) — wrap-row below the signature.
+      // 5. Extra screenshots (5+) — wrap-row below the main row.
       extraThumbs.length > 0
         ? React.createElement(
             P.View,
@@ -594,17 +620,19 @@ export function createReportPdfElement(
           )
         : null,
 
-      // 8. Bottom band — profile footer image.
-      footerBox !== null
-        ? React.createElement(
-            P.Image,
-            {
+      // 6. Bottom band — same shape as the top band: always
+      //    renders so the page layout is stable.
+      React.createElement(
+        P.View,
+        { style: FOOTER_BAND_STYLE, 'data-testid': 'report-pdf-footer-band' },
+        footerBox !== null
+          ? React.createElement(P.Image, {
               src: footerBox.buffer,
-              style: FOOTER_BAND_STYLE,
+              style: FOOTER_BAND_IMAGE_STYLE,
               'data-testid': 'report-pdf-footer-image',
-            },
-          )
-        : null,
+            })
+          : null,
+      ),
     ),
   );
 }
