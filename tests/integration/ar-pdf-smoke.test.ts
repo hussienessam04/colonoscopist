@@ -109,19 +109,28 @@ describe.skipIf(!smokeEnabled)('AR PDF smoke (D-27)', () => {
     Font.register({ family: 'NotoSansArabic', src: ttfPath });
 
     const input: ReportPdfInput = {
-      logoBox: { buffer: FAKE_PNG, widthPx: 120, heightPx: 60, relPath: 'logo.png' },
+      // Quick task 20260907-redesign-pdf-layout — slim input shape.
+      // No logoBox / clinicName / patientMrn / patientDob / patientGender /
+      // procedureDurationLabel / usedDevices. patientAgeYears supplied
+      // directly (we don't need to compute it here).
+      headerBox: { buffer: FAKE_PNG, widthPx: 0, heightPx: 0, relPath: 'header.png' },
+      footerBox: { buffer: FAKE_PNG, widthPx: 0, heightPx: 0, relPath: 'footer.png' },
       signatureBox: { buffer: FAKE_PNG, widthPx: 120, heightPx: 40, relPath: 'signature.png' },
-      clinicName: 'Cairo Clinic',
-      doctorName: 'Dr. Layla',
-      procedureDateLabel: '2026-08-08',
+      instrumentLabel: 'Olympus CV-260 SL',
+      premedication: 'Propofol',
       patientName: 'Patient Layla',
-      patientMrn: '12345',
-      patientDob: '1980-04-12',
-      patientGender: 'male',
-      procedureDurationLabel: '00:10:00',
-      findings: 'Patient shows mild inflammation in the lower colon.',
-      diagnosis: 'Mild colitis.',
-      recommendations: '',
+      patientAgeYears: 46,
+      procedureDateLabel: '2026-08-08',
+      doctorName: 'Dr. Layla',
+      procedureType: 'colon',
+      esophagus: '',
+      stomach: '',
+      pylorus: '',
+      duodenum: '',
+      colon: 'Patient shows mild inflammation in the lower colon.',
+      ileum: '',
+      conclusion: 'Mild colitis.',
+      recommendation: '',
       attachedScreenshots: [
         {
           screenshotId: 1,

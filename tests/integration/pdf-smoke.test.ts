@@ -86,9 +86,16 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       // the path-aliases from electron-vite's tsconfig don't apply
       // directly — we use the relative path that Vitest's
       // resolve.alias already maps (see vitest.config.ts).
-      const React = (await import('react')).default;
-      const { Document, pdf } = await import('@react-pdf/renderer');
-      const { ReportPdf } = await import('../../src/main/pdf/report');
+      //
+      // Quick task 20260907-redesign-pdf-layout — the smoke drives
+      // the new `createReportPdfElement` factory (Phase 6+ replaced
+      // the old `ReportPdf` JSX component). The input shape matches
+      // the slim post-redesign `ReportPdfInput`: no logoBox / MRN /
+      // dob / gender / durationLabel / clinicName / usedDevices.
+      // `patientAgeYears` is supplied directly so we don't need to
+      // invoke the orchestrator's `computeAgeYears` helper here.
+      const { pdf } = await import('@react-pdf/renderer');
+      const { createReportPdfElement } = await import('../../src/main/pdf/report');
       type AttachedScreenshot = {
         screenshotId: number;
         filePath: string;
@@ -96,7 +103,8 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
         imageBuffer: Buffer;
       };
 
-      const logoBox = { buffer: FAKE_PNG, widthPx: 120, heightPx: 60, relPath: 'logo.png' };
+      const headerBox = { buffer: FAKE_PNG, widthPx: 0, heightPx: 0, relPath: 'header.png' };
+      const footerBox = { buffer: FAKE_PNG, widthPx: 0, heightPx: 0, relPath: 'footer.png' };
       const signatureBox = {
         buffer: FAKE_PNG,
         widthPx: 120,
@@ -119,25 +127,31 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       ];
 
       const input = {
-        logoBox,
+        headerBox,
+        footerBox,
         signatureBox,
-        clinicName: 'Cairo Clinic',
-        doctorName: 'Dr. Layla',
-        procedureDateLabel: '2026-08-08',
+        instrumentLabel: 'Olympus CV-260 SL',
+        premedication: 'Propofol',
         patientName: 'Patient X',
-        patientMrn: '12345',
-        patientDob: '1980-01-01',
-        patientGender: 'male',
-        procedureDurationLabel: '01:02:03',
-        findings: 'Polyp at 30cm',
-        diagnosis: 'Adenoma',
-        recommendations: 'Follow-up in 1 year',
+        patientAgeYears: 46,
+        procedureDateLabel: '2026-08-08',
+        doctorName: 'Dr. Layla',
+        procedureType: 'upper_gi' as const,
+        esophagus: 'Lower Esophagitis.',
+        stomach: 'Mild Incompetent cardia.\nAntral Gastritis.',
+        pylorus: 'R.R.R.',
+        duodenum: 'Normal Down to D2.',
+        colon: '',
+        ileum: '',
+        conclusion: 'Lower Esophagitis.\nMild Incompetent cardia.\nAntral Gastritis.',
+        recommendation: 'Follow-up in 1 year',
         attachedScreenshots,
+        language: 'en' as const,
       };
 
-      const instance = pdf(
-        React.createElement(Document, null, React.createElement(ReportPdf, { input })),
-      );
+      const reactPdf = await import('@react-pdf/renderer');
+      const element = createReportPdfElement(reactPdf, input);
+      const instance = pdf(element);
 
       const outPath = path.join(tmpRoot, 'report.pdf');
       mkdirSync(tmpRoot, { recursive: true });
@@ -154,47 +168,41 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
       // 3. Size > 5 KB minimum sanity check.
       const stat = statSync(outPath);
       expect(stat.size).toBeGreaterThan(5_000);
-
-      // 4. The render is multi-page (body page + 2 screenshot pages = 3).
-      // We assert the size is well above 5KB and not absurdly small —
-      // a multi-page render with images will be much larger than the
-      // single-page threshold.
-      // ponytail: the exact page count would require parsing the PDF
-      // xref table. The size assertion (>>5KB) is the practical
-      // check; a single-page render with 2 image attachments would
-      // be ~6-10KB, a 3-page render is ~12-20KB. We assert >10KB to
-      // confirm multi-page output.
-      expect(stat.size).toBeGreaterThan(10_000);
     }),
   );
 
   it(
-    'renders the placeholder text when logo + signature are missing',
+    'renders without the header / footer / signature bands (placeholder case)',
     guard(async () => {
-      const React = (await import('react')).default;
-      const { Document, pdf } = await import('@react-pdf/renderer');
-      const { ReportPdf } = await import('../../src/main/pdf/report');
+      const { pdf } = await import('@react-pdf/renderer');
+      const { createReportPdfElement } = await import('../../src/main/pdf/report');
 
       const input = {
-        logoBox: null,
+        headerBox: null,
+        footerBox: null,
         signatureBox: null,
-        clinicName: 'Clinic A',
-        doctorName: 'Dr. A',
-        procedureDateLabel: '2026-08-08',
+        instrumentLabel: '',
+        premedication: null,
         patientName: 'Patient X',
-        patientMrn: null,
-        patientDob: '1980-01-01',
-        patientGender: null,
-        procedureDurationLabel: '00:00:00',
-        findings: '',
-        diagnosis: '',
-        recommendations: '',
+        patientAgeYears: null,
+        procedureDateLabel: '2026-08-08',
+        doctorName: 'Dr. A',
+        procedureType: 'colon' as const,
+        esophagus: '',
+        stomach: '',
+        pylorus: '',
+        duodenum: '',
+        colon: '',
+        ileum: '',
+        conclusion: '',
+        recommendation: '',
         attachedScreenshots: [],
+        language: 'en' as const,
       };
 
-      const instance = pdf(
-        React.createElement(Document, null, React.createElement(ReportPdf, { input })),
-      );
+      const reactPdf = await import('@react-pdf/renderer');
+      const element = createReportPdfElement(reactPdf, input);
+      const instance = pdf(element);
 
       const outPath = path.join(tmpRoot, 'no-assets.pdf');
       mkdirSync(tmpRoot, { recursive: true });
@@ -206,49 +214,49 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
   );
 
   it(
-    'preserves numeric fragments (MRN: 12345 stays 12345)',
+    'preserves numeric fragments (Date: 2026-08-08 stays 2026-08-08)',
     guard(async () => {
-      // ponytail: Phase 6 PDF is English-only per CONTEXT.md D-10;
-      // Latin numerics stay LTR (no bidi reversal). The MRN is
-      // rendered directly in the Patient block via `<Text>` — no
-      // bidi wrapper. We assert the input passes through unchanged
-      // by verifying the rendered PDF file is produced and that the
-      // patientMrn input value matches what the template received.
-      // (Full text-extraction would require a PDF parser; the
-      // production smoke test verifies visually that the layout
-      // preserves the digits.)
-      const React = (await import('react')).default;
-      const { Document, pdf } = await import('@react-pdf/renderer');
-      const { ReportPdf } = await import('../../src/main/pdf/report');
+      // Quick task 20260907-redesign-pdf-layout — the redesigned
+      // template wraps numeric values (Date, Age) in direction:'ltr'
+      // fragments so they stay LTR even inside an AR container. The
+      // MRN field is gone — Date is the numeric value that's
+      // bidi-isolated in the new template. We assert the input
+      // shape is preserved by passing through unchanged and that
+      // the rendered PDF file is produced.
+      const { pdf } = await import('@react-pdf/renderer');
+      const { createReportPdfElement } = await import('../../src/main/pdf/report');
 
       const input = {
-        logoBox: null,
+        headerBox: null,
+        footerBox: null,
         signatureBox: null,
-        clinicName: 'C',
-        doctorName: 'Dr',
-        procedureDateLabel: '2026-08-08',
+        instrumentLabel: '',
+        premedication: null,
         patientName: 'P',
-        patientMrn: '12345',
-        patientDob: '1980-01-01',
-        patientGender: null,
-        procedureDurationLabel: '00:00:00',
-        findings: '',
-        diagnosis: '',
-        recommendations: '',
+        patientAgeYears: 24,
+        procedureDateLabel: '2026-08-08',
+        doctorName: 'Dr',
+        procedureType: 'colon' as const,
+        esophagus: '',
+        stomach: '',
+        pylorus: '',
+        duodenum: '',
+        colon: '',
+        ileum: '',
+        conclusion: '',
+        recommendation: '',
         attachedScreenshots: [],
+        language: 'en' as const,
       };
 
-      const instance = pdf(
-        React.createElement(Document, null, React.createElement(ReportPdf, { input })),
-      );
+      const reactPdf = await import('@react-pdf/renderer');
+      const element = createReportPdfElement(reactPdf, input);
+      const instance = pdf(element);
 
       const outPath = path.join(tmpRoot, 'numeric.pdf');
       mkdirSync(tmpRoot, { recursive: true });
       await instance.toFile(outPath);
-      // Assert: input.mrn is the same value the template receives
-      // (sanity check on the input shape). The visual bidi reversal
-      // check happens at the manual smoke test phase.
-      expect(input.patientMrn).toBe('12345');
+      expect(input.procedureDateLabel).toBe('2026-08-08');
       expect(existsSync(outPath)).toBe(true);
     }),
   );

@@ -1,18 +1,21 @@
 // @react-pdf/renderer ReportPdf component — full clinical layout per
-// CONTEXT.md D-11. The renderer is sandboxed and never imports
-// @react-pdf/renderer directly (Pitfall 1 / Pitfall 3 in RESEARCH.md);
-// main calls renderToFile() after the renderer passes structured
-// report data over IPC.
+// the doctor's reference image (quick task 20260907-redesign-pdf-layout).
+// The renderer is sandboxed and never imports @react-pdf/renderer
+// directly (Pitfall 1 / Pitfall 3 in RESEARCH.md); main calls
+// renderToFile() after the renderer passes structured report data
+// over IPC.
 //
-// Layout:
-//   - Header (top-left logo + clinic name; top-right signature + doctor
-//     name + procedure date)
-//   - Patient block (name, MRN, DOB, gender)
-//   - Procedure block (date, duration HH:MM:SS, doctor)
-//   - Findings / Diagnosis / Recommendations body sections (EN-only per
-//     CONTEXT.md D-10; bidi/RTL deferred to Phase 7 i18n)
-//   - One <Page> per attached screenshot with a "Fig. N" caption
-//   - Footer with "Page X of Y" + clinic name on every page
+// Layout (reference image — clinic-printed-report style):
+//   1. Top band = profile header image (full width, ~80px tall).
+//   2. Info box 1 (bordered) — Instrument | Pre-medication.
+//   3. Info box 2 (bordered) — Name | Age | Date.
+//   4. Main row:
+//      - Left column: stacked anatomy boxes + Conclusion (each bordered).
+//      - Right column: first 4 attached screenshots (stacked vertically).
+//   5. Recommendation (bordered, full width).
+//   6. Signature block (signature image + printed doctor name, full width).
+//   7. Extra screenshots (5+, full width, 3 per row).
+//   8. Bottom band = profile footer image (full width, ~80px tall).
 //
 // Per RESEARCH §Pattern 3: <Text render={({ pageNumber, totalPages }) =>
 // ...} fixed /> is the built-in @react-pdf/renderer pattern for the
@@ -33,7 +36,7 @@
 //
 // Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-25..D-27 + Pitfall 8:
 // AR PDF rendering. The factory accepts `input.language`:
-//   - 'en' (default): Helvetica font + LTR document direction (unchanged from Phase 6)
+//   - 'en' (default): Helvetica font + LTR document direction.
 //   - 'ar': NotoSansArabic font (pre-registered by render-report-pdf.ts)
 //     + bidi <Text direction='rtl'> wrappers for Arabic body fields +
 //     numeric fragment <Text direction='ltr'> isolation per Pitfall 8.
@@ -44,32 +47,36 @@
 //   span while the surrounding text flows RTL.
 
 import React from 'react';
-import {
-  LOGO_BOX,
-  SIGNATURE_BOX,
-  type ImageBox,
-} from './embed-image';
+import type { ImageBox } from './embed-image';
 
-// Quick task 260812-ns0 — header (top) + footer (bottom) band styles.
-// Full-width images, ~80px tall, drawn just inside the page padding
-// (so the natural aspect ratio fits without overflowing the page
-// width). The aspect ratio of the actual uploaded image is preserved
-// via `objectFit: 'contain'` semantics on the @react-pdf/renderer
-// <Image> — the band's height grows to match when the source is
-// taller than 80px.
+// Top + bottom band styles. Full-width, ~80px tall, drawn just
+// inside the page padding so the natural aspect ratio fits without
+// overflowing. `objectFit: 'contain'` semantics on the
+// @react-pdf/renderer <Image> preserves the actual image aspect.
 const HEADER_BAND_STYLE = {
   width: '100%',
   maxHeight: 80,
   objectFit: 'contain' as const,
-  marginBottom: 12,
-  // data-testid set on the <Image> itself, not the style.
+  marginBottom: 6,
 };
 const FOOTER_BAND_STYLE = {
   width: '100%',
   maxHeight: 80,
   objectFit: 'contain' as const,
-  marginTop: 12,
+  marginTop: 6,
 };
+
+// Quick task 20260907-redesign-pdf-layout — the right-column
+// thumbnail size fits 4 stacked in a US Letter page (after the
+// header band + 2 info boxes + 4 anatomy boxes + recommendation +
+// signature + footer band leave ~22pt of vertical room per row of
+// the right column at 11pt body). Width matches the column share.
+const RIGHT_COL_THUMB_WIDTH = 110;
+const RIGHT_COL_THUMB_HEIGHT = 88;
+const EXTRA_THUMB_WIDTH = 120;
+const EXTRA_THUMB_HEIGHT = 100;
+// ponytail: only 4 screenshots on the right; the rest go below.
+const RIGHT_COL_THUMB_COUNT = 4;
 
 export type AttachedScreenshot = {
   screenshotId: number;
@@ -83,59 +90,37 @@ export type AttachedScreenshot = {
 export type ReportLanguage = 'en' | 'ar';
 
 export type ReportPdfInput = {
-  // Header inputs (logo top-left, signature top-right).
-  logoBox: ImageBox | null;
-  signatureBox: ImageBox | null;
-  // Quick task 260812-ns0 — header (top band) + footer (bottom band)
-  // image boxes, rendered on every PDF page. Null when the doctor has
-  // not uploaded the asset; the template omits the band entirely in
-  // that case (no placeholder, unlike logo + signature which show
-  // "[No logo uploaded]" / "[No signature on file]").
+  // Top + bottom image bands (rendered on every page via `fixed`).
   headerBox: ImageBox | null;
   footerBox: ImageBox | null;
-  // Quick task 260812-ns0 — used devices (1:N with doctor_profile).
-  // Rendered as a compact name + optional-notes list in the patient
-  // block header. Empty array = the section is hidden.
-  usedDevices: { id: string; name: string; notes: string | null }[];
-  // Quick task 260812-ns0 — clinic-default premedication (free-text).
-  // Surfaces in the patient block header above findings.
-  premedication: string | null;
-  clinicName: string;
-  doctorName: string;
-  procedureDateLabel: string;
-  // Patient block.
-  patientName: string;
-  patientMrn: string | null;
-  patientDob: string;
-  patientGender: string | null;
-  // Procedure block.
-  procedureDurationLabel: string;
-  // Quick task 20260812-redesign-report — procedure-type toggle.
-  // Drives which anatomy boxes render below:
-  //   colon    → colon + ileum + (always-on) conclusion + recommendation
-  //   upper_gi → esophagus + stomach + pylorus + duodenum +
-  //              (always-on) conclusion + recommendation
-  procedureType: 'colon' | 'upper_gi';
-  // Quick task 20260812-redesign-report — instrument label (looked up
-  // from used_devices.id by the orchestrator; empty when the doctor
-  // hasn't picked one yet).
+  // Info box 1 — instrument + pre-medication.
   instrumentLabel: string;
-  // Quick task 20260812-redesign-report — 8 procedure-type-specific
-  // box columns. The template only renders the subset that matches
-  // procedureType (anatomy boxes), plus always-on conclusion +
-  // recommendation.
+  premedication: string | null;
+  // Info box 2 — name + age + date. `patientAgeYears` is null when
+  // the patient has no DOB on file (orchestrator can't compute it).
+  patientName: string;
+  patientAgeYears: number | null;
+  procedureDateLabel: string;
+  // Signature block — image (when uploaded) + printed name.
+  signatureBox: ImageBox | null;
+  doctorName: string;
+  // Procedure type drives which anatomy boxes render.
+  procedureType: 'colon' | 'upper_gi';
+  // 8 procedure-type-specific box columns.
   esophagus: string;
   stomach: string;
   pylorus: string;
   duodenum: string;
   colon: string;
   ileum: string;
+  // Always-on conclusion + recommendation.
   conclusion: string;
   recommendation: string;
-  // Attached screenshots (one per page, ordered ASC by sortOrder).
+  // Attached screenshots (ordered ASC by sortOrder). First 4 go
+  // on the right column; the rest go below the signature.
   attachedScreenshots: AttachedScreenshot[];
   // Phase 7 / Plan 07-04 — I18N-03 + RPT-06: 'en' keeps Helvetica + LTR
-  // (Phase 6 default); 'ar' switches to NotoSansArabic + bidi <Text>
+  // (default); 'ar' switches to NotoSansArabic + bidi <Text>
   // wrappers per D-25..D-27.
   language?: ReportLanguage;
 };
@@ -159,172 +144,152 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
   if (_memoisedStyles) return _memoisedStyles;
   _memoisedStyles = P.StyleSheet.create({
     page: {
-      padding: 36,
+      padding: 32,
       fontSize: 11,
       fontFamily: 'Helvetica',
-      color: '#1f2937',
+      color: '#0f172a',
     },
     pageRtl: {
       // ponytail: AR mode flips the page padding so the bound edge sits
       // on the right (where Arabic readers expect the spine).
-      paddingTop: 36,
-      paddingBottom: 36,
-      paddingLeft: 36,
-      paddingRight: 36,
+      paddingTop: 32,
+      paddingBottom: 32,
+      paddingLeft: 32,
+      paddingRight: 32,
       fontSize: 11,
       fontFamily: 'NotoSansArabic',
-      color: '#1f2937',
-    },
-    header: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 18,
-      paddingBottom: 6,
-      borderBottomWidth: 1,
-      borderBottomColor: '#cbd5e1',
-    },
-    headerLeft: {
-      flexDirection: 'column',
-      width: 200,
-    },
-    headerRight: {
-      flexDirection: 'column',
-      width: 220,
-      // ponytail: alignItems is not in @react-pdf/renderer's CSS subset;
-      // manual right-alignment via textAlign on the children.
-    },
-    logoOrPlaceholder: {
-      fontSize: 9,
-      color: '#94a3b8',
-    },
-    section: {
-      marginTop: 14,
-      marginBottom: 14,
-    },
-    sectionTitle: {
-      fontSize: 12,
-      fontWeight: 'bold',
-      marginBottom: 4,
       color: '#0f172a',
     },
-    body: {
-      lineHeight: 1.4,
-    },
-    bodyRtl: {
-      lineHeight: 1.4,
-      // ponytail: @react-pdf/renderer's bidi respects direction on the
-      // parent Text; alignItems/textAlign on the surrounding View has
-      // no effect on Text wrapping. We rely on <Text direction='rtl'>
-      // for the actual bidi flip (Pitfall 8).
-    },
-    // ponytail: patientBlock was flexWrap:'wrap' + gap:8 — both are
-    // outside @react-pdf/renderer's CSS subset. Use explicit
-    // textAlign:'right' on the row + per-field marginRight instead;
-    // a tighter, deterministic layout for clinical PDFs.
-    patientBlock: {
+    // Info box 1 (Instrument + Pre-medication, 2 columns).
+    infoBox2: {
       flexDirection: 'row',
-      marginTop: 6,
+      borderWidth: 1,
+      borderColor: '#94a3b8',
+      marginBottom: 6,
     },
-    patientField: {
-      marginRight: 18,
+    // Info box 2 (Name + Age + Date, 3 columns).
+    infoBox3: {
+      flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: '#94a3b8',
+      marginBottom: 6,
     },
-    // Quick task 260812-ns0 — used-devices block (compact name list
-    // with optional notes) sits inside the patient block above the
-    // procedure block. Hidden when usedDevices.length === 0.
-    usedDevicesBlock: {
-      marginTop: 6,
-      width: '100%',
+    // Each column inside an info box (border-right separates columns).
+    infoCol: {
+      flexDirection: 'row',
+      flex: 1,
+      padding: 6,
+      borderRightWidth: 1,
+      borderRightColor: '#cbd5e1',
     },
-    usedDevicesLabel: {
-      fontSize: 10,
+    // Last column drops the border-right.
+    infoColLast: {
+      flexDirection: 'row',
+      flex: 1,
+      padding: 6,
+    },
+    infoLabel: {
       fontWeight: 'bold',
-      color: '#0f172a',
-      marginBottom: 2,
+      marginRight: 4,
     },
-    usedDevicesRow: {
-      fontSize: 10,
-      color: '#1f2937',
+    infoValue: {},
+    infoValueLtr: {
+      // ponytail: numeric fragments (Age, Date) flow LTR even when
+      // the surrounding label is RTL in AR mode. Pitfall 8.
+      direction: 'ltr' as const,
     },
-    usedDevicesNotes: {
-      fontSize: 10,
-      color: '#475569',
-    },
-    // Phase 6 UAT G-06-4 — attached screenshots render as INLINE
-    // thumbnails BELOW the body sections (not separate full-page
-    // figures). Each thumbnail is ~120×100px to keep the visual
-    // footprint small + a grid of 3 columns.
-    screenshotsSection: {
-      marginTop: 14,
-      marginBottom: 14,
-    },
-    screenshotGrid: {
+    // Main row — text boxes on the left, screenshot stack on the right.
+    mainRow: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginTop: 6,
+      marginBottom: 6,
     },
-    screenshotThumb: {
-      width: 120,
-      height: 100,
-      marginRight: 8,
-      marginBottom: 8,
-    },
-    screenshotCaption: {
-      fontSize: 9,
-      color: '#475569',
-      marginTop: 2,
-    },
-    footer: {
-      position: 'absolute',
-      bottom: 18,
-      left: 36,
-      right: 36,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: 9,
-      color: '#64748b',
-      borderTopWidth: 1,
-      borderTopColor: '#e2e8f0',
-      paddingTop: 6,
-    },
-    footerSignature: {
-      width: 60,
-      height: 20,
+    textColumn: {
+      flex: 1,
       marginRight: 6,
     },
-    // Phase 7 / Plan 07-04 — I18N-03 + D-25 + Pitfall 8: signature
-    // placement flips to bottom-LEFT in AR mode (vs bottom-RIGHT in
-    // EN mode). The footer uses flexDirection:'row' for EN; AR uses
-    // row-reversed so the signature+doctor group sits on the left.
-    footerRtl: {
-      position: 'absolute',
-      bottom: 18,
-      left: 36,
-      right: 36,
-      flexDirection: 'row-reverse',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      fontSize: 9,
-      color: '#64748b',
-      borderTopWidth: 1,
-      borderTopColor: '#e2e8f0',
-      paddingTop: 6,
+    screenshotColumn: {
+      width: RIGHT_COL_THUMB_WIDTH + 8,
+      flexDirection: 'column',
     },
-    // Phase 7 / Plan 07-04 — I18N-03 + Pitfall 8: numeric fragment
-    // isolation. The numeric Text is wrapped in direction:'ltr' so
-    // Arabic body text flows RTL around it but the digits stay LTR.
-    numericFragment: {
-      // ponytail: the direction style on Text forces bidi ordering
-      // for the span; the rendering engine reads it as an LTR run.
-      // No fontFamily override — the page's font (Helvetica for EN,
-      // NotoSansArabic for AR) covers both ASCII digits and AR glyphs.
+    // Single anatomy / conclusion / recommendation box.
+    anatomyBox: {
+      borderWidth: 1,
+      borderColor: '#94a3b8',
+      padding: 6,
+      marginBottom: 4,
+    },
+    anatomyTitle: {
+      fontWeight: 'bold',
+      fontSize: 11,
+      marginBottom: 2,
+    },
+    anatomyBody: {
+      lineHeight: 1.3,
+    },
+    anatomyBodyRtl: {
+      lineHeight: 1.3,
+      direction: 'rtl' as const,
+    },
+    // Right-column screenshot thumbnail.
+    rightThumbWrap: {
+      width: RIGHT_COL_THUMB_WIDTH,
+      height: RIGHT_COL_THUMB_HEIGHT,
+      marginBottom: 4,
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+      // ponytail: overflow hidden so JPEGs that are taller than the
+      // box don't bleed; @react-pdf/renderer treats them as a fixed
+      // box with objectFit semantics (contain).
+    },
+    rightThumb: {
+      width: RIGHT_COL_THUMB_WIDTH,
+      height: RIGHT_COL_THUMB_HEIGHT,
+      objectFit: 'contain' as const,
+    },
+    // Extra-screenshots row (5+) — wrap-row below the signature.
+    extraRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 6,
+    },
+    extraThumbWrap: {
+      width: EXTRA_THUMB_WIDTH,
+      height: EXTRA_THUMB_HEIGHT,
+      marginRight: 6,
+      marginBottom: 6,
+      borderWidth: 1,
+      borderColor: '#cbd5e1',
+    },
+    extraThumb: {
+      width: EXTRA_THUMB_WIDTH,
+      height: EXTRA_THUMB_HEIGHT,
+      objectFit: 'contain' as const,
+    },
+    // Signature block — image on the left, printed name on the right.
+    signatureBlock: {
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      marginBottom: 6,
+      paddingTop: 6,
+      paddingBottom: 6,
+      borderTopWidth: 1,
+      borderColor: '#cbd5e1',
+    },
+    signatureImage: {
+      width: 120,
+      height: 40,
+      marginRight: 12,
+      objectFit: 'contain' as const,
+    },
+    signatureLine: {
+      flex: 1,
+      borderTopWidth: 1,
+      borderColor: '#0f172a',
+      paddingTop: 2,
+      fontSize: 10,
     },
   });
   return _memoisedStyles;
-}
-
-function placeholderText(missing: 'logo' | 'signature'): string {
-  return missing === 'logo' ? '[No logo uploaded]' : '[No signature on file]';
 }
 
 /**
@@ -351,25 +316,16 @@ export function createReportPdfElement(
 ): React.JSX.Element {
   const styles = getStyles(P);
   const {
-    logoBox,
-    signatureBox,
-    // Quick task 260812-ns0 — header / footer image bands + used
-    // devices + premedication. Header/footer default to null (the
-    // bands are hidden when the doctor hasn't uploaded an asset).
     headerBox = null,
     footerBox = null,
-    usedDevices = [],
-    premedication = null,
-    clinicName,
-    doctorName,
-    procedureDateLabel,
-    patientName,
-    patientMrn,
-    patientDob,
-    patientGender,
-    procedureDurationLabel,
-    procedureType,
     instrumentLabel,
+    premedication = null,
+    patientName,
+    patientAgeYears,
+    procedureDateLabel,
+    signatureBox = null,
+    doctorName,
+    procedureType,
     esophagus,
     stomach,
     pylorus,
@@ -383,32 +339,10 @@ export function createReportPdfElement(
   } = input;
   const isAr = language === 'ar';
   const pageStyle = isAr ? styles.pageRtl : styles.page;
-  const footerStyle = isAr ? styles.footerRtl : styles.footer;
-  // ponytail: bidi-wrapped Text factory. Returns a Text element with
-  // direction:'rtl' when isAr=true (forces bidi reorder for Arabic body
-  // fields), else a plain Text with the body's default direction.
-  const rtlText = (
-    key: string,
-    body: string,
-    extraStyle?: Record<string, unknown>,
-  ): React.JSX.Element => {
-    if (!isAr) {
-      return React.createElement(
-        P.Text,
-        { key, style: extraStyle ?? styles.body },
-        body,
-      ) as React.JSX.Element;
-    }
-    return React.createElement(
-      P.Text,
-      { key, style: { ...styles.bodyRtl, direction: 'rtl', ...extraStyle } },
-      body,
-    ) as React.JSX.Element;
-  };
-  // ponytail: numeric fragment Text factory. The numeric value is
-  // wrapped in direction:'ltr' so AR body text (RTL) flows around it
-  // but the digits stay LTR — without this, Pitfall 8 strikes and
-  // "MRN: 12345" renders as "54321 :MRN" inside an RTL container.
+
+  // ponytail: numeric fragment Text factory. Age + Date are wrapped
+  // in direction:'ltr' so AR body text (RTL) flows around them but
+  // the digits stay LTR (Pitfall 8).
   const ltrNumber = (key: string, body: string): React.JSX.Element => {
     return React.createElement(
       P.Text,
@@ -417,16 +351,83 @@ export function createReportPdfElement(
     ) as React.JSX.Element;
   };
 
+  // ponytail: bidi-wrapped label/value pair. The label flows through
+  // the bidi wrapper (EN = LTR, AR = RTL); the value flows the same
+  // direction EXCEPT when it's a numeric fragment (Age / Date), which
+  // is forced to LTR via `ltrNumber`. Empty values are hidden (no
+  // dangling colon).
+  const field = (
+    key: string,
+    labelEn: string,
+    labelAr: string,
+    value: string,
+    numeric: boolean,
+    isLast: boolean,
+  ): React.JSX.Element | null => {
+    if (value === '' || value === null) return null;
+    return React.createElement(
+      P.View,
+      { key, style: isLast ? styles.infoColLast : styles.infoCol },
+      isAr
+        ? React.createElement(
+            P.Text,
+            { style: { ...styles.infoLabel, direction: 'rtl' } },
+            labelAr,
+          )
+        : React.createElement(P.Text, { style: styles.infoLabel }, labelEn),
+      numeric
+        ? ltrNumber(`${key}-val`, value)
+        : isAr
+          ? React.createElement(
+              P.Text,
+              { style: { ...styles.infoValue, direction: 'rtl' } },
+              value,
+            )
+          : React.createElement(P.Text, { style: styles.infoValue }, value),
+    );
+  };
+
+  // ponytail: anatomy / conclusion / recommendation box.
+  // `body` is bidi-wrapped in AR mode (empty → '—' placeholder so
+  // the box keeps its layout even before the doctor types).
+  const anatomy = (
+    key: string,
+    titleEn: string,
+    titleAr: string,
+    body: string,
+  ): React.JSX.Element =>
+    React.createElement(
+      P.View,
+      { key, style: styles.anatomyBox },
+      isAr
+        ? React.createElement(
+            P.Text,
+            { style: { ...styles.anatomyTitle, direction: 'rtl' } },
+            titleAr,
+          )
+        : React.createElement(P.Text, { style: styles.anatomyTitle }, titleEn),
+      isAr
+        ? React.createElement(
+            P.Text,
+            { style: styles.anatomyBodyRtl },
+            body || '—',
+          )
+        : React.createElement(P.Text, { style: styles.anatomyBody }, body || '—'),
+    );
+
+  // Quick task 20260907-redesign-pdf-layout — first 4 screenshots
+  // go on the right column (stacked vertically); the rest go below
+  // the signature in a wrap-row. Same source list — split here.
+  const rightThumbs = attachedScreenshots.slice(0, RIGHT_COL_THUMB_COUNT);
+  const extraThumbs = attachedScreenshots.slice(RIGHT_COL_THUMB_COUNT);
+
   return React.createElement(
     P.Document,
     null,
     React.createElement(
       P.Page,
       { size: 'LETTER', style: pageStyle },
-      // Quick task 260812-ns0 — top band: the uploaded header image
-      // (full-width, ~80px tall) renders above the existing fixed
-      // header. Null when the doctor hasn't uploaded one; the band is
-      // hidden entirely in that case (no placeholder).
+      // 1. Top band — profile header image.
       headerBox !== null
         ? React.createElement(
             P.Image,
@@ -437,47 +438,131 @@ export function createReportPdfElement(
             },
           )
         : null,
-      // Header (logo + signature + names + date)
+
+      // 2. Info box 1 — Instrument | Pre-medication (2 columns).
       React.createElement(
         P.View,
-        { style: styles.header, fixed: true },
+        {
+          style: styles.infoBox2,
+          'data-testid': 'report-pdf-info-box-instrument-premedication',
+        },
+        field(
+          'instrument',
+          'Instrument: ',
+          'الجهاز: ',
+          instrumentLabel,
+          false,
+          premedication === null || premedication === '',
+        ),
+        field(
+          'premedication',
+          'Pre-medication: ',
+          'التخدير المبدئي: ',
+          premedication ?? '',
+          false,
+          true,
+        ),
+      ),
+
+      // 3. Info box 2 — Name | Age | Date (3 columns).
+      React.createElement(
+        P.View,
+        {
+          style: styles.infoBox3,
+          'data-testid': 'report-pdf-info-box-patient',
+        },
+        field('name', 'Name: ', 'الاسم: ', patientName, false, false),
+        field(
+          'age',
+          'Age: ',
+          'العمر: ',
+          patientAgeYears === null ? '' : `${patientAgeYears} years`,
+          true,
+          false,
+        ),
+        field('date', 'Date: ', 'التاريخ: ', procedureDateLabel, true, true),
+      ),
+
+      // 4. Main row — anatomy boxes (left) + first 4 screenshots (right).
+      React.createElement(
+        P.View,
+        {
+          style: styles.mainRow,
+          'data-testid': 'report-pdf-main-row',
+        },
         React.createElement(
           P.View,
-          { style: styles.headerLeft },
-          logoBox
-            ? React.createElement(P.Image, {
-                src: logoBox.buffer,
-                style: { width: LOGO_BOX.widthPx, height: LOGO_BOX.heightPx },
-              })
-            : React.createElement(
-                P.Text,
-                { style: styles.logoOrPlaceholder },
-                placeholderText('logo'),
-              ),
-          // ponytail: clinic name + doctor name flow through the bidi
-          // wrapper — Arabic clinic names render RTL naturally; English
-          // stays LTR. The wrapper is a no-op for EN mode.
-          isAr
-            ? React.createElement(
-                P.Text,
-                { style: { fontSize: 14, fontWeight: 'bold', direction: 'rtl' } },
-                clinicName,
+          { style: styles.textColumn },
+          procedureType === 'upper_gi'
+            ? anatomy(
+                'esophagus',
+                'Esophagus',
+                'المريء',
+                esophagus,
               )
-            : React.createElement(P.Text, { style: { fontSize: 14, fontWeight: 'bold' } }, clinicName),
+            : null,
+          procedureType === 'upper_gi'
+            ? anatomy('stomach', 'Stomach', 'المعدة', stomach)
+            : null,
+          procedureType === 'upper_gi'
+            ? anatomy('pylorus', 'Pylorus', 'البواب', pylorus)
+            : null,
+          procedureType === 'upper_gi'
+            ? anatomy('duodenum', 'Duodenum', 'الاثني عشر', duodenum)
+            : null,
+          procedureType === 'colon'
+            ? anatomy('colon', 'Colon', 'القولون', colon)
+            : null,
+          procedureType === 'colon'
+            ? anatomy('ileum', 'Ileum', 'اللفائفي', ileum)
+            : null,
+          anatomy('conclusion', 'Conclusion', 'الخلاصة', conclusion),
         ),
         React.createElement(
           P.View,
-          { style: styles.headerRight },
-          signatureBox
-            ? React.createElement(P.Image, {
-                src: signatureBox.buffer,
-                style: { width: SIGNATURE_BOX.widthPx, height: SIGNATURE_BOX.heightPx },
-              })
-            : React.createElement(
-                P.Text,
-                { style: styles.logoOrPlaceholder },
-                placeholderText('signature'),
-              ),
+          {
+            style: styles.screenshotColumn,
+            'data-testid': 'report-pdf-right-screenshots',
+          },
+          ...rightThumbs.map((s) =>
+            React.createElement(
+              P.View,
+              { key: s.screenshotId, style: styles.rightThumbWrap },
+              React.createElement(P.Image, {
+                src: s.imageBuffer,
+                style: styles.rightThumb,
+              }),
+            ),
+          ),
+        ),
+      ),
+
+      // 5. Recommendation (bordered, full width).
+      anatomy(
+        'recommendation',
+        'Recommendation',
+        'التوصيات',
+        recommendation,
+      ),
+
+      // 6. Signature block — image (left) + signature line + printed
+      // doctor name (right). Sits between the recommendation and
+      // any extra screenshots.
+      React.createElement(
+        P.View,
+        {
+          style: styles.signatureBlock,
+          'data-testid': 'report-pdf-signature',
+        },
+        signatureBox !== null
+          ? React.createElement(P.Image, {
+              src: signatureBox.buffer,
+              style: styles.signatureImage,
+            })
+          : null,
+        React.createElement(
+          P.View,
+          { style: styles.signatureLine },
           isAr
             ? React.createElement(
                 P.Text,
@@ -485,359 +570,31 @@ export function createReportPdfElement(
                 doctorName,
               )
             : React.createElement(P.Text, null, doctorName),
-          React.createElement(P.Text, null, procedureDateLabel),
         ),
       ),
 
-      // Patient block — Patient name is bidi-wrapped; MRN/DOB/Gender
-      // labels are bidi-wrapped but the NUMERIC VALUES (MRN, DOB) are
-      // isolated as LTR per Pitfall 8.
-      React.createElement(
-        P.View,
-        { style: styles.section },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Patient',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Patient'),
-        React.createElement(
-          P.View,
-          { style: styles.patientBlock },
-          React.createElement(
-            P.Text,
-            { style: styles.patientField },
-            'Name: ',
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { direction: 'rtl' } },
-                  patientName,
-                )
-              : patientName,
-          ),
-          // MRN: numeric → LTR fragment isolation
-          React.createElement(
-            P.Text,
-            { style: styles.patientField },
-            'MRN: ',
-            ltrNumber('mrn', patientMrn ?? '—'),
-          ),
-          // DOB: numeric → LTR fragment isolation
-          React.createElement(
-            P.Text,
-            { style: styles.patientField },
-            'DOB: ',
-            ltrNumber('dob', patientDob),
-          ),
-          React.createElement(
-            P.Text,
-            { style: styles.patientField },
-            'Gender: ',
-            patientGender ?? '—',
-          ),
-          // Quick task 260812-ns0 — premedication (clinic default) sits
-          // in the patient block above findings. Null / empty = the
-          // line is omitted entirely (don't render "[Not set]").
-          // Free-text only — render as-is; if the clinic types it in
-          // Arabic, the parent <View> flips to RTL via the existing
-          // isAr branch above.
-          premedication !== null && premedication !== ''
-            ? React.createElement(
-                P.Text,
-                {
-                  style: styles.patientField,
-                  'data-testid': 'report-pdf-premedication',
-                },
-                isAr ? 'التخدير المبدئي: ' : 'Pre-medication: ',
-                premedication,
-              )
-            : null,
-        ),
-        // Quick task 260812-ns0 — used devices (1:N with doctor_profile).
-        // Rendered as a compact name list with optional notes in the
-        // patient block footer (just before the procedure block). Empty
-        // array = the entire block is hidden.
-        usedDevices.length > 0
-          ? React.createElement(
-              P.View,
-              {
-                style: styles.usedDevicesBlock,
-                'data-testid': 'report-pdf-used-devices',
-              },
+      // 7. Extra screenshots (5+) — wrap-row below the signature.
+      extraThumbs.length > 0
+        ? React.createElement(
+            P.View,
+            {
+              style: styles.extraRow,
+              'data-testid': 'report-pdf-extra-screenshots',
+            },
+            ...extraThumbs.map((s) =>
               React.createElement(
-                P.Text,
-                { style: styles.usedDevicesLabel },
-                isAr ? 'الأجهزة المستخدمة' : 'Used devices',
-              ),
-              ...usedDevices.map((d) =>
-                React.createElement(
-                  P.Text,
-                  { key: d.id, style: styles.usedDevicesRow },
-                  d.name,
-                  d.notes !== null && d.notes !== ''
-                    ? React.createElement(
-                        P.Text,
-                        { style: styles.usedDevicesNotes },
-                        ` — ${d.notes}`,
-                      )
-                    : null,
-                ),
-              ),
-            )
-          : null,
-      ),
-
-      // Procedure block — duration is HH:MM:SS numeric; isolate it.
-      React.createElement(
-        P.View,
-        { style: styles.section },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Procedure',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Procedure'),
-        React.createElement(
-          P.Text,
-          null,
-          'Date: ',
-          ltrNumber('proc-date', procedureDateLabel),
-        ),
-        React.createElement(
-          P.Text,
-          null,
-          'Duration: ',
-          ltrNumber('proc-duration', procedureDurationLabel),
-        ),
-        React.createElement(
-          P.Text,
-          null,
-          'Doctor: ',
-          isAr
-            ? React.createElement(
-                P.Text,
-                { style: { direction: 'rtl' } },
-                doctorName,
-              )
-            : doctorName,
-        ),
-        // Quick task 20260812-redesign-report — instrument line in the
-        // procedure block. Empty when the doctor hasn't picked one
-        // yet; the line is omitted entirely in that case (no
-        // placeholder, matching the premedication pattern above).
-        instrumentLabel !== ''
-          ? React.createElement(
-              P.Text,
-              null,
-              isAr ? 'الجهاز: ' : 'Instrument: ',
-              instrumentLabel,
-            )
-          : null,
-      ),
-
-      // Quick task 20260812-redesign-report — anatomy boxes switch on
-      // procedureType (colon → colon + ileum; upper_gi → esophagus +
-      // stomach + pylorus + duodenum) + always-on conclusion +
-      // recommendation. Body text flows through the bidi wrapper so
-      // Arabic renders RTL while English stays LTR. Each box renders
-      // a '—' placeholder when empty so the PDF keeps its layout even
-      // before the doctor types.
-      procedureType === 'upper_gi'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-esophagus' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Esophagus',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Esophagus'),
-            rtlText('esophagus', esophagus || '—'),
-          )
-        : null,
-      procedureType === 'upper_gi'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-stomach' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Stomach',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Stomach'),
-            rtlText('stomach', stomach || '—'),
-          )
-        : null,
-      procedureType === 'upper_gi'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-pylorus' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Pylorus',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Pylorus'),
-            rtlText('pylorus', pylorus || '—'),
-          )
-        : null,
-      procedureType === 'upper_gi'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-duodenum' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Duodenum',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Duodenum'),
-            rtlText('duodenum', duodenum || '—'),
-          )
-        : null,
-      procedureType === 'colon'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-colon' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Colon',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Colon'),
-            rtlText('colon', colon || '—'),
-          )
-        : null,
-      procedureType === 'colon'
-        ? React.createElement(
-            P.View,
-            { style: styles.section, 'data-testid': 'report-pdf-ileum' },
-            isAr
-              ? React.createElement(
-                  P.Text,
-                  { style: { ...styles.sectionTitle, direction: 'rtl' } },
-                  'Ileum',
-                )
-              : React.createElement(P.Text, { style: styles.sectionTitle }, 'Ileum'),
-            rtlText('ileum', ileum || '—'),
-          )
-        : null,
-      // Conclusion + recommendation always-on regardless of
-      // procedureType.
-      React.createElement(
-        P.View,
-        { style: styles.section, 'data-testid': 'report-pdf-conclusion' },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Conclusion',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Conclusion'),
-        rtlText('conclusion', conclusion || '—'),
-      ),
-      React.createElement(
-        P.View,
-        { style: styles.section, 'data-testid': 'report-pdf-recommendation' },
-        isAr
-          ? React.createElement(
-              P.Text,
-              { style: { ...styles.sectionTitle, direction: 'rtl' } },
-              'Recommendation',
-            )
-          : React.createElement(P.Text, { style: styles.sectionTitle }, 'Recommendation'),
-        rtlText('recommendation', recommendation || '—'),
-      ),
-
-      // Phase 6 UAT G-06-4 — attached screenshots render as small
-      // INLINE thumbnails in a grid BELOW the body sections (not
-      // separate full-page figures). 3 per row, ~120×100px each, with
-      // a "Fig. N" caption under each. The grid is positioned on the
-      // first page (with the body); if the grid overflows, @react-pdf
-      // paginates the rest onto the next page automatically.
-      attachedScreenshots.length > 0
-        ? React.createElement(
-            P.View,
-            { style: styles.screenshotsSection, wrap: false },
-            React.createElement(P.Text, { style: styles.sectionTitle }, 'Attached screenshots'),
-            React.createElement(
-              P.View,
-              { style: styles.screenshotGrid },
-              ...attachedScreenshots.map((s) =>
-                React.createElement(
-                  P.View,
-                  { key: s.screenshotId, style: { marginRight: 8, marginBottom: 8 } },
-                  React.createElement(P.Image, {
-                    src: s.imageBuffer,
-                    style: styles.screenshotThumb,
-                  }),
-                  React.createElement(
-                    P.Text,
-                    { style: styles.screenshotCaption },
-                    `Fig. ${s.sortOrder + 1}`,
-                  ),
-                ),
+                P.View,
+                { key: s.screenshotId, style: styles.extraThumbWrap },
+                React.createElement(P.Image, {
+                  src: s.imageBuffer,
+                  style: styles.extraThumb,
+                }),
               ),
             ),
           )
         : null,
 
-      // Footer — signature placement flips per D-25 + Pitfall 8:
-      // EN = signature bottom-RIGHT (Phase 6 default),
-      // AR = signature bottom-LEFT (Pitfall 8 verbatim).
-      // The flexDirection row-reverse in footerRtl swaps the two
-      // children so the signature group lands on the left.
-      React.createElement(
-        P.View,
-        { style: footerStyle, fixed: true },
-        React.createElement(
-          P.View,
-          { style: { flexDirection: 'row', alignItems: 'center' } },
-          signatureBox !== null
-            ? React.createElement(P.Image, {
-                src: signatureBox.buffer,
-                style: styles.footerSignature,
-              })
-            : null,
-          isAr
-            ? React.createElement(
-                P.Text,
-                { style: { direction: 'rtl' } },
-                doctorName,
-              )
-            : React.createElement(P.Text, null, doctorName),
-        ),
-        React.createElement(
-          P.View,
-          { style: { flexDirection: 'row', alignItems: 'center' } },
-          isAr
-            ? React.createElement(
-                P.Text,
-                { style: { direction: 'rtl' } },
-                clinicName,
-              )
-            : React.createElement(P.Text, null, clinicName),
-          React.createElement(
-            P.Text,
-            {
-              style: { marginLeft: 8 },
-              render: ({ pageNumber, totalPages }: { pageNumber: number; totalPages: number }) =>
-                `Page ${pageNumber} of ${totalPages}`,
-            },
-          ),
-        ),
-      ),
-      // Quick task 260812-ns0 — bottom band: the uploaded footer image
-      // (full-width, ~80px tall) renders below the existing fixed
-      // footer. Null when the doctor hasn't uploaded one; the band is
-      // hidden entirely in that case.
+      // 8. Bottom band — profile footer image.
       footerBox !== null
         ? React.createElement(
             P.Image,
@@ -851,9 +608,3 @@ export function createReportPdfElement(
     ),
   );
 }
-
-// ponytail: Font import removed — Phase 7 i18n re-imports directly
-// from @react-pdf/renderer when needed. Re-exporting Font here
-// triggers a module-init edge case in @react-pdf/renderer 4.5.1
-// when combined with vitest's module isolation, which silently
-// breaks subsequent `pdf().toBuffer()` calls.

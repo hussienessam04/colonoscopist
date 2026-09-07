@@ -158,9 +158,14 @@ describe.skipIf(!smokeEnabled)('AR PDF ship-gate (RPT-06 / D-27)', () => {
     // bytes. Visual Arabic glyph rendering is the manual smoke step
     // per PITFALLS §Pitfall 8.
     reportsRepo.updateDraft(report.id, {
-      findings: 'Patient shows mild inflammation in the lower colon.',
-      diagnosis: 'Mild colitis.',
-      recommendations: 'Repeat exam in one month.',
+      // Quick task 20260907-redesign-pdf-layout — the report body is
+      // now anatomy boxes (colon procedure type), not the legacy
+      // findings/diagnosis/recommendations triplet. Pre-finalize write
+      // to `colon` + `recommendation` mirrors the production flow for
+      // a colon procedure.
+      colon: 'Patient shows mild inflammation in the lower colon.',
+      conclusion: 'Mild colitis.',
+      recommendation: 'Repeat exam in one month.',
     });
 
     // 4. Attach a real (padded) JPEG screenshot to the report. The

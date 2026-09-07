@@ -41,7 +41,6 @@ import { reportPdfPath, reportsDir, profileAssetPath, screenshotAbsPath } from '
 import { ipcError } from '@shared/errors';
 
 import {
-  LOGO_BOX,
   SIGNATURE_BOX,
   readImageBox,
 } from './embed-image';
@@ -110,16 +109,34 @@ function registerNotoArabicIfNeeded(reactPdf: typeof import('@react-pdf/renderer
   return _notoArabicAvailable;
 }
 
-// ponytail: HH:MM:SS duration formatter. Mirrors the format used in
-// REC-04 / ProcedureReview. durationSeconds is the canonical
-// better-sqlite3 integer (Phase 4 D-10).
-function formatHHMMSS(durationSeconds: number): string {
-  const safe = Math.max(0, Math.floor(durationSeconds));
-  const hh = Math.floor(safe / 3600);
-  const mm = Math.floor((safe % 3600) / 60);
-  const ss = safe % 60;
-  const pad = (n: number): string => n.toString().padStart(2, '0');
-  return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+// Quick task 20260907-redesign-pdf-layout — age computation for the
+// "Age: <n> years" field in the patient info box. patient.dob is a
+// yyyy-mm-dd string (ISO date, no timezone); procedure.startedAt is
+// ms epoch (UTC). We compute floor((nowMs - dobMs) / year) using the
+// standard "completed years" rule (same calendar day counts as a full
+// year only when reached). Returns null when dob is empty, malformed,
+// or in the future relative to procedureDateMs.
+function computeAgeYears(dob: string, procedureDateMs: number): number | null {
+  if (!dob) return null;
+  // Parse yyyy-mm-dd directly — `new Date('1980-01-01')` interprets as
+  // UTC midnight per ISO 8601. Subtract ms-epoch via .getTime().
+  const dobMs = Date.parse(`${dob}T00:00:00Z`);
+  if (Number.isNaN(dobMs)) return null;
+  if (dobMs > procedureDateMs) return null;
+  const dobDate = new Date(dobMs);
+  const procDate = new Date(procedureDateMs);
+  let age = procDate.getUTCFullYear() - dobDate.getUTCFullYear();
+  // ponytail: subtract one year if the procedure date hasn't yet
+  // reached the birthday in the current year. UTC accessors avoid
+  // local-time drift (Pitfall 8).
+  const procMonth = procDate.getUTCMonth();
+  const procDay = procDate.getUTCDate();
+  const dobMonth = dobDate.getUTCMonth();
+  const dobDay = dobDate.getUTCDate();
+  if (procMonth < dobMonth || (procMonth === dobMonth && procDay < dobDay)) {
+    age -= 1;
+  }
+  return age >= 0 ? age : null;
 }
 
 export type ReportLanguage = 'en' | 'ar';
@@ -166,20 +183,15 @@ export async function renderReportPdf(
     doctor.language ??
     'en';
 
-  // Plan 06-03 Task 3 — load the logo + signature ImageBox buffers
-  // (null when the doctor hasn't uploaded the asset; the template
-  // renders a "[No logo uploaded]" placeholder in that case). The
-  // path is `profileAssetPath(userId, storedRel)` per Anti-Pattern 2:
-  // the DB stores a userData-relative path; main resolves to absolute
-  // at read time.
-  //
   // Quick task 260812-ns0 — header + footer image boxes (top/bottom
   // band on every PDF page). The same `readImageBox` helper handles
   // header/footer — natural aspect ratio + buffer; the template
   // computes the actual on-page size from the report page width.
-  const logoBox = profile?.logoPath
-    ? readImageBox(profileAssetPath(report.doctorId, profile.logoPath), LOGO_BOX)
-    : null;
+  //
+  // Quick task 20260907-redesign-pdf-layout — signature image moves
+  // into the body (between the recommendation and the extra
+  // screenshots). LOGO_BOX is gone — the header band IS the page
+  // header now, no logo + clinic-name row beneath it.
   const signatureBox = profile?.signaturePath
     ? readImageBox(profileAssetPath(report.doctorId, profile.signaturePath), SIGNATURE_BOX)
     : null;
@@ -219,23 +231,23 @@ export async function renderReportPdf(
     });
   }
 
-  // Quick task 260812-ns0 — load used-devices for the report (sorted
+// Quick task 260812-ns0 — load used-devices for the report (sorted
   // by sort_order ASC, then created_at ASC per the repo's listByProfile).
   // Empty array when the doctor hasn't added any devices; the template
   // hides the section in that case.
+  //
+  // Quick task 20260907-redesign-pdf-layout — usedDevices is no longer
+  // rendered in the PDF body. We still resolve the instrument name
+  // from the list (per-report override → used_devices.id → name),
+  // so the device lookup stays.
   const usedDevicesRows = profile
-    ? usedDevicesRepo.listByProfile(profile.id).map((d) => ({
-        id: d.id,
-        name: d.name,
-        notes: d.notes,
-      }))
+    ? usedDevicesRepo.listByProfile(profile.id)
     : [];
 
-  // Quick task 20260812-redesign-report — resolve the instrument name
+  // Quick task 20260812-redesign-report — resolve the instrument label
   // from used_devices.id. Empty string when the doctor hasn't picked
-  // one; the template omits the "Instrument:" line in that case
-  // (matching the premedication pattern). Per-report override falls
-  // back to the profile default.
+  // one; the template omits the field in that case (matching the
+  // premedication pattern).
   const instrumentLabel =
     report.instrument !== null
       ? (usedDevicesRows.find((d) => d.id === report.instrument)?.name ?? '')
@@ -245,31 +257,41 @@ export async function renderReportPdf(
       ? report.premedicationOverride
       : (profile?.premedication ?? null);
 
+  // Quick task 20260907-redesign-pdf-layout — compute patient age
+  // (whole years) from dob + procedure.startedAt. patient.dob is a
+  // yyyy-mm-dd string; procedure.startedAt is ms epoch (UTC). Returns
+  // null when dob is missing or unparseable so the template hides the
+  // age column gracefully.
+  const patientAgeYears: number | null = computeAgeYears(
+    patient.dob,
+    procedure.startedAt,
+  );
+
   const input: ReportPdfInput = {
-    logoBox,
-    signatureBox,
-    // Quick task 260812-ns0 — header / footer image bands + used
-    // devices + premedication. Each is null / empty when the source
-    // is unset; the template handles the null / empty case by hiding
-    // the section entirely (no placeholder text).
+    // Quick task 260812-ns0 — header / footer image bands. Each is
+    // null when the source is unset; the template handles the null
+    // case by hiding the band entirely (no placeholder).
+    //
+    // Quick task 20260907-redesign-pdf-layout — logoBox dropped
+    // (header band alone IS the page header). signatureBox moves
+    // into the body (between the recommendation and the extra
+    // screenshots).
     headerBox,
     footerBox,
-    usedDevices: usedDevicesRows,
-    premedication: premedicationText,
-    clinicName: profile?.clinicNameEn ?? 'Clinic',
-    doctorName: `Dr. ${doctor.full_name}`,
-    procedureDateLabel: new Date(procedure.startedAt).toISOString().slice(0, 10),
-    patientName: patient.fullName,
-    patientMrn: patient.mrn,
-    patientDob: patient.dob,
-    patientGender: patient.gender,
-    procedureDurationLabel: formatHHMMSS(procedure.durationSeconds),
-    // Quick task 20260812-redesign-report — procedure-type toggle +
-    // 8 box columns + instrument line. The template renders anatomy
-    // boxes conditional on procedureType + always-on conclusion +
-    // recommendation.
-    procedureType: report.procedureType,
+    signatureBox,
+    // Info box 1 — instrument + pre-medication.
     instrumentLabel,
+    premedication: premedicationText,
+    // Info box 2 — name + age + date.
+    patientName: patient.fullName,
+    patientAgeYears,
+    procedureDateLabel: new Date(procedure.startedAt).toISOString().slice(0, 10),
+    // Signature block — printed doctor name (signature image is above).
+    doctorName: `Dr. ${doctor.full_name}`,
+    // Procedure-type toggle + 8 box columns. The template renders
+    // anatomy boxes conditional on procedureType + always-on
+    // conclusion + recommendation.
+    procedureType: report.procedureType,
     esophagus: report.esophagus,
     stomach: report.stomach,
     pylorus: report.pylorus,
