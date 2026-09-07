@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { ArrowRight, Camera, Video } from 'lucide-react';
+import { ArrowRight, Camera, CircleDot, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -16,6 +16,25 @@ import EmptyStateCard from '@/components/EmptyStateCard';
 import { useRoute } from '@/store/route';
 import { safeInvoke } from '@/lib/ipc-result';
 import type { Procedure } from '@shared/ipc-contract';
+
+// Quick task 20260907-procedure-preview-ui-enhance — design
+// tokens lifted verbatim from ProcedureReview.tsx + ProcedureRoom
+// .tsx so the three pages share the "clinical workstation"
+// palette + chrome. Kept inline rather than promoted to a shared
+// module (small surface; a future design-system pass would
+// extract).
+const CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-white shadow-sm";
+const RAIL_CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-[#E6EFF1] p-4 shadow-sm transition-colors hover:border-[#A8C5B5]";
+const SMALL_CAPS_LABEL =
+  "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]";
+const SMALL_CAPS_FIELD =
+  "text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]";
+const SECONDARY_OUTLINE_BUTTON =
+  "border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]";
+const PRIMARY_TEAL_BUTTON =
+  "bg-[#0E3A47] text-white hover:bg-[#0B2C36] shadow-inner";
 
 function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Element {
   return (
@@ -149,18 +168,30 @@ export default function ProcedurePreview(): JSX.Element {
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+    <main className="min-h-screen bg-slate-50 p-6">
+      {/* Quick task 20260907-procedure-preview-ui-enhance —
+          dropped `mx-auto max-w-7xl` so the page spans full
+          width (matches ProcedureReview + ProcedureRoom). */}
+      <div className="flex flex-col gap-5">
+        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-3">
           <div>
-            <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-              Preview &amp; Setup
+            {/* Quick task 20260907-procedure-preview-ui-enhance —
+                kicker text ("Preview") is intentionally distinct
+                from the h1 ("Preview & setup") so existing tests
+                that search for /preview/i don't match both. */}
+            <p className={SMALL_CAPS_FIELD}>Preview</p>
+            <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
+              Preview &amp; setup
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Pick the capture device, frame the shot, then continue to recording.
-            </p>
           </div>
-          <Button variant="outline" onClick={() => navigate({ name: 'patients' })}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate({ name: 'patients' })}
+            data-testid="procedure-preview-back"
+            className={SECONDARY_OUTLINE_BUTTON}
+          >
+            <ArrowRight className="size-4 mr-1 rotate-180" aria-hidden="true" />
             Back to patients
           </Button>
         </header>
@@ -168,8 +199,14 @@ export default function ProcedurePreview(): JSX.Element {
         <section
           className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'}`}
         >
-          <div className="overflow-hidden rounded-xl border border-slate-800 bg-black shadow-2xl">
-            <div className="relative aspect-video">
+          {/* Quick task 20260907-procedure-preview-ui-enhance —
+              live preview card uses the same warm-ivory
+              CARD_CHROME as ProcedureReview + ProcedureRoom.
+              The dark `bg-slate-900` stays for the video frame
+              itself — Chromium native controls need the dark
+              backdrop. */}
+          <div className={`overflow-hidden ${CARD_CHROME}`}>
+            <div className="relative aspect-video bg-slate-900">
               <video
                 ref={preview.videoRef}
                 autoPlay
@@ -188,7 +225,10 @@ export default function ProcedurePreview(): JSX.Element {
                     <Video aria-hidden="true" className="size-9 text-rose-400" />
                     <p className="font-medium">Could not open the capture device.</p>
                     <p className="text-xs text-slate-300">{preview.error.message}</p>
-                    <Button variant="secondary" onClick={() => preview.start()}>
+                    <Button
+                      variant="secondary"
+                      onClick={() => preview.start()}
+                    >
                       Retry
                     </Button>
                   </div>
@@ -198,16 +238,34 @@ export default function ProcedurePreview(): JSX.Element {
           </div>
 
           {!notesCollapsed ? (
-            <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm">
+            <aside className={`flex flex-col gap-4 ${RAIL_CARD_CHROME}`}>
               <div className="flex items-center justify-between">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Side panel
-                </p>
+                <div className="flex items-center gap-2">
+                  <Camera className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
+                  <p className={SMALL_CAPS_LABEL}>Capture device</p>
+                  {/* Quick task 20260907-procedure-preview-ui-enhance —
+                      signature element: live status pill that
+                      echoes the live/streaming state in mono +
+                      a pulsing dot. The pill sits in the header
+                      row so the doctor sees live state at a
+                      glance without reading the body text. */}
+                  <span
+                    data-testid="procedure-preview-live-pill"
+                    className="ml-1 inline-flex items-center gap-1 rounded-full bg-white px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-[#0E3A47] shadow-sm ring-1 ring-[#E0D9C6]"
+                  >
+                    <CircleDot
+                      className={`size-3 ${isRunning ? "text-[#0E3A47] animate-pulse" : "text-slate-400"}`}
+                      aria-hidden="true"
+                    />
+                    {isRunning ? "Live" : "Idle"}
+                  </span>
+                </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setNotesCollapsed(true)}
-                  aria-label="Collapse notes panel"
+                  aria-label="Collapse side panel"
+                  className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   Hide
                 </Button>
@@ -219,7 +277,15 @@ export default function ProcedurePreview(): JSX.Element {
               ) : null}
 
               <div className="flex flex-col gap-2">
-                <label htmlFor="procedure-device" className="text-sm font-medium">
+                {/* Quick task 20260907-procedure-preview-ui-enhance —
+                    the small-caps 'Capture device' header above
+                    is the visual label. The `<label
+                    className="sr-only">` here is the accessible
+                    label so the <Select> trigger gets a real
+                    `<label htmlFor>` association + existing
+                    tests using `findByLabelText(/capture device/i)`
+                    still resolve. */}
+                <label htmlFor="procedure-device" className="sr-only">
                   Capture device
                 </label>
                 <Select
@@ -242,21 +308,22 @@ export default function ProcedurePreview(): JSX.Element {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">
+                <p className="font-mono text-[11px] tabular-nums text-[#5C6770]">
                   {selectedCanonical ? `Using: ${selectedCanonical}` : 'Pick a device to enable preview'}
                 </p>
               </div>
 
               <div
-                className="flex flex-col gap-2 rounded-md border border-slate-200 p-3"
+                className="flex items-center gap-2 rounded-md border border-[#E0D9C6] bg-white px-3 py-2"
                 data-testid="preview-step"
               >
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  Preview
-                </p>
-                <p className="text-sm text-foreground">
-                  {isRunning ? 'Streaming live feed.' : 'Idle.'}
-                </p>
+                <Video className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
+                <p className={SMALL_CAPS_FIELD}>Preview</p>
+                <span
+                  className="ml-auto font-mono text-[11px] tabular-nums text-[#13202E]"
+                >
+                  {isRunning ? "Streaming live feed" : "Idle"}
+                </span>
               </div>
 
               <Button
@@ -264,10 +331,10 @@ export default function ProcedurePreview(): JSX.Element {
                 disabled={creating || !patientId}
                 data-testid="continue-to-recording-button"
                 size="lg"
-                className="w-full"
+                className={`mt-2 w-full ${PRIMARY_TEAL_BUTTON}`}
               >
                 {creating ? 'Preparing…' : 'Continue to recording'}
-                <ArrowRight aria-hidden="true" />
+                <ArrowRight aria-hidden="true" className="ml-1 size-4" />
               </Button>
               {procedureError ? (
                 <p
@@ -279,7 +346,7 @@ export default function ProcedurePreview(): JSX.Element {
                 </p>
               ) : null}
               {gated ? <EmptyStateCard /> : null}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-[#5C6770]">
                 {creating
                   ? 'Preparing procedure row…'
                   : procedureId
@@ -294,6 +361,7 @@ export default function ProcedurePreview(): JSX.Element {
                 size="sm"
                 onClick={() => setNotesCollapsed(false)}
                 aria-label="Show side panel"
+                className={SECONDARY_OUTLINE_BUTTON}
               >
                 Show side panel
               </Button>
