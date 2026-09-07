@@ -415,7 +415,13 @@ export default function ProcedureReview({
           </div>
         </header>
 
-        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {/* Quick task 20260907-procedure-review-3-columns — page
+            laid out as 3 columns on lg+ screens: (1) video +
+            Scrubber, (2) Notes + Trim + Procedure metadata +
+            Report CTA (the "middle rail"), (3) Screenshots (the
+            dedicated right column). Smaller screens stack the
+            columns single-column via `grid-cols-1`. */}
+        <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px_320px]">
           <div
             className={`flex flex-col gap-4 ${CARD_CHROME} p-4`}
             data-testid="procedure-review-left"
@@ -498,9 +504,13 @@ export default function ProcedureReview({
             </div>
           </div>
 
+          {/* Middle rail — Notes + Trim + Procedure metadata +
+              Report CTA. Same chrome as before, just now a
+              standalone column instead of being grouped with
+              Screenshots. */}
           <aside
             className="flex flex-col gap-4"
-            data-testid="procedure-review-right"
+            data-testid="procedure-review-middle"
           >
             <div className={RAIL_CARD_CHROME}>
               <p className={SMALL_CAPS_LABEL}>Notes</p>
@@ -508,31 +518,6 @@ export default function ProcedureReview({
                 <ProcedureNotesReview
                   procedureId={procedureId}
                   status={procedure?.status ?? 'completed'}
-                />
-              </div>
-            </div>
-
-            {/* Quick task 20260907-procedure-review-full-width-rail —
-                the ScreenshotTimeline moved from below the
-                video (inside the left column) into the right
-                rail, directly under Notes. Same shape as the
-                Report Editor's screenshot column (right side,
-                vertical stack). */}
-            <div className={RAIL_CARD_CHROME} data-testid="procedure-review-screenshots">
-              <p className={SMALL_CAPS_LABEL}>Screenshots</p>
-              <div className="mt-2">
-                <ScreenshotTimeline
-                  procedureId={procedureId}
-                  patientId={procedure?.patientId ?? ''}
-                  mediaBaseUrl={mediaUrl.url}
-                  status={procedure?.status}
-                  screenshots={screenshots}
-                  onSeek={handleSeek}
-                  onCapture={handleCapture}
-                  onDelete={handleDelete}
-                  onAnnotate={handleAnnotate}
-                  onOpen={setLightboxScreenshot}
-                  mediaCacheBuster={croppedAtMs}
                 />
               </div>
             </div>
@@ -631,6 +616,33 @@ export default function ProcedureReview({
                 onDismiss={() => recordingStore.clearLastLost()}
               />
             ) : null}
+          </aside>
+
+          {/* Right column — Screenshots box. Dedicated column
+              (matches the right-side screenshot column in the
+              Report Editor). */}
+          <aside
+            className="flex flex-col gap-4"
+            data-testid="procedure-review-screenshots-rail"
+          >
+            <div className={RAIL_CARD_CHROME} data-testid="procedure-review-screenshots">
+              <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+              <div className="mt-2">
+                <ScreenshotTimeline
+                  procedureId={procedureId}
+                  patientId={procedure?.patientId ?? ''}
+                  mediaBaseUrl={mediaUrl.url}
+                  status={procedure?.status}
+                  screenshots={screenshots}
+                  onSeek={handleSeek}
+                  onCapture={handleCapture}
+                  onDelete={handleDelete}
+                  onAnnotate={handleAnnotate}
+                  onOpen={setLightboxScreenshot}
+                  mediaCacheBuster={croppedAtMs}
+                />
+              </div>
+            </div>
           </aside>
         </section>
         {/* Plan 07 / G-05-10 — lightbox mounts at the page root so the
