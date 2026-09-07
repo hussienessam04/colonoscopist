@@ -358,16 +358,18 @@ export default function ProcedureReview({
   if (!procedureId) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-7xl">
-          <p className="text-sm text-slate-500">Missing procedure id.</p>
-        </div>
+        <p className="text-sm text-slate-500">Missing procedure id.</p>
       </main>
     );
   }
 
   return (
     <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto flex max-w-7xl flex-col gap-5">
+      {/* Quick task 20260907-procedure-review-full-width-rail —
+          outer wrapper dropped `mx-auto max-w-7xl` so the
+          document card + grid span the full window width
+          (matches the wider feel of the Report Editor). */}
+      <div className="flex flex-col gap-5">
         <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-3">
           <div>
             <p className={SMALL_CAPS_FIELD}>
@@ -493,19 +495,6 @@ export default function ProcedureReview({
                   trim.setOutMs(range.outMs);
                 }}
               />
-              <ScreenshotTimeline
-                procedureId={procedureId}
-                patientId={procedure?.patientId ?? ''}
-                mediaBaseUrl={mediaUrl.url}
-                status={procedure?.status}
-                screenshots={screenshots}
-                onSeek={handleSeek}
-                onCapture={handleCapture}
-                onDelete={handleDelete}
-                onAnnotate={handleAnnotate}
-                onOpen={setLightboxScreenshot}
-                mediaCacheBuster={croppedAtMs}
-              />
             </div>
           </div>
 
@@ -519,6 +508,31 @@ export default function ProcedureReview({
                 <ProcedureNotesReview
                   procedureId={procedureId}
                   status={procedure?.status ?? 'completed'}
+                />
+              </div>
+            </div>
+
+            {/* Quick task 20260907-procedure-review-full-width-rail —
+                the ScreenshotTimeline moved from below the
+                video (inside the left column) into the right
+                rail, directly under Notes. Same shape as the
+                Report Editor's screenshot column (right side,
+                vertical stack). */}
+            <div className={RAIL_CARD_CHROME} data-testid="procedure-review-screenshots">
+              <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+              <div className="mt-2">
+                <ScreenshotTimeline
+                  procedureId={procedureId}
+                  patientId={procedure?.patientId ?? ''}
+                  mediaBaseUrl={mediaUrl.url}
+                  status={procedure?.status}
+                  screenshots={screenshots}
+                  onSeek={handleSeek}
+                  onCapture={handleCapture}
+                  onDelete={handleDelete}
+                  onAnnotate={handleAnnotate}
+                  onOpen={setLightboxScreenshot}
+                  mediaCacheBuster={croppedAtMs}
                 />
               </div>
             </div>
