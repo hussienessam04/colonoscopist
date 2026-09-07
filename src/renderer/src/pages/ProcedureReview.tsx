@@ -21,9 +21,9 @@
 // internals (Scrubber, ScreenshotTimeline, TrimControls,
 // ProcedureNotesReview, ScreenshotLightbox) are untouched.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowLeft, FileText } from 'lucide-react';
+import { ArrowLeft, Calendar, CalendarClock, Clock, FileText, NotebookPen, Scissors, User } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,8 +56,12 @@ import type { Patient, Procedure, Screenshot } from '@shared/ipc-contract';
 // is small enough that duplication beats indirection right now.
 const CARD_CHROME =
   "rounded-lg border border-[#E0D9C6] bg-white shadow-sm";
+// Quick task 20260907-procedure-review-design-enhance —
+// `hover:border-[#A8C5B5] transition-colors` adds a subtle
+// teal-tint hover state on the rail cards so the doctor can
+// see the card is interactive at a glance. Stays quiet otherwise.
 const RAIL_CARD_CHROME =
-  "rounded-lg border border-[#E0D9C6] bg-[#E6EFF1] p-4 shadow-sm";
+  "rounded-lg border border-[#E0D9C6] bg-[#E6EFF1] p-4 shadow-sm transition-colors hover:border-[#A8C5B5]";
 const SMALL_CAPS_LABEL =
   "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]";
 const SMALL_CAPS_FIELD =
@@ -66,6 +70,75 @@ const SECONDARY_OUTLINE_BUTTON =
   "border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]";
 const PRIMARY_TEAL_BUTTON =
   "bg-[#0E3A47] text-white hover:bg-[#0B2C36] shadow-inner";
+
+// Quick task 20260907-procedure-review-design-enhance — small
+// inline component that shows a mono timestamp badge in the
+// top-LEFT corner of the video frame. Subscribes to the video's
+// `timeupdate` event to keep the badge in sync. Hidden when the
+// video isn't ready (no ref / no src / no duration yet). Reads as
+// "clinical instrumentation" (think: medical monitor showing
+// procedure elapsed time) — one signature element on the page.
+function VideoTimestampBadge({
+  videoRef,
+}: {
+  videoRef: React.RefObject<HTMLVideoElement | null>;
+}): JSX.Element | null {
+  const [now, setNow] = React.useState<number>(0);
+  const [duration, setDuration] = React.useState<number>(0);
+  const [ready, setReady] = React.useState<boolean>(false);
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const onTime = (): void => {
+      setNow(v.currentTime);
+      if (Number.isFinite(v.duration) && v.duration > 0) {
+        setDuration(v.duration);
+      }
+    };
+    const onLoaded = (): void => {
+      if (Number.isFinite(v.duration) && v.duration > 0) {
+        setDuration(v.duration);
+        setReady(true);
+      }
+    };
+    const onPlay = (): void => {
+      setReady(true);
+    };
+    v.addEventListener("timeupdate", onTime);
+    v.addEventListener("loadedmetadata", onLoaded);
+    v.addEventListener("durationchange", onLoaded);
+    v.addEventListener("play", onPlay);
+    // Initial sync — covers the case where the video loaded
+    // before the effect ran.
+    onLoaded();
+    return () => {
+      v.removeEventListener("timeupdate", onTime);
+      v.removeEventListener("loadedmetadata", onLoaded);
+      v.removeEventListener("durationchange", onLoaded);
+      v.removeEventListener("play", onPlay);
+    };
+  }, [videoRef]);
+  if (!ready || duration <= 0) return null;
+  const fmt = (sec: number): string => {
+    const safe = Math.max(0, Math.floor(sec));
+    const hh = Math.floor(safe / 3600);
+    const mm = Math.floor((safe % 3600) / 60);
+    const ss = safe % 60;
+    const pad = (n: number): string => n.toString().padStart(2, "0");
+    return `${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+  };
+  return (
+    <div
+      data-testid="procedure-review-video-timestamp"
+      className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-1 rounded bg-black/65 px-2 py-1 font-mono text-[11px] tabular-nums text-white shadow-md backdrop-blur-sm"
+    >
+      <span className="text-[#5EEAD4]">●</span>
+      <span>{fmt(now)}</span>
+      <span className="text-white/55">/</span>
+      <span className="text-white/75">{fmt(duration)}</span>
+    </div>
+  );
+}
 
 function formatTimestamp(ms: number | null): string {
   if (ms === null) return '—';
@@ -427,25 +500,37 @@ export default function ProcedureReview({
             data-testid="procedure-review-left"
           >
             {gated ? <EmptyStateCard /> : null}
-            <div className="overflow-hidden rounded-md border border-[#E0D9C6] bg-slate-900">
+            <div className="relative overflow-hidden rounded-md border border-[#E0D9C6] bg-slate-900">
               {mediaUrl.url && videoSrc ? (
-                <video
-                  ref={videoRef}
-                  controls
-                  // G-05-3 + D-01 — crossOrigin=anonymous tells Chromium to
-                  // issue a CORS-mode request. The server's
-                  // Access-Control-Allow-Origin: * header (set as the
-                  // first line of MediaServer.onHttpRequest) lets the
-                  // load succeed, and the resulting HTMLVideoElement is
-                  // not a tainted canvas source — ctx.drawImage + toBlob
-                  // works without throwing.
-                  crossOrigin="anonymous"
-                  preload="metadata"
-                  className="aspect-video w-full"
-                  data-testid="procedure-review-video"
-                  aria-label="Procedure recording playback"
-                  src={videoSrc ?? undefined}
-                />
+                <>
+                  <video
+                    ref={videoRef}
+                    controls
+                    // G-05-3 + D-01 — crossOrigin=anonymous tells Chromium to
+                    // issue a CORS-mode request. The server's
+                    // Access-Control-Allow-Origin: * header (set as the
+                    // first line of MediaServer.onHttpRequest) lets the
+                    // load succeed, and the resulting HTMLVideoElement is
+                    // not a tainted canvas source — ctx.drawImage + toBlob
+                    // works without throwing.
+                    crossOrigin="anonymous"
+                    preload="metadata"
+                    className="aspect-video w-full"
+                    data-testid="procedure-review-video"
+                    aria-label="Procedure recording playback"
+                    src={videoSrc ?? undefined}
+                  />
+                  {/* Quick task 20260907-procedure-review-design-enhance —
+                      one signature element on the page: the mono
+                      timestamp badge in the top-LEFT of the video
+                      frame. Reads as clinical instrumentation
+                      (medical monitor showing procedure elapsed time)
+                      without being gimmicky. Sits ABOVE the
+                      <video> via the relative parent + absolute
+                      positioning + pointer-events-none so it
+                      doesn't block native controls. */}
+                  <VideoTimestampBadge videoRef={videoRef} />
+                </>
               ) : null}
               {!mediaUrl.url ? (
                 <Card
@@ -513,7 +598,13 @@ export default function ProcedureReview({
             data-testid="procedure-review-middle"
           >
             <div className={RAIL_CARD_CHROME}>
-              <p className={SMALL_CAPS_LABEL}>Notes</p>
+              {/* Quick task 20260907-procedure-review-design-enhance —
+                  small Lucide icon next to the section label adds
+                  visual rhythm without adding color or weight. */}
+              <div className="flex items-center gap-2">
+                <NotebookPen className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
+                <p className={SMALL_CAPS_LABEL}>Notes</p>
+              </div>
               <div className="mt-2">
                 <ProcedureNotesReview
                   procedureId={procedureId}
@@ -523,7 +614,10 @@ export default function ProcedureReview({
             </div>
 
             <div className={RAIL_CARD_CHROME}>
-              <p className={SMALL_CAPS_LABEL}>Trim</p>
+              <div className="flex items-center gap-2">
+                <Scissors className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
+                <p className={SMALL_CAPS_LABEL}>Trim</p>
+              </div>
               <div className="mt-2">
                 <TrimControls
                   status={procedure?.status ?? 'completed'}
@@ -551,21 +645,25 @@ export default function ProcedureReview({
               <p className={SMALL_CAPS_LABEL}>Procedure</p>
               {procedure ? (
                 <div className="mt-1 grid grid-cols-1 gap-2 font-mono text-xs tabular-nums text-[#13202E]">
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <User className="size-3 text-[#8C8478]" aria-hidden="true" />
                     <span className={SMALL_CAPS_FIELD}>Patient</span>{" "}
-                    {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
+                    <span>{patient ? patient.fullName : procedure.patientId.slice(0, 8)}</span>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="size-3 text-[#8C8478]" aria-hidden="true" />
                     <span className={SMALL_CAPS_FIELD}>Started</span>{" "}
-                    {formatTimestamp(procedure.startedAt)}
+                    <span>{formatTimestamp(procedure.startedAt)}</span>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <CalendarClock className="size-3 text-[#8C8478]" aria-hidden="true" />
                     <span className={SMALL_CAPS_FIELD}>Ended</span>{" "}
-                    {formatTimestamp(procedure.endedAt)}
+                    <span>{formatTimestamp(procedure.endedAt)}</span>
                   </div>
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="size-3 text-[#8C8478]" aria-hidden="true" />
                     <span className={SMALL_CAPS_FIELD}>Duration</span>{" "}
-                    {formatDurationHHMMSS(durationMs)}
+                    <span>{formatDurationHHMMSS(durationMs)}</span>
                   </div>
                 </div>
               ) : (
