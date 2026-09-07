@@ -344,4 +344,35 @@ describe('Audit page', () => {
     expect(auditButton).toBeInTheDocument();
     expect(auditButton.getAttribute('data-active')).toBe('true');
   });
+
+  // Regression: 260907-lk4 follow-up. The user's reported symptom was
+  // "clicking Next on the Audit table doesn't change the data". Root
+  // cause was a stale closure in useAudit — `useCallback([])` for the
+  // refresh callback captured the FIRST render's page=1, so the IPC
+  // always re-fetched page=1 regardless of subsequent state updates.
+  // This end-to-end test clicks the Next button and asserts the IPC
+  // gets called with the new page number. Locks the contract so this
+  // can't regress again.
+  it('clicking Next re-fetches audit.list with the new page (regression)', async () => {
+    const api = getApi();
+    api.audit.list
+      .mockResolvedValueOnce({ rows: [ROW], total: 250 })
+      .mockResolvedValueOnce({ rows: [ROW2], total: 250 });
+    await renderAudit();
+    // Initial mount fetches page=1.
+    await waitFor(() => expect(api.audit.list).toHaveBeenCalledTimes(1));
+    expect(api.audit.list.mock.calls[0]?.[0]).toMatchObject({ page: 1 });
+    await waitFor(() => expect(screen.getAllByTestId('audit-row')).toHaveLength(1));
+    // Sanity: the Next button is enabled (total=250 + pageSize=100 → page 2 exists).
+    const next = screen.getByTestId('audit-next');
+    expect(next).not.toBeDisabled();
+    // Click Next → React state update → useAudit should re-fetch with page=2.
+    fireEvent.click(next);
+    await waitFor(() => expect(api.audit.list).toHaveBeenCalledTimes(2));
+    expect(api.audit.list.mock.calls[1]?.[0]).toMatchObject({ page: 2 });
+    // The new row (ROW2) renders — proves the response actually replaced state.
+    await waitFor(() =>
+      expect(screen.getByTestId('audit-row').textContent).toContain('backup.created'),
+    );
+  });
 });
