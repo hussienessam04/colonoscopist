@@ -72,13 +72,17 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
           );
 
   return (
-    <aside className="flex flex-col gap-3 rounded-lg border bg-card p-4 shadow-sm">
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+    <aside className="flex flex-col gap-2 rounded-lg border border-[#E0D9C6] bg-[#EFEAE0] p-4 shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
         Sections
       </p>
       <Button
         variant={activeTab === 'capture' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'capture'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
         onClick={() => navigate({ name: 'settings-capture' })}
         data-testid="settings-hub-capture"
         data-active={activeTab === 'capture' ? 'true' : 'false'}
@@ -88,7 +92,11 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       </Button>
       <Button
         variant={activeTab === 'profile' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'profile'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
         onClick={() => navigate({ name: 'profile-edit' })}
         data-testid="settings-hub-profile"
         data-active={activeTab === 'profile' ? 'true' : 'false'}
@@ -98,7 +106,11 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       </Button>
       <Button
         variant={activeTab === 'audit' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'audit'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
         onClick={() => navigate({ name: 'audit' })}
         data-testid="settings-hub-audit"
         data-active={activeTab === 'audit' ? 'true' : 'false'}
@@ -108,7 +120,11 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       </Button>
       <Button
         variant={activeTab === 'license' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'license'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
         onClick={() => navigate({ name: 'license' })}
         data-testid="settings-hub-license"
         data-active={activeTab === 'license' ? 'true' : 'false'}
@@ -124,7 +140,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
               aria-hidden="true"
             />
             <span
-              className="ms-2 truncate text-xs font-normal opacity-80"
+              className="ms-2 truncate text-xs font-normal text-[#A39A86]"
               data-testid="settings-hub-license-badge"
             >
               {licenseBadge}
@@ -134,7 +150,11 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       </Button>
       <Button
         variant={activeTab === 'backup-restore' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'backup-restore'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
         onClick={() => navigate({ name: 'backup-restore' })}
         data-testid="settings-hub-backup-restore"
         data-active={activeTab === 'backup-restore' ? 'true' : 'false'}
@@ -144,7 +164,11 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       </Button>
       <Button
         variant={activeTab === 'users' ? 'default' : 'outline'}
-        className="justify-start"
+        className={
+          activeTab === 'users'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47] disabled:opacity-50 disabled:cursor-not-allowed'
+        }
         onClick={() => navigate({ name: 'settings-users' })}
         disabled={!isAdmin}
         title={isAdmin ? 'Manage users' : 'Admin only'}

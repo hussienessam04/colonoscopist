@@ -219,6 +219,7 @@ export default function SettingsCapture(): JSX.Element {
           onClick={() => void handleSave()}
           disabled={!canSave}
           data-testid="save-capture"
+          className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
         >
           <Save className="size-4 mr-1" aria-hidden="true" />
           {saving ? 'Saving…' : 'Save'}
@@ -244,9 +245,9 @@ export default function SettingsCapture(): JSX.Element {
           </div>
         </div>
 
-        <aside className="flex flex-col gap-5 rounded-xl border bg-card p-5 shadow-sm">
+        <aside className="flex flex-col gap-5 rounded-xl border border-[#E0D9C6] bg-[#FBF7EE] p-5 shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#5C6770]">
               Last used: {savedDeviceId ?? 'None'}
             </p>
             <Label htmlFor="settings-capture-device">Capture device</Label>
@@ -255,7 +256,11 @@ export default function SettingsCapture(): JSX.Element {
               onValueChange={handleDeviceChange}
               disabled={browser.length === 0}
             >
-              <SelectTrigger id="settings-capture-device" aria-label="Capture device">
+              <SelectTrigger
+                id="settings-capture-device"
+                aria-label="Capture device"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
+              >
                 <SelectValue placeholder="Select a device" />
               </SelectTrigger>
               <SelectContent>
@@ -271,7 +276,7 @@ export default function SettingsCapture(): JSX.Element {
           </div>
 
           {noSavedDevice ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#8C8478]">
               <Settings aria-hidden="true" className="mr-1 inline-block size-4" />
               No device saved yet. Pick one to enable Save.
             </p>
@@ -279,7 +284,7 @@ export default function SettingsCapture(): JSX.Element {
 
           {gated ? <EmptyStateCard /> : null}
 
-          <fieldset className="flex flex-col gap-2">
+          <fieldset className="flex flex-col gap-2 accent-[#0E3A47]">
             <legend className="text-sm font-medium">Quality preset</legend>
             <div className="flex flex-col gap-1 text-sm">
               <label className="flex items-center gap-2">
@@ -318,7 +323,7 @@ export default function SettingsCapture(): JSX.Element {
             </div>
 
             {form.kind === 'custom' ? (
-              <div className="flex flex-col gap-3 rounded-md border bg-background p-3">
+              <div className="flex flex-col gap-3 rounded-md border border-[#E0D9C6] bg-[#FBF7EE] p-3">
                 <div className="flex flex-col gap-1">
                   <Label htmlFor="settings-capture-resolution">Resolution (W×H)</Label>
                   <Input
@@ -328,6 +333,7 @@ export default function SettingsCapture(): JSX.Element {
                     placeholder="1920x1080"
                     aria-invalid={!customResolutionValid}
                     data-testid="custom-resolution"
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                   {!customResolutionValid ? (
                     <p role="alert" className="text-xs text-destructive">
@@ -341,7 +347,11 @@ export default function SettingsCapture(): JSX.Element {
                     value={String(form.framerate)}
                     onValueChange={(value) => setFramerate(Number(value))}
                   >
-                    <SelectTrigger id="settings-capture-framerate" aria-label="Framerate">
+                    <SelectTrigger
+                      id="settings-capture-framerate"
+                      aria-label="Framerate"
+                      className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
+                    >
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -367,7 +377,11 @@ export default function SettingsCapture(): JSX.Element {
 
           <div className="mt-auto flex flex-col gap-2">
             {isPreviewing ? (
-              <Button variant="outline" onClick={preview.stop}>
+              <Button
+                variant="outline"
+                onClick={preview.stop}
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
+              >
                 Stop Preview
               </Button>
             ) : (
@@ -375,6 +389,7 @@ export default function SettingsCapture(): JSX.Element {
                 onClick={preview.start}
                 disabled={!selectedBrowserId || !previewPreset}
                 data-testid="start-preview"
+                className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
               >
                 <Video aria-hidden="true" />
                 Start Preview

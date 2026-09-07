@@ -116,10 +116,10 @@ function AssetUploader({
     logo: t('profile.uploadLogo'),
   }[kind];
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div className="flex flex-col gap-2 rounded-lg border border-[#E0D9C6] bg-[#FBF7EE] p-3">
       <p className="text-sm font-medium">{label}</p>
       <p
-        className="text-xs text-muted-foreground"
+        className="text-xs text-[#8C8478]"
         data-testid={`profile-editor-${kind}-status`}
       >
         {uploadedAt === null
@@ -130,11 +130,11 @@ function AssetUploader({
         <img
           src={preview}
           alt={`${label} preview`}
-          className="max-h-[80px] max-w-full rounded border border-slate-200 bg-white object-contain p-1"
+          className="max-h-[80px] max-w-full rounded border border-[#E0D9C6] bg-white object-contain p-1"
           data-testid={`profile-editor-${kind}-preview`}
         />
       ) : (
-        <div className="flex h-[80px] items-center justify-center rounded border border-dashed border-slate-300 bg-white text-xs text-muted-foreground">
+        <div className="flex h-[80px] items-center justify-center rounded border border-dashed border-[#E0D9C6] bg-white text-xs text-[#8C8478]">
           {t('profile.noPreview')}
         </div>
       )}
@@ -143,7 +143,7 @@ function AssetUploader({
         size="sm"
         onClick={onPick}
         data-testid={`profile-editor-${kind}-button`}
-        className="self-start"
+        className="self-start border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
       >
         <ImagePlus className="size-4 mr-1" aria-hidden="true" />
         {uploadButtonLabel}
@@ -427,9 +427,9 @@ export default function ProfileEditor(): JSX.Element {
 
   if (loading && profile === null) {
     return (
-      <main className="min-h-screen bg-slate-50 p-6">
+      <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
         <div className="mx-auto max-w-3xl">
-          <p className="text-sm text-slate-500">{t('profile.loadingProfile')}</p>
+          <p className="text-sm text-[#5C6770]">{t('profile.loadingProfile')}</p>
         </div>
       </main>
     );
@@ -460,10 +460,10 @@ export default function ProfileEditor(): JSX.Element {
       activeTab="profile"
       backTestId="profile-editor-back"
     >
-      <Card>
+      <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle>{t('profile.cardClinicTitle')}</CardTitle>
-          <CardDescription>{t('profile.cardClinicDescription')}</CardDescription>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('profile.cardClinicTitle')}</CardTitle>
+          <CardDescription className="text-[#5C6770]">{t('profile.cardClinicDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -475,6 +475,7 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.fullNameEn}
                 onChange={handleFieldChange('fullNameEn')}
                 data-testid="profile-editor-fullNameEn"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -485,6 +486,7 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.fullNameAr ?? ''}
                 onChange={handleFieldChange('fullNameAr')}
                 data-testid="profile-editor-fullNameAr"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -495,6 +497,7 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.clinicNameEn}
                 onChange={handleFieldChange('clinicNameEn')}
                 data-testid="profile-editor-clinicNameEn"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -505,6 +508,7 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.clinicNameAr ?? ''}
                 onChange={handleFieldChange('clinicNameAr')}
                 data-testid="profile-editor-clinicNameAr"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -515,6 +519,7 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.address ?? ''}
                 onChange={handleFieldChange('address')}
                 data-testid="profile-editor-address"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
             <div className="flex flex-col gap-2">
@@ -525,12 +530,13 @@ export default function ProfileEditor(): JSX.Element {
                 value={f.phone ?? ''}
                 onChange={handleFieldChange('phone')}
                 data-testid="profile-editor-phone"
+                className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               />
             </div>
           </div>
 
           <p
-            className="text-xs text-muted-foreground"
+            className="text-xs text-[#8C8478]"
             data-testid="profile-editor-save-indicator"
             role="status"
             aria-live="polite"
@@ -543,10 +549,10 @@ export default function ProfileEditor(): JSX.Element {
       {/* Quick task 260812-ns0 — Assets card now renders as a 2x2 grid
           (header / footer / signature / logo). The four quadrants share
           the same shape via the inline <AssetUploader> helper above. */}
-      <Card>
+      <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle>{t('profile.cardAssetsTitle')}</CardTitle>
-          <CardDescription>{t('profile.cardAssetsDescription')}</CardDescription>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('profile.cardAssetsTitle')}</CardTitle>
+          <CardDescription className="text-[#5C6770]">{t('profile.cardAssetsDescription')}</CardDescription>
         </CardHeader>
         <CardContent>
           <input
@@ -618,10 +624,10 @@ export default function ProfileEditor(): JSX.Element {
           premedication input + used-devices CRUD UI. Sits between Assets
           and Language so the existing profile-editor tests for the upper
           cards continue to find the same testids. */}
-      <Card data-testid="profile-editor-procedure-defaults-card">
+      <Card data-testid="profile-editor-procedure-defaults-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle>{t('profile.cardProcedureDefaultsTitle')}</CardTitle>
-          <CardDescription>{t('profile.cardProcedureDefaultsDescription')}</CardDescription>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('profile.cardProcedureDefaultsTitle')}</CardTitle>
+          <CardDescription className="text-[#5C6770]">{t('profile.cardProcedureDefaultsDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-2">
@@ -632,8 +638,9 @@ export default function ProfileEditor(): JSX.Element {
               onChange={handleFieldChange('premedication')}
               placeholder={t('profile.premedicationPlaceholder')}
               data-testid="profile-editor-premedication"
+              className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-xs text-[#8C8478]">
               {t('profile.premedicationHelp')}
             </p>
           </div>
@@ -642,10 +649,10 @@ export default function ProfileEditor(): JSX.Element {
             <Label>{t('profile.usedDevicesLabel')}</Label>
             <div className="flex flex-col gap-2" data-testid="profile-editor-used-devices">
               {devicesLoading && usedDevices.length === 0 ? (
-                <p className="text-xs text-muted-foreground">…</p>
+                <p className="text-xs text-[#8C8478]">…</p>
               ) : usedDevices.length === 0 ? (
                 <p
-                  className="text-xs text-muted-foreground italic"
+                  className="text-xs text-[#8C8478] italic"
                   data-testid="profile-editor-used-devices-empty"
                 >
                   {t('profile.usedDevicesEmpty')}
@@ -655,13 +662,13 @@ export default function ProfileEditor(): JSX.Element {
                   {usedDevices.map((d) => (
                     <li
                       key={d.id}
-                      className="flex items-center justify-between gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                      className="flex items-center justify-between gap-2 rounded-md border border-[#E0D9C6] bg-[#FBF7EE] px-3 py-2 text-sm"
                       data-testid={`profile-editor-used-device-row-${d.id}`}
                     >
                       <div className="flex flex-col">
                         <span className="font-medium">{d.name}</span>
                         {d.notes !== null ? (
-                          <span className="text-xs text-muted-foreground">{d.notes}</span>
+                          <span className="text-xs text-[#5C6770]">{d.notes}</span>
                         ) : null}
                       </div>
                       <Button
@@ -678,7 +685,7 @@ export default function ProfileEditor(): JSX.Element {
                 </ul>
               )}
 
-              <div className="flex flex-wrap items-end gap-2 rounded-md border border-dashed border-slate-300 p-2">
+              <div className="flex flex-wrap items-end gap-2 rounded-md border border-dashed border-[#E0D9C6] p-2">
                 <div className="flex min-w-[200px] flex-1 flex-col gap-1">
                   <Input
                     placeholder={t('profile.usedDevicesNamePlaceholder')}
@@ -688,6 +695,7 @@ export default function ProfileEditor(): JSX.Element {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void handleAddDevice();
                     }}
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                 </div>
                 <div className="flex min-w-[200px] flex-1 flex-col gap-1">
@@ -699,12 +707,14 @@ export default function ProfileEditor(): JSX.Element {
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') void handleAddDevice();
                     }}
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                 </div>
                 <Button
                   onClick={() => void handleAddDevice()}
                   disabled={newDeviceName.trim() === '' || addingDevice}
                   data-testid="profile-editor-used-device-add"
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
                 >
                   {t('profile.usedDevicesAdd')}
                 </Button>
@@ -714,13 +724,13 @@ export default function ProfileEditor(): JSX.Element {
         </CardContent>
       </Card>
 
-      <Card data-testid="profile-editor-language-card">
+      <Card data-testid="profile-editor-language-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle>{t('language.label')}</CardTitle>
-          <CardDescription>{t('language.description')}</CardDescription>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('language.label')}</CardTitle>
+          <CardDescription className="text-[#5C6770]">{t('language.description')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 accent-[#0E3A47]">
             <div className="flex items-center gap-2">
               <input
                 id="profile-editor-language-en"

@@ -319,10 +319,10 @@ export default function BackupRestore(): JSX.Element {
         backTestId="backup-restore-back"
       >
         <div className="grid gap-4 lg:grid-cols-2">
-              <Card data-testid="backup-card">
+              <Card data-testid="backup-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
                 <CardHeader>
-                  <CardTitle>{t('backup.sectionBackup')}</CardTitle>
-                  <CardDescription>{t('backup.backupDescription')}</CardDescription>
+                  <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('backup.sectionBackup')}</CardTitle>
+                  <CardDescription className="text-[#5C6770]">{t('backup.backupDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   {/*
@@ -350,7 +350,7 @@ export default function BackupRestore(): JSX.Element {
                       real data arrives. */}
                   {lastBackupChecked ? (
                     <p
-                      className="text-xs text-muted-foreground"
+                      className="text-xs text-[#8C8478]"
                       data-testid="backup-last-indicator"
                     >
                       {lastBackupLabel}
@@ -364,7 +364,7 @@ export default function BackupRestore(): JSX.Element {
                       void handleCreateBackup();
                     }}
                     disabled={backupInFlight}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
                   >
                     {backupInFlight ? (
                       <>
@@ -389,10 +389,10 @@ export default function BackupRestore(): JSX.Element {
                 </CardContent>
               </Card>
 
-              <Card data-testid="restore-card">
+              <Card data-testid="restore-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
                 <CardHeader>
-                  <CardTitle>{t('backup.sectionRestore')}</CardTitle>
-                  <CardDescription>{t('backup.restoreDescription')}</CardDescription>
+                  <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('backup.sectionRestore')}</CardTitle>
+                  <CardDescription className="text-[#5C6770]">{t('backup.restoreDescription')}</CardDescription>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-3">
                   {restoreError !== null ? (
@@ -413,6 +413,7 @@ export default function BackupRestore(): JSX.Element {
                         void handleChooseBackup();
                       }}
                       disabled={restoreInFlight}
+                      className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                     >
                       <FolderOpen className="size-4 mr-2" aria-hidden="true" />
                       {t('backup.restoreStep1')}
@@ -425,6 +426,7 @@ export default function BackupRestore(): JSX.Element {
                       onClick={() => {
                         void handlePreview();
                       }}
+                      className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                     >
                       {previewInFlight ? (
                         <Loader2 className="size-4 mr-2 animate-spin" aria-hidden="true" />
@@ -435,7 +437,7 @@ export default function BackupRestore(): JSX.Element {
 
                   {zipPath !== null ? (
                     <p
-                      className="font-mono text-xs text-muted-foreground break-all"
+                      className="font-mono text-xs text-[#5C6770] break-all"
                       data-testid="restore-zip-path"
                     >
                       {truncateTail(zipPath, 60)}
@@ -445,7 +447,7 @@ export default function BackupRestore(): JSX.Element {
                     // Replaces the previous "blank" affordance so the
                     // doctor immediately knows what to do next.
                     <p
-                      className="text-xs text-muted-foreground italic"
+                      className="text-xs text-[#8C8478] italic"
                       data-testid="restore-empty-hint"
                     >
                       {t('backup.noBackupSelectedYet')}
@@ -464,7 +466,7 @@ export default function BackupRestore(): JSX.Element {
                           disabled
                           data-testid="restore-activate"
                           title={t('backup.restoreActivateDisabledTooltip')}
-                          className="w-full sm:w-auto"
+                          className="w-full sm:w-auto border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                         >
                           <ShieldCheck className="size-4 mr-2" aria-hidden="true" />
                           {t('backup.restoreActivatePlaceholder')}
@@ -511,8 +513,8 @@ export default function BackupRestore(): JSX.Element {
 
             {preview !== null ? (
               <div className="grid gap-3 text-sm">
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
-                  <span className="text-muted-foreground">{t('backup.restorePreviewFilename')}</span>
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#E0D9C6]">
+                  <span className="text-[#5C6770]">{t('backup.restorePreviewFilename')}</span>
                   <span
                     className="col-span-2 font-mono break-all"
                     data-testid="preview-filename"
@@ -520,8 +522,8 @@ export default function BackupRestore(): JSX.Element {
                     {truncateMiddle(preview.filename, 80)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
-                  <span className="text-muted-foreground">{t('backup.restorePreviewStaging')}</span>
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#E0D9C6]">
+                  <span className="text-[#5C6770]">{t('backup.restorePreviewStaging')}</span>
                   <span
                     className="col-span-2 font-mono break-all"
                     data-testid="preview-staging"
@@ -529,14 +531,14 @@ export default function BackupRestore(): JSX.Element {
                     {truncateTail(`<userData>/${stagingDir ?? ''}`, 60)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
-                  <span className="text-muted-foreground">{t('backup.restorePreviewSize')}</span>
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#E0D9C6]">
+                  <span className="text-[#5C6770]">{t('backup.restorePreviewSize')}</span>
                   <span className="col-span-2" data-testid="preview-size">
                     {formatBytes(preview.totalSize)}
                   </span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-slate-200">
-                  <span className="text-muted-foreground">{t('backup.restorePreviewContents')}</span>
+                <div className="grid grid-cols-3 gap-2 pb-2 border-b border-[#E0D9C6]">
+                  <span className="text-[#5C6770]">{t('backup.restorePreviewContents')}</span>
                   <span className="col-span-2" data-testid="preview-contents">
                     {preview.procedureCount}{' '}
                     {t('backup.restorePreviewProcedures_other', { count: preview.procedureCount })}
@@ -550,7 +552,7 @@ export default function BackupRestore(): JSX.Element {
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 pb-2">
-                  <span className="text-muted-foreground">{t('backup.restorePreviewIntegrity')}</span>
+                  <span className="text-[#5C6770]">{t('backup.restorePreviewIntegrity')}</span>
                   <span
                     className={
                       integrityPassed
@@ -582,6 +584,7 @@ export default function BackupRestore(): JSX.Element {
                 variant="outline"
                 onClick={handleClosePreview}
                 disabled={restoreInFlight}
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
                 {t('backup.restoreCancel')}
               </Button>
@@ -590,6 +593,7 @@ export default function BackupRestore(): JSX.Element {
                 data-testid="restore-confirm-open"
                 disabled={integrityFailed || preview === null || restoreInFlight}
                 onClick={() => setRestoreConfirmOpen(true)}
+                className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
               >
                 {t('backup.restoreActivate')}
               </Button>

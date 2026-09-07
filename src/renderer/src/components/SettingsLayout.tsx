@@ -61,18 +61,18 @@ export function SettingsLayout({
 }: Props): JSX.Element {
   const { navigate } = useRoute();
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
-      <div className="mx-auto grid max-w-6xl gap-4 lg:grid-cols-[16rem_minmax(0,1fr)]">
+    <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
+      <div className="mx-auto grid max-w-6xl gap-5 lg:grid-cols-[16rem_minmax(0,1fr)]">
         <SettingsSidebar activeTab={activeTab} />
-        <div className="flex flex-col gap-4">
-          <header className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-col gap-5">
+          <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-4">
             <div className="flex flex-col gap-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]">
                 Settings
               </p>
-              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              <h1 className="text-2xl font-medium tracking-tight text-[#13202E]">{title}</h1>
               {subtitle ? (
-                <p className="text-sm text-muted-foreground">{subtitle}</p>
+                <p className="text-sm text-[#5C6770]">{subtitle}</p>
               ) : null}
             </div>
             <div className="flex items-center gap-2">
@@ -81,13 +81,22 @@ export function SettingsLayout({
                 variant="outline"
                 onClick={() => navigate(backTo)}
                 data-testid={backTestId}
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
                 <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
                 {backLabel}
               </Button>
             </div>
           </header>
-          {children}
+          <div className="relative overflow-hidden rounded-lg border border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
+            <div
+              aria-hidden="true"
+              className="absolute inset-y-0 left-0 w-1 bg-[#0E3A47]"
+            />
+            <div className="relative flex flex-col gap-5 p-6 pl-7">
+              {children}
+            </div>
+          </div>
         </div>
       </div>
     </main>

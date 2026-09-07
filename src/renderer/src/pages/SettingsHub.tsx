@@ -46,23 +46,23 @@ export default function SettingsHub(): JSX.Element {
       backTestId="settings-hub-back"
       backLabel="Back to patients"
     >
-      <Card>
+      <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle>Workspace</CardTitle>
-          <CardDescription>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">Workspace</CardTitle>
+          <CardDescription className="text-[#5C6770]">
             Capture, Profile, Audit, and Backup &amp; restore are
             available to every authenticated doctor; Users is available
             to the first admin.
           </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-col gap-3 text-sm text-muted-foreground">
+        <CardContent className="flex flex-col gap-3 text-sm text-[#5C6770]">
           <p>
-            <span className="font-medium text-foreground">Capture</span> — pick
+            <span className="font-medium text-[#13202E]">Capture</span> — pick
             a default device, choose a quality preset, and verify the live
             preview before saving.
           </p>
           <p data-testid="settings-hub-profile-card">
-            <span className="font-medium text-foreground">Profile</span> —{' '}
+            <span className="font-medium text-[#13202E]">Profile</span> —{' '}
             {previewClinicName === ''
               ? 'add your clinic + doctor details for the report header.'
               : `report header currently shows ${previewClinicName}.`}{' '}
@@ -77,19 +77,19 @@ export default function SettingsHub(): JSX.Element {
             </Button>
           </p>
           <p>
-            <span className="font-medium text-foreground">Audit</span> —
+            <span className="font-medium text-[#13202E]">Audit</span> —
             review the read + write log for every action the system
             recorded, filter by date or doctor, and export for a periodic
             compliance review.
           </p>
           <p>
-            <span className="font-medium text-foreground">Backup &amp; restore</span> —
+            <span className="font-medium text-[#13202E]">Backup &amp; restore</span> —
             snapshot the entire patient database + media to a zip on the
             workstation, or unpack a previous backup into a staging folder
             for review before activating.
           </p>
           <p>
-            <span className="font-medium text-foreground">Users</span> — add
+            <span className="font-medium text-[#13202E]">Users</span> — add
             or remove staff and reset PINs (first admin only).
           </p>
         </CardContent>

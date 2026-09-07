@@ -240,9 +240,9 @@ export default function Audit(): JSX.Element {
       activeTab="audit"
       backTestId="audit-back"
     >
-      <Card data-testid="audit-filter-card">
+      <Card data-testid="audit-filter-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">{t('audit.filtersTitle')}</CardTitle>
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('audit.filtersTitle')}</CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
@@ -257,6 +257,7 @@ export default function Audit(): JSX.Element {
                       setPage(1);
                     }}
                     data-testid="audit-date-from"
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -270,6 +271,7 @@ export default function Audit(): JSX.Element {
                       setPage(1);
                     }}
                     data-testid="audit-date-to"
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -281,7 +283,7 @@ export default function Audit(): JSX.Element {
                       setPage(1);
                     }}
                   >
-                    <SelectTrigger id="audit-user" data-testid="audit-user">
+                    <SelectTrigger id="audit-user" data-testid="audit-user" className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30">
                       <SelectValue placeholder={t('audit.filterUserPlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -305,6 +307,7 @@ export default function Audit(): JSX.Element {
                     }}
                     placeholder={t('audit.filterActionPlaceholder')}
                     data-testid="audit-action"
+                    className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -316,7 +319,7 @@ export default function Audit(): JSX.Element {
                       setPage(1);
                     }}
                   >
-                    <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type">
+                    <SelectTrigger id="audit-entity-type" data-testid="audit-entity-type" className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30">
                       <SelectValue placeholder={t('audit.filterEntityTypePlaceholder')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -337,12 +340,14 @@ export default function Audit(): JSX.Element {
                   variant="outline"
                   onClick={handleClearAll}
                   data-testid="audit-clear"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   {t('audit.clearAll')}
                 </Button>
                 <Button
                   onClick={() => void refresh()}
                   data-testid="audit-apply"
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
                 >
                   {t('common.apply')}
                 </Button>
@@ -357,11 +362,11 @@ export default function Audit(): JSX.Element {
             </Alert>
           ) : null}
 
-          <Card>
+          <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">
+              <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
                 {t('audit.sectionTitle')}{' '}
-                <span className="text-muted-foreground text-sm font-normal">
+                <span className="text-[#5C6770] text-sm font-normal">
                   ({t('patient.total', { count: total })})
                 </span>
               </CardTitle>
@@ -369,8 +374,8 @@ export default function Audit(): JSX.Element {
             <CardContent className="p-0">
               <div className="max-h-[60vh] overflow-y-auto" data-testid="audit-table-scroll">
                 <table className="w-full">
-                  <thead className="sticky top-0 z-10 bg-card">
-                    <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+                  <thead className="sticky top-0 z-10 bg-[#FBF7EE]">
+                    <tr className="border-b border-[#E0D9C6] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
                       <th className="px-3 py-2 w-28">{t('audit.columnTime')}</th>
                       <th className="px-3 py-2 w-44">{t('audit.columnUser')}</th>
                       <th className="px-3 py-2 w-44">{t('audit.columnAction')}</th>
@@ -386,7 +391,7 @@ export default function Audit(): JSX.Element {
                         {[0, 1, 2].map((i) => (
                           <tr key={`skeleton-${i}`} data-testid="audit-skeleton-row">
                             <td colSpan={4} className="px-3 py-2">
-                              <div className="h-4 w-full animate-pulse rounded bg-slate-200" />
+                              <div className="h-4 w-full animate-pulse rounded bg-[#E0D9C6]/60" />
                             </td>
                           </tr>
                         ))}
@@ -395,7 +400,7 @@ export default function Audit(): JSX.Element {
                       <tr>
                         <td
                           colSpan={4}
-                          className="px-3 py-8 text-center text-sm text-muted-foreground"
+                          className="px-3 py-8 text-center text-sm text-[#5C6770]"
                           data-testid="audit-empty"
                         >
                           {t('audit.empty')}
@@ -405,7 +410,7 @@ export default function Audit(): JSX.Element {
                       rows.map((row) => (
                         <tr
                           key={row.id}
-                          className="border-b min-h-[36px] cursor-pointer hover:bg-slate-50"
+                          className="border-b border-[#E0D9C6] min-h-[36px] cursor-pointer hover:bg-[#E6EFF1]"
                           onClick={() => setDetail(row)}
                           data-testid="audit-row"
                           data-row-id={row.id}
@@ -416,7 +421,7 @@ export default function Audit(): JSX.Element {
                             </span>
                           </td>
                           <td className="px-3 py-1 align-middle">
-                            <span className="truncate text-sm">
+                            <span className="truncate text-sm text-[#13202E]">
                               {resolveUserDisplayName(row.userId, users, fallbackUserName)}
                             </span>
                           </td>
@@ -435,7 +440,7 @@ export default function Audit(): JSX.Element {
                           </td>
                           <td className="px-3 py-1 align-middle">
                             {row.entityType === null ? (
-                              <span className="text-muted-foreground text-sm">—</span>
+                              <span className="text-[#5C6770] text-sm">—</span>
                             ) : (
                               <span
                                 className={`inline-block truncate rounded px-1.5 py-0.5 text-xs ${entityTypeBadgeClass(
@@ -458,7 +463,7 @@ export default function Audit(): JSX.Element {
           </Card>
 
       <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground" data-testid="audit-pagination">
+            <span className="text-[#5C6770]" data-testid="audit-pagination">
               {t('audit.pageInfo', { page, totalPages })}
             </span>
             <div className="flex gap-2">
@@ -468,6 +473,7 @@ export default function Audit(): JSX.Element {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 data-testid="audit-prev"
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
                 {t('common.previous')}
               </Button>
@@ -477,6 +483,7 @@ export default function Audit(): JSX.Element {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
                 data-testid="audit-next"
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
                 {t('common.next')}
               </Button>
@@ -501,19 +508,19 @@ export default function Audit(): JSX.Element {
           {detail !== null ? (
             <div className="flex flex-col gap-3">
               <dl className="grid grid-cols-2 gap-2 text-sm">
-                <dt className="text-muted-foreground">{t('audit.detailUser')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailUser')}</dt>
                 <dd className="font-mono text-xs break-all">
                   {detail.userId ?? '(system)'}
                 </dd>
-                <dt className="text-muted-foreground">{t('audit.detailAction')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailAction')}</dt>
                 <dd className="font-mono text-xs">{detail.action}</dd>
-                <dt className="text-muted-foreground">{t('audit.detailEntityType')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailEntityType')}</dt>
                 <dd className="font-mono text-xs">{detail.entityType ?? '—'}</dd>
-                <dt className="text-muted-foreground">{t('audit.detailEntityId')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailEntityId')}</dt>
                 <dd className="font-mono text-xs break-all">
                   {detail.entityId ?? '—'}
                 </dd>
-                <dt className="text-muted-foreground">{t('audit.detailOutcome')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailOutcome')}</dt>
                 <dd className="font-mono text-xs">
                   <span
                     className={`inline-block rounded px-1.5 py-0.5 text-xs ${outcomeBadgeClass(
@@ -523,7 +530,7 @@ export default function Audit(): JSX.Element {
                     {detail.outcome}
                   </span>
                 </dd>
-                <dt className="text-muted-foreground">{t('audit.detailTime')}</dt>
+                <dt className="text-[#5C6770]">{t('audit.detailTime')}</dt>
                 <dd className="font-mono text-xs">
                   {new Date(detail.createdAt).toISOString()}
                 </dd>
@@ -533,7 +540,7 @@ export default function Audit(): JSX.Element {
                 <pre
                   id="audit-detail-metadata"
                   data-testid="audit-detail-metadata"
-                  className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border bg-slate-50 p-3 font-mono text-xs"
+                  className="max-h-96 overflow-auto whitespace-pre-wrap rounded-md border border-[#E0D9C6] bg-[#FBF7EE] p-3 font-mono text-xs"
                 >
                   {detail.metadata === null
                     ? '—'
@@ -547,6 +554,7 @@ export default function Audit(): JSX.Element {
               variant="outline"
               onClick={() => void handleCopyJson()}
               data-testid="audit-copy-json"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               <ClipboardCopy className="size-4 mr-1" aria-hidden="true" />
               {t('audit.detailCopyJson')}

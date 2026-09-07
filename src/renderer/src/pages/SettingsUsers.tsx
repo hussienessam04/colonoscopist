@@ -83,16 +83,20 @@ export default function SettingsUsers(): JSX.Element {
 
   if (!isAdmin) {
     return (
-      <main className="min-h-screen grid place-items-center bg-slate-50">
-        <Card className="w-full max-w-md">
+      <main className="min-h-screen grid place-items-center bg-[#F7F1E6] font-sans text-[#13202E]">
+        <Card className="w-full max-w-md border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <CardHeader>
-            <CardTitle>Admin only</CardTitle>
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">Admin only</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-muted-foreground mb-4">
+            <p className="text-sm text-[#5C6770] mb-4">
               Settings → Users is available to the first admin only.
             </p>
-            <Button variant="outline" onClick={() => navigate({ name: 'patients' })}>
+            <Button
+              variant="outline"
+              onClick={() => navigate({ name: 'patients' })}
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
+            >
               Back to patients
             </Button>
           </CardContent>
@@ -160,7 +164,7 @@ export default function SettingsUsers(): JSX.Element {
         // alongside Back. The dialog content stays the same.
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">
               <Plus className="size-4 mr-1" />
               Add user
             </Button>
@@ -169,10 +173,10 @@ export default function SettingsUsers(): JSX.Element {
         </Dialog>
       }
     >
-      <div className="rounded-md border bg-card">
+      <div className="rounded-md border border-[#E0D9C6] bg-[#FBF7EE]">
         <table className="w-full">
           <thead>
-            <tr className="border-b text-left text-xs uppercase text-muted-foreground">
+            <tr className="border-b border-[#E0D9C6] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
               <th className="px-3 py-2">Name</th>
               <th className="px-3 py-2">Last login</th>
               <th className="px-3 py-2 text-right">Actions</th>
@@ -181,13 +185,13 @@ export default function SettingsUsers(): JSX.Element {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#5C6770]">
                   Loading…
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
-                <td colSpan={3} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#5C6770]">
                   No users yet.
                 </td>
               </tr>
@@ -195,14 +199,14 @@ export default function SettingsUsers(): JSX.Element {
               users.map((u) => {
                 const isSelf = currentUser?.id === u.id;
                 return (
-                  <tr key={u.id} className="border-b last:border-b-0">
-                    <td className="px-3 py-2 text-sm font-medium">
+                  <tr key={u.id} className="border-b border-[#E0D9C6] last:border-b-0 hover:bg-[#E6EFF1]">
+                    <td className="px-3 py-2 text-sm font-medium text-[#13202E]">
                       {u.fullName}
-                      <span className="ml-2 text-xs text-muted-foreground">
+                      <span className="ml-2 text-xs text-[#8C8478]">
                         {u.isFirstAdmin ? 'Admin' : 'Staff'}
                       </span>
                     </td>
-                    <td className="px-3 py-2 text-sm text-muted-foreground">
+                    <td className="px-3 py-2 text-sm text-[#5C6770]">
                       {relativeTime(u.lastLoginAt)}
                     </td>
                     <td className="px-3 py-2 text-right">
@@ -281,7 +285,7 @@ function AddUserDialog({
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
           <Label htmlFor="addFullName">Full name</Label>
-          <Input id="addFullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} />
+          <Input id="addFullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30" />
           {errors.fullName && (
             <p role="alert" className="text-sm text-destructive">{errors.fullName.message}</p>
           )}
@@ -297,14 +301,15 @@ function AddUserDialog({
             autoComplete="off"
             {...register('pin')}
             aria-invalid={!!errors.pin}
+            className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
           />
           {errors.pin && (
             <p role="alert" className="text-sm text-destructive">{errors.pin.message}</p>
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button type="submit">Add user</Button>
+          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">Cancel</Button>
+          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">Add user</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -347,6 +352,7 @@ function ResetPinDialog({
             autoComplete="off"
             {...register('pin')}
             aria-invalid={!!errors.pin}
+            className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
           />
           {errors.pin && (
             <p role="alert" className="text-sm text-destructive">{errors.pin.message}</p>
@@ -363,14 +369,15 @@ function ResetPinDialog({
             autoComplete="off"
             {...register('confirmPin')}
             aria-invalid={!!errors.confirmPin}
+            className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
           />
           {errors.confirmPin && (
             <p role="alert" className="text-sm text-destructive">{errors.confirmPin.message}</p>
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-          <Button type="submit">Reset PIN</Button>
+          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">Cancel</Button>
+          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">Reset PIN</Button>
         </DialogFooter>
       </form>
     </DialogContent>

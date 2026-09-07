@@ -168,19 +168,19 @@ export default function License(): JSX.Element {
       activeTab="license"
       backTestId="license-back"
     >
-      <Card data-testid="license-status-card">
+      <Card data-testid="license-status-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+          <CardTitle className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
             <KeyRound className="size-4" aria-hidden="true" />
             {t('license.statusTitle')}
           </CardTitle>
-          <CardDescription>{t('license.pageDescription')}</CardDescription>
+          <CardDescription className="text-[#5C6770]">{t('license.pageDescription')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {status !== null ? (
             <>
               <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
-                <span className="text-muted-foreground">{t('license.statusLabel')}</span>
+                <span className="text-[#5C6770]">{t('license.statusLabel')}</span>
                 <span
                   className="col-span-2 flex items-center gap-2"
                   data-testid="license-status-label"
@@ -199,7 +199,7 @@ export default function License(): JSX.Element {
 
               {status.state === 'trial' ? (
                 <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
-                  <span className="text-muted-foreground">
+                  <span className="text-[#5C6770]">
                     {t('license.trialDaysRemainingLabel')}
                   </span>
                   <span className="col-span-2" data-testid="license-trial-days">
@@ -215,7 +215,7 @@ export default function License(): JSX.Element {
               {status.state === 'licensed' ? (
                 <>
                   <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
-                    <span className="text-muted-foreground">{t('license.vendorIdLabel')}</span>
+                    <span className="text-[#5C6770]">{t('license.vendorIdLabel')}</span>
                     <span
                       className="col-span-2 font-mono"
                       data-testid="license-vendor-id"
@@ -224,7 +224,7 @@ export default function License(): JSX.Element {
                     </span>
                   </div>
                   <div className="grid grid-cols-3 gap-2 pb-2 border-b border-border">
-                    <span className="text-muted-foreground">
+                    <span className="text-[#5C6770]">
                       {t('license.licensedAtLabel')}
                     </span>
                     <span
@@ -240,7 +240,7 @@ export default function License(): JSX.Element {
               ) : null}
 
               <div className="grid grid-cols-3 gap-2">
-                <span className="text-muted-foreground">{t('license.machineIdLabel')}</span>
+                <span className="text-[#5C6770]">{t('license.machineIdLabel')}</span>
                 <div className="col-span-2 flex items-center gap-2">
                   <span
                     className="font-mono break-all"
@@ -263,7 +263,7 @@ export default function License(): JSX.Element {
               </div>
             </>
           ) : loading ? (
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-[#5C6770]">
               {t('license.loading')}
             </p>
           ) : null}
@@ -275,7 +275,7 @@ export default function License(): JSX.Element {
             }}
             disabled={activating}
             data-testid="license-load-lic"
-            className="w-full sm:w-auto"
+            className="w-full sm:w-auto bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
           >
             {activating ? (
               <>
