@@ -625,9 +625,25 @@ export default function ProcedureReview({
             className="flex flex-col gap-4"
             data-testid="procedure-review-screenshots-rail"
           >
+            {/* Quick task 20260907-screenshots-grid-vertical —
+                enhanced the Screenshots box: small-caps label
+                + mono count badge + hairline divider, then
+                the ScreenshotTimeline in `layout="grid"` mode
+                (2-column vertical grid) wrapped in a fixed-
+                height scrollable container so the column
+                doesn't grow the page vertically. */}
             <div className={RAIL_CARD_CHROME} data-testid="procedure-review-screenshots">
-              <p className={SMALL_CAPS_LABEL}>Screenshots</p>
-              <div className="mt-2">
+              <div className="flex items-center justify-between">
+                <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+                <span
+                  className="font-mono text-xs tabular-nums text-[#5C6770]"
+                  data-testid="procedure-review-screenshots-count"
+                >
+                  {screenshots.length}
+                </span>
+              </div>
+              <hr className="mt-2 border-[#E0D9C6]" />
+              <div className="mt-2 max-h-[70vh] overflow-y-auto pr-1">
                 <ScreenshotTimeline
                   procedureId={procedureId}
                   patientId={procedure?.patientId ?? ''}
@@ -640,6 +656,7 @@ export default function ProcedureReview({
                   onAnnotate={handleAnnotate}
                   onOpen={setLightboxScreenshot}
                   mediaCacheBuster={croppedAtMs}
+                  layout="grid"
                 />
               </div>
             </div>
