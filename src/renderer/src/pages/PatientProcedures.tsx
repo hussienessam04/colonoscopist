@@ -303,7 +303,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
               data-testid="patient-procedures-new"
               className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
             >
-
+              <Plus className="size-4 mr-1" aria-hidden="true" />
               {t('patientProcedures.newProcedure')}
             </Button>
           </div>
@@ -435,11 +435,10 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                   size="sm"
                   onClick={handleApply}
                   data-testid="patient-procedures-apply"
-              className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
-            >
-              <Plus className="size-4 mr-1" aria-hidden="true" />
-              {t('patientProcedures.newProcedure')}
-            </Button>
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
+                >
+                  {t('patientProcedures.applyFilters')}
+                </Button>
               </div>
             </div>
           </CardContent>

@@ -439,6 +439,34 @@ describe('PatientProcedures page', () => {
       screen.queryByTestId(`patient-procedure-row-${PROC_C.id}`),
     ).not.toBeInTheDocument();
   });
+
+  // Regression: 260907-mbh follow-up. The palette-executor accidentally
+  // replaced the filter row's Apply button with a duplicate of the
+  // header's New Procedure button (kept the testid `patient-procedures-apply`
+  // but swapped the visible label + added a Plus icon). The Apply test
+  // on line 284 still passed because the testid was preserved — the
+  // user noticed the wrong label. This test locks the visible label +
+  // the icon presence so the same mistake can't recur.
+  it('Apply button (filter row) shows "Apply" label with NO Plus icon; New Procedure button (header) shows "New Procedure" with Plus icon', async () => {
+    const api = getApi();
+    api.procedures.list.mockResolvedValue({ rows: [PROC_A], total: 1 });
+    api.reports.getByProcedure.mockResolvedValue(null);
+    render(<PatientProcedures patientId={PATIENT_ID} />);
+    await screen.findByTestId('patient-procedures-header');
+
+    // Filter row's Apply button — translated label, no icon.
+    const apply = await screen.findByTestId('patient-procedures-apply');
+    expect(apply).toHaveTextContent('Apply');
+    expect(apply.querySelector('svg')).toBeNull();
+
+    // Header's New Procedure button — translated label + Plus icon.
+    const newProc = await screen.findByTestId('patient-procedures-new');
+    expect(newProc).toHaveTextContent('New Procedure');
+    expect(newProc.querySelector('svg')).not.toBeNull();
+
+    // And only one button carries the New Procedure testid (no duplicate).
+    expect(screen.getAllByTestId('patient-procedures-new')).toHaveLength(1);
+  });
 });
 
 // ponytail: native <input type="date"> + RTL fireEvent on the value setter
