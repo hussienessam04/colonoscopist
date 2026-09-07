@@ -12,6 +12,14 @@
 // D-11 — the Scrubber receives `segments` from `useProcedures` so pause
 // markers render as tick marks. The default no-pause case (zero segments)
 // renders a clean track.
+//
+// Quick task 20260907-procedure-review-ui-enhance — page chrome
+// refactored to mirror the Report Editor's "clinical workstation"
+// palette (warm ivory document card + teal accents + small-caps
+// labels + serif h1 + mono date/duration). Only the surrounding
+// chrome changes; the data flow + IPC contract + sub-component
+// internals (Scrubber, ScreenshotTimeline, TrimControls,
+// ProcedureNotesReview, ScreenshotLightbox) are untouched.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -39,6 +47,25 @@ import { formatDurationHHMMSS } from '@/lib/format-duration';
 import { safeInvoke } from '@/lib/ipc-result';
 import EmptyStateCard from '@/components/EmptyStateCard';
 import type { Patient, Procedure, Screenshot } from '@shared/ipc-contract';
+
+// ponytail: a couple of design tokens lifted verbatim from the
+// ReportEditor surface so the two pages read as the same product
+// (warm ivory + teal accent + small-caps labels). Kept inline
+// rather than promoted to a shared constant — a future
+// design-system pass would extract them, but the page surface
+// is small enough that duplication beats indirection right now.
+const CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-white shadow-sm";
+const RAIL_CARD_CHROME =
+  "rounded-lg border border-[#E0D9C6] bg-[#E6EFF1] p-4 shadow-sm";
+const SMALL_CAPS_LABEL =
+  "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]";
+const SMALL_CAPS_FIELD =
+  "text-[11px] font-medium uppercase tracking-[0.18em] text-[#8C8478]";
+const SECONDARY_OUTLINE_BUTTON =
+  "border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]";
+const PRIMARY_TEAL_BUTTON =
+  "bg-[#0E3A47] text-white hover:bg-[#0B2C36] shadow-inner";
 
 function formatTimestamp(ms: number | null): string {
   if (ms === null) return '—';
@@ -330,7 +357,7 @@ export default function ProcedureReview({
 
   if (!procedureId) {
     return (
-      <main className="min-h-screen bg-slate-100 p-6">
+      <main className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-7xl">
           <p className="text-sm text-slate-500">Missing procedure id.</p>
         </div>
@@ -339,33 +366,60 @@ export default function ProcedureReview({
   }
 
   return (
-    <main className="min-h-screen bg-slate-100 p-6">
+    <main className="min-h-screen bg-slate-50 p-6">
       <div className="mx-auto flex max-w-7xl flex-col gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3">
+        <header className="flex flex-wrap items-end justify-between gap-3 border-b border-[#E0D9C6] pb-3">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-              Review
+            <p className={SMALL_CAPS_FIELD}>
+              {t("procedure.pageKicker")}
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight">Procedure</h1>
+            <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
+              {t("procedure.reviewPageTitle")}
+              {patient !== null ? (
+                <span className="ml-2 font-sans text-base font-normal text-[#5C6770]">
+                  · {patient.fullName}
+                </span>
+              ) : null}
+            </h1>
           </div>
-          <Button
-            variant="outline"
-            onClick={() =>
-              procedure
-                ? navigate({ name: 'patient-detail', id: procedure.patientId })
-                : navigate({ name: 'patients' })
-            }
-            data-testid="procedure-review-back"
-          >
-            <ArrowLeft aria-hidden="true" />
-            {procedure ? 'Back to Patient' : 'Back'}
-          </Button>
+          <div className="flex items-center gap-3">
+            {procedure !== null ? (
+              <div className="flex items-center gap-3 font-mono text-xs tabular-nums text-[#5C6770]">
+                <span>
+                  <span className={SMALL_CAPS_FIELD}>Started</span>{" "}
+                  {formatTimestamp(procedure.startedAt)}
+                </span>
+                <span>
+                  <span className={SMALL_CAPS_FIELD}>Duration</span>{" "}
+                  {formatDurationHHMMSS(durationMs)}
+                </span>
+                <StatusBadge status={procedure.status} />
+              </div>
+            ) : null}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                procedure
+                  ? navigate({ name: 'patient-detail', id: procedure.patientId })
+                  : navigate({ name: 'patients' })
+              }
+              data-testid="procedure-review-back"
+              className={SECONDARY_OUTLINE_BUTTON}
+            >
+              <ArrowLeft aria-hidden="true" />
+              {procedure ? 'Back to Patient' : 'Back'}
+            </Button>
+          </div>
         </header>
 
         <section className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <div className="flex flex-col gap-3" data-testid="procedure-review-left">
+          <div
+            className={`flex flex-col gap-4 ${CARD_CHROME} p-4`}
+            data-testid="procedure-review-left"
+          >
             {gated ? <EmptyStateCard /> : null}
-            <div className="overflow-hidden rounded-lg bg-slate-900">
+            <div className="overflow-hidden rounded-md border border-[#E0D9C6] bg-slate-900">
               {mediaUrl.url && videoSrc ? (
                 <video
                   ref={videoRef}
@@ -423,122 +477,132 @@ export default function ProcedureReview({
                 </div>
               ) : null}
             </div>
-            <Scrubber
-              durationMs={durationMs}
-              currentMs={currentMs}
-              onSeek={handleSeek}
-              segments={segments}
-              screenshots={screenshots}
-              trimMode={trim.trimMode}
-              inMs={trim.inMs}
-              outMs={trim.outMs}
-              onTrim={(range) => {
-                trim.setInMs(range.inMs);
-                trim.setOutMs(range.outMs);
-              }}
-            />
-            <ScreenshotTimeline
-              procedureId={procedureId}
-              patientId={procedure?.patientId ?? ''}
-              mediaBaseUrl={mediaUrl.url}
-              status={procedure?.status}
-              screenshots={screenshots}
-              onSeek={handleSeek}
-              onCapture={handleCapture}
-              onDelete={handleDelete}
-              onAnnotate={handleAnnotate}
-              onOpen={setLightboxScreenshot}
-              mediaCacheBuster={croppedAtMs}
-            />
+            <div className="flex flex-col gap-2">
+              <p className={SMALL_CAPS_LABEL}>Timeline</p>
+              <Scrubber
+                durationMs={durationMs}
+                currentMs={currentMs}
+                onSeek={handleSeek}
+                segments={segments}
+                screenshots={screenshots}
+                trimMode={trim.trimMode}
+                inMs={trim.inMs}
+                outMs={trim.outMs}
+                onTrim={(range) => {
+                  trim.setInMs(range.inMs);
+                  trim.setOutMs(range.outMs);
+                }}
+              />
+              <ScreenshotTimeline
+                procedureId={procedureId}
+                patientId={procedure?.patientId ?? ''}
+                mediaBaseUrl={mediaUrl.url}
+                status={procedure?.status}
+                screenshots={screenshots}
+                onSeek={handleSeek}
+                onCapture={handleCapture}
+                onDelete={handleDelete}
+                onAnnotate={handleAnnotate}
+                onOpen={setLightboxScreenshot}
+                mediaCacheBuster={croppedAtMs}
+              />
+            </div>
           </div>
 
-          <aside className="flex flex-col gap-3" data-testid="procedure-review-right">
-            <ProcedureNotesReview
-              procedureId={procedureId}
-              status={procedure?.status ?? 'completed'}
-            />
+          <aside
+            className="flex flex-col gap-4"
+            data-testid="procedure-review-right"
+          >
+            <div className={RAIL_CARD_CHROME}>
+              <p className={SMALL_CAPS_LABEL}>Notes</p>
+              <div className="mt-2">
+                <ProcedureNotesReview
+                  procedureId={procedureId}
+                  status={procedure?.status ?? 'completed'}
+                />
+              </div>
+            </div>
 
-            <TrimControls
-              status={procedure?.status ?? 'completed'}
-              videoPathOriginal={procedure?.videoPathOriginal ?? null}
-              inMs={trim.inMs}
-              outMs={trim.outMs}
-              durationMs={durationMs}
-              trimMode={trim.trimMode}
-              setTrimMode={trim.setTrimMode}
-              applying={trim.applying}
-              restoring={trim.restoring}
-              apply={trim.apply}
-              restore={trim.restore}
-              screenshots={screenshots}
-              videoRef={videoRef}
-              captureFrame={captureFrameForTrim}
-            />
+            <div className={RAIL_CARD_CHROME}>
+              <p className={SMALL_CAPS_LABEL}>Trim</p>
+              <div className="mt-2">
+                <TrimControls
+                  status={procedure?.status ?? 'completed'}
+                  videoPathOriginal={procedure?.videoPathOriginal ?? null}
+                  inMs={trim.inMs}
+                  outMs={trim.outMs}
+                  durationMs={durationMs}
+                  trimMode={trim.trimMode}
+                  setTrimMode={trim.setTrimMode}
+                  applying={trim.applying}
+                  restoring={trim.restoring}
+                  apply={trim.apply}
+                  restore={trim.restore}
+                  screenshots={screenshots}
+                  videoRef={videoRef}
+                  captureFrame={captureFrameForTrim}
+                />
+              </div>
+            </div>
 
-            <Card data-testid="procedure-review-metadata">
-              <CardHeader>
-                <CardTitle>{t('procedure.reviewPageTitle')}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2 text-sm">
-                {procedure ? (
-                  <>
-                    <p>
-                      <span className="font-medium">{t('procedure.patientLabel')}</span>{' '}
-                      {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
-                    </p>
-                    <p>
-                      <span className="font-medium">{t('common.workspace') /* 'Started:' label */}</span>{' '}
-                      {formatTimestamp(procedure.startedAt)}
-                    </p>
-                    <p>
-                      <span className="font-medium">{t('report.labelDate') /* 'Ended:' label */}</span>{' '}
-                      {formatTimestamp(procedure.endedAt)}
-                    </p>
-                    <p>
-                      <span className="font-medium">{t('report.labelDuration')}</span>{' '}
-                      {formatDurationHHMMSS(durationMs)}
-                    </p>
-                    <p>
-                      <span className="font-medium">{t('procedure.recordingLabel') /* 'Status:' */}</span>{' '}
-                    </p>
-                    <div>
-                      <StatusBadge status={procedure.status} />
-                    </div>
-                  </>
-                ) : (
-                  <p className="text-muted-foreground">{t('common.loading')}</p>
-                )}
-              </CardContent>
-            </Card>
+            <div
+              className={`flex flex-col gap-2 ${CARD_CHROME} p-4`}
+              data-testid="procedure-review-metadata"
+            >
+              <p className={SMALL_CAPS_LABEL}>Procedure</p>
+              {procedure ? (
+                <div className="mt-1 grid grid-cols-1 gap-2 font-mono text-xs tabular-nums text-[#13202E]">
+                  <div>
+                    <span className={SMALL_CAPS_FIELD}>Patient</span>{" "}
+                    {patient ? patient.fullName : procedure.patientId.slice(0, 8)}
+                  </div>
+                  <div>
+                    <span className={SMALL_CAPS_FIELD}>Started</span>{" "}
+                    {formatTimestamp(procedure.startedAt)}
+                  </div>
+                  <div>
+                    <span className={SMALL_CAPS_FIELD}>Ended</span>{" "}
+                    {formatTimestamp(procedure.endedAt)}
+                  </div>
+                  <div>
+                    <span className={SMALL_CAPS_FIELD}>Duration</span>{" "}
+                    {formatDurationHHMMSS(durationMs)}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {t("common.loading")}
+                </p>
+              )}
+            </div>
 
-            <Card data-testid="procedure-review-report-cta">
-              <CardHeader>
-                <CardTitle>{t('report.pageTitle')}</CardTitle>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-2 text-sm">
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={() => void handleOpenReport()}
-                  disabled={
-                    procedure === null ||
-                    procedure.status === 'recording'
-                  }
-                  data-testid="procedure-review-report-button"
+            <div
+              className={`flex flex-col gap-2 ${CARD_CHROME} p-4`}
+              data-testid="procedure-review-report-cta"
+            >
+              <p className={SMALL_CAPS_LABEL}>{t("report.pageTitle")}</p>
+              <Button
+                size="sm"
+                onClick={() => void handleOpenReport()}
+                disabled={
+                  procedure === null ||
+                  procedure.status === 'recording'
+                }
+                data-testid="procedure-review-report-button"
+                className={PRIMARY_TEAL_BUTTON}
+              >
+                <FileText className="size-4 mr-1" aria-hidden="true" />
+                {report === null ? t("procedure.finalizeReport") : t("procedure.editReport")}
+              </Button>
+              {pdfLeafName !== null ? (
+                <p
+                  className="font-mono text-xs tabular-nums text-[#5C6770]"
+                  data-testid="procedure-review-pdf-path"
                 >
-                  <FileText className="size-4 mr-1" aria-hidden="true" />
-                  {report === null ? t('procedure.finalizeReport') : t('procedure.editReport')}
-                </Button>
-                {pdfLeafName !== null ? (
-                  <p
-                    className="text-xs text-muted-foreground"
-                    data-testid="procedure-review-pdf-path"
-                  >
-                    PDF: {pdfLeafName}
-                  </p>
-                ) : null}
-              </CardContent>
-            </Card>
+                  PDF: {pdfLeafName}
+                </p>
+              ) : null}
+            </div>
 
             {procedure?.status === 'partial' ? (
               <DestructivePartialAlert
