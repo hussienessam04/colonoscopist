@@ -41,7 +41,7 @@ export default function PatientRow({
   const isDeleted = patient.deletedAt !== null;
   return (
     <tr
-      className="border-b last:border-b-0"
+      className="border-b border-[#E0D9C6] last:border-b-0 hover:bg-[#E6EFF1]"
       data-testid={`patient-row-${patient.id}`}
     >
       <td className="px-3 py-2 text-sm align-top">
@@ -54,10 +54,10 @@ export default function PatientRow({
           )}
         </div>
       </td>
-      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.dob}</td>
-      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.gender ?? '—'}</td>
-      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.mrn}</td>
-      <td className="px-3 py-2 text-sm text-muted-foreground align-top">{patient.phone ?? '—'}</td>
+      <td className="px-3 py-2 text-sm text-[#5C6770] align-top">{patient.dob}</td>
+      <td className="px-3 py-2 text-sm text-[#5C6770] align-top">{patient.gender ?? '—'}</td>
+      <td className="px-3 py-2 text-sm text-[#5C6770] align-top">{patient.mrn}</td>
+      <td className="px-3 py-2 text-sm text-[#5C6770] align-top">{patient.phone ?? '—'}</td>
       <td className="px-3 py-2 text-right align-top">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -19,7 +19,7 @@ export function EmptyStateCard({ message }: { message?: string }): JSX.Element {
       className="flex flex-col items-center justify-center gap-3 p-8 text-center"
       data-testid="gated-empty-state"
     >
-      <p className="text-sm text-muted-foreground">
+      <p className="text-sm text-[#5C6770]">
         {message ?? t('license.emptyStateMessage')}
       </p>
       <Button
@@ -27,6 +27,7 @@ export function EmptyStateCard({ message }: { message?: string }): JSX.Element {
         size="sm"
         onClick={() => navigate({ name: 'license' })}
         data-testid="gated-empty-state-open-license"
+        className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
       >
         {t('license.emptyStateOpenLicense')}
       </Button>

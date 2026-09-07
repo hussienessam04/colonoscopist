@@ -19,7 +19,7 @@
 //     (no outer Card wrapper) — matches Phase 7 RESEARCH.md Pattern 1
 //   - Active filter chips (search / MRN) render below the row when set;
 //     click × clears that filter
-//   - Results: sticky thead inside max-h-[60vh] + hover:bg-slate-50 rows
+//   - Results: sticky thead inside max-h-[60vh] + hover:bg-[#E6EFF1] rows
 //     + 3 grey animate-pulse skeleton rows for loading (no shadcn Skeleton
 //     dep — same pattern as Audit + PatientProcedures)
 //   - Empty state differentiates "no patients yet" (with CTA → patient-new)
@@ -167,18 +167,20 @@ export default function PatientsList(): JSX.Element {
   const filtersActive = search !== '' || mrn !== '';
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
       <div className="mx-auto max-w-6xl flex flex-col gap-4">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E0D9C6] pb-4">
           <div className="flex flex-col gap-1">
             <p
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground"
+              className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]"
               data-testid="patient-page-kicker"
             >
               {t('patient.pageKicker')}
             </p>
-            <h1 className="text-2xl font-semibold">{t('patient.pageTitle')}</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-2xl font-medium tracking-tight text-[#13202E]">
+              {t('patient.pageTitle')}
+            </h1>
+            <p className="text-sm text-[#5C6770]">
               {filtersActive
                 ? `${t('patient.total', { count: total })} · filtered`
                 : t('patient.total', { count: total })}
@@ -199,6 +201,7 @@ export default function PatientsList(): JSX.Element {
               size="lg"
               onClick={() => navigate({ name: 'patient-new' })}
               data-testid="patient-new-button"
+              className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
             >
               <Plus className="size-4 mr-2" aria-hidden="true" /> {t('patient.newPatient')}
             </Button>
@@ -211,12 +214,12 @@ export default function PatientsList(): JSX.Element {
               {t('patient.searchByName')}
             </Label>
             <Search
-              className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+              className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-[#5C6770] pointer-events-none"
               aria-hidden="true"
             />
             <Input
               id="patient-search"
-              className="pl-8"
+              className="pl-8 bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               placeholder={t('patient.searchPlaceholder')}
               value={search}
               onChange={(e) => {
@@ -232,6 +235,7 @@ export default function PatientsList(): JSX.Element {
             </Label>
             <Input
               id="patient-mrn"
+              className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               placeholder={t('patient.mrnPlaceholder')}
               value={mrn}
               onChange={(e) => {
@@ -253,7 +257,7 @@ export default function PatientsList(): JSX.Element {
               data-testid="filter-include-deleted"
               className="size-4"
             />
-            <Label htmlFor="patient-include-deleted" className="text-sm whitespace-nowrap">
+            <Label htmlFor="patient-include-deleted" className="text-sm whitespace-nowrap text-[#13202E]">
               {t('patient.showDeleted')}
             </Label>
           </div>
@@ -282,7 +286,7 @@ export default function PatientsList(): JSX.Element {
                     setSearch('');
                     setPage(1);
                   }}
-                  className="ml-1 rounded-sm hover:bg-slate-200/60 size-4 inline-flex items-center justify-center"
+                  className="ml-1 rounded-sm hover:bg-[#E0D9C6]/60 size-4 inline-flex items-center justify-center"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -300,7 +304,7 @@ export default function PatientsList(): JSX.Element {
                     setMrn('');
                     setPage(1);
                   }}
-                  className="ml-1 rounded-sm hover:bg-slate-200/60 size-4 inline-flex items-center justify-center"
+                  className="ml-1 rounded-sm hover:bg-[#E0D9C6]/60 size-4 inline-flex items-center justify-center"
                 >
                   <X className="size-3" aria-hidden="true" />
                 </button>
@@ -311,18 +315,18 @@ export default function PatientsList(): JSX.Element {
 
         {gated ? <EmptyStateCard /> : null}
 
-        <Card>
+        <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <CardContent className="p-0">
-            <div className="max-h-[60vh] overflow-y-auto rounded-md" data-testid="patient-table-scroll">
+            <div className="max-h-[60vh] overflow-y-auto border border-[#E0D9C6]" data-testid="patient-table-scroll">
               <table className="w-full">
-                <thead className="sticky top-0 z-10 bg-card shadow-[0_1px_0_0_hsl(var(--border))]">
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2 bg-card">Name</th>
-                    <th className="px-3 py-2 bg-card">DOB</th>
-                    <th className="px-3 py-2 bg-card">Gender</th>
-                    <th className="px-3 py-2 bg-card">MRN</th>
-                    <th className="px-3 py-2 bg-card">Phone</th>
-                    <th className="px-3 py-2 bg-card text-right">Actions</th>
+                <thead className="sticky top-0 z-10 bg-[#FBF7EE] shadow-[0_1px_0_0_hsl(var(--border))]">
+                  <tr className="border-b text-left text-xs uppercase text-[#8C8478]">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Name</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">DOB</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Gender</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">MRN</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Phone</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -334,7 +338,7 @@ export default function PatientsList(): JSX.Element {
                       {[0, 1, 2].map((i) => (
                         <tr key={`skeleton-${i}`} data-testid="patient-skeleton-row">
                           <td colSpan={6} className="px-3 py-2">
-                            <div className="h-5 w-full animate-pulse rounded bg-slate-200" />
+                            <div className="h-5 w-full animate-pulse rounded bg-[#E0D9C6]/60" />
                           </td>
                         </tr>
                       ))}
@@ -343,7 +347,7 @@ export default function PatientsList(): JSX.Element {
                     <tr>
                       <td
                         colSpan={6}
-                        className="px-3 py-10 text-center text-sm text-muted-foreground"
+                        className="px-3 py-10 text-center text-sm text-[#5C6770]"
                         data-testid={
                           filtersActive ? 'patient-empty-filtered' : 'patient-empty-first'
                         }
@@ -355,14 +359,14 @@ export default function PatientsList(): JSX.Element {
                           </div>
                         ) : (
                           <div className="flex flex-col gap-3 items-center">
-                            <UserPlus className="size-8 text-muted-foreground" aria-hidden="true" />
+                            <UserPlus className="size-8 text-[#5C6770]" aria-hidden="true" />
                             <span className="font-medium">{t('patient.emptyFirst')}</span>
                             <span className="text-xs">{t('patient.emptyFirstHint')}</span>
                             <Button
                               size="lg"
                               onClick={() => navigate({ name: 'patient-new' })}
                               data-testid="patient-empty-cta"
-                              className="mt-1"
+                              className="mt-1 bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
                             >
                               <Plus className="size-4 mr-2" aria-hidden="true" />
                               {t('patient.emptyFirstCta')}
@@ -391,7 +395,7 @@ export default function PatientsList(): JSX.Element {
 
         <div className="flex items-center justify-between text-sm">
           <span
-            className="text-muted-foreground"
+            className="text-[#5C6770]"
             data-testid="pagination-range"
           >
             {total === 0
@@ -410,6 +414,7 @@ export default function PatientsList(): JSX.Element {
               size="sm"
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               {t('common.previous')}
             </Button>
@@ -418,6 +423,7 @@ export default function PatientsList(): JSX.Element {
               size="sm"
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               {t('common.next')}
             </Button>

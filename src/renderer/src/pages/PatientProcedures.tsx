@@ -16,7 +16,7 @@
 //     PatientList filter UX (Apply is the commit gate; typing does
 //     NOT auto-filter) but kept compact (single-row layout).
 //   - Procedures Card: sticky thead inside a max-h-[60vh] scrollable
-//     container; hover:bg-slate-50 rows; status badge tokens via
+//     container; hover:bg-[#E6EFF1] rows; status badge tokens via
 //     Tailwind utility classes (bg-emerald-100 / bg-amber-100 /
 //     bg-blue-100 / bg-red-100) — NO new color tokens; ghost icon
 //     buttons for actions; 3-row skeleton (animate-pulse divs) while
@@ -273,20 +273,23 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
   const rangeEnd = Math.min(page * PAGE_SIZE, total);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
       <div className="mx-auto max-w-6xl flex flex-col gap-4">
-        <header className="flex items-center justify-between">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[#E0D9C6] pb-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]">
               {t('patientProcedures.pageKicker')}
             </p>
-            <h1 className="text-2xl font-semibold">{t('patientProcedures.pageTitle')}</h1>
+            <h1 className="text-2xl font-medium tracking-tight text-[#13202E]">
+              {t('patientProcedures.pageTitle')}
+            </h1>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
               onClick={() => navigate({ name: 'patients' })}
               data-testid="patient-procedures-back"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               <ArrowLeft className="size-4 mr-1" aria-hidden="true" />
               {t('patientProcedures.backToList')}
@@ -298,6 +301,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
               }
               title={t('patientProcedures.newProcedureTooltip')}
               data-testid="patient-procedures-new"
+              className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
             >
               <Plus className="size-4 mr-1" aria-hidden="true" />
               {t('patientProcedures.newProcedure')}
@@ -309,10 +313,13 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
           <EmptyStateCard />
         ) : null}
 
-        <Card data-testid="patient-procedures-header">
+        <Card
+          data-testid="patient-procedures-header"
+          className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]"
+        >
           <CardContent className="flex items-center gap-4 py-4">
             <div
-              className="size-12 shrink-0 rounded-full bg-primary/10 text-primary flex items-center justify-center font-semibold text-lg"
+              className="size-12 shrink-0 rounded-full bg-[#E6EFF1] text-[#0E3A47] flex items-center justify-center font-semibold text-lg"
               data-testid="patient-procedures-avatar"
               aria-hidden="true"
             >
@@ -325,7 +332,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                   : patient.fullName}
               </h2>
               {patient !== null ? (
-                <p className="text-sm text-muted-foreground flex flex-wrap gap-x-5 gap-y-1">
+                <p className="text-sm text-[#5C6770] flex flex-wrap gap-x-5 gap-y-1">
                   <span>
                     <span className="font-medium text-foreground">
                       {t('patient.mrnExact')}:
@@ -346,16 +353,16 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <CardContent className="py-3">
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative flex-1 min-w-[180px]">
                 <Search
-                  className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 size-4 text-[#5C6770] pointer-events-none"
                   aria-hidden="true"
                 />
                 <Input
-                  className="pl-8"
+                  className="pl-8 bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   placeholder={t('patientProcedures.searchPlaceholder')}
                   value={pendingSearch}
                   onChange={(e) => setPendingSearch(e.target.value)}
@@ -368,7 +375,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                 onChange={(e) => setPendingDateFrom(e.target.value)}
                 aria-label={t('patient.filtersDateFrom')}
                 data-testid="patient-procedures-date-from"
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="h-10 rounded-md border border-[#E0D9C6] bg-[#FBF7EE] px-3 text-sm text-[#13202E] hover:border-[#A8C5B5] focus-visible:outline-none focus-visible:border-[#0E3A47] focus-visible:ring-1 focus-visible:ring-[#0E3A47]/30"
               />
               <input
                 type="date"
@@ -376,13 +383,13 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                 onChange={(e) => setPendingDateTo(e.target.value)}
                 aria-label={t('patient.filtersDateTo')}
                 data-testid="patient-procedures-date-to"
-                className="h-10 rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="h-10 rounded-md border border-[#E0D9C6] bg-[#FBF7EE] px-3 text-sm text-[#13202E] hover:border-[#A8C5B5] focus-visible:outline-none focus-visible:border-[#0E3A47] focus-visible:ring-1 focus-visible:ring-[#0E3A47]/30"
               />
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
-                    className="min-w-[140px] justify-between"
+                    className="min-w-[140px] justify-between border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                     data-testid="patient-procedures-status"
                   >
                     <span className="truncate">{statusTriggerLabel()}</span>
@@ -399,7 +406,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                       return (
                         <label
                           key={status}
-                          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer hover:bg-accent"
+                          className="flex items-center gap-2 rounded-sm px-2 py-1.5 text-sm cursor-pointer hover:bg-[#E6EFF1]"
                           data-testid={`patient-procedures-status-option-${status}`}
                         >
                           <Checkbox
@@ -420,6 +427,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                   size="sm"
                   onClick={handleClear}
                   data-testid="patient-procedures-clear"
+                  className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   {t('patientProcedures.clearFilters')}
                 </Button>
@@ -427,6 +435,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                   size="sm"
                   onClick={handleApply}
                   data-testid="patient-procedures-apply"
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
                 >
                   {t('patientProcedures.applyFilters')}
                 </Button>
@@ -435,25 +444,25 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <CardContent className="p-0">
-            <div className="max-h-[60vh] overflow-y-auto rounded-md">
+            <div className="max-h-[60vh] overflow-y-auto border border-[#E0D9C6]">
               <table className="w-full">
-                <thead className="sticky top-0 bg-card z-10 shadow-[0_1px_0_0_hsl(var(--border))]">
-                  <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                    <th className="px-3 py-2 bg-card">
+                <thead className="sticky top-0 bg-[#FBF7EE] z-10 shadow-[0_1px_0_0_hsl(var(--border))]">
+                  <tr className="border-b text-left text-xs uppercase text-[#8C8478]">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">
                       {t('patientProcedures.columnStarted')}
                     </th>
-                    <th className="px-3 py-2 bg-card">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">
                       {t('patientProcedures.columnStatus')}
                     </th>
-                    <th className="px-3 py-2 bg-card">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">
                       {t('patientProcedures.columnDuration')}
                     </th>
-                    <th className="px-3 py-2 bg-card">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">
                       {t('patientProcedures.columnReport')}
                     </th>
-                    <th className="px-3 py-2 bg-card text-right">
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em] text-right">
                       {t('patientProcedures.columnActions')}
                     </th>
                   </tr>
@@ -463,9 +472,9 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     <tr data-testid="patient-procedures-skeleton-row">
                       <td colSpan={5} className="px-3 py-3">
                         <div className="flex flex-col gap-2">
-                          <div className="h-6 rounded bg-slate-200 animate-pulse" />
-                          <div className="h-6 rounded bg-slate-200 animate-pulse" />
-                          <div className="h-6 rounded bg-slate-200 animate-pulse" />
+                          <div className="h-6 rounded bg-[#E0D9C6]/60 animate-pulse" />
+                          <div className="h-6 rounded bg-[#E0D9C6]/60 animate-pulse" />
+                          <div className="h-6 rounded bg-[#E0D9C6]/60 animate-pulse" />
                         </div>
                       </td>
                     </tr>
@@ -473,7 +482,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     <tr>
                       <td
                         colSpan={5}
-                        className="px-3 py-8 text-center text-sm text-muted-foreground"
+                        className="px-3 py-8 text-center text-sm text-[#5C6770]"
                         data-testid={
                           filtersActive
                             ? 'patient-procedures-empty-filtered'
@@ -496,7 +505,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     filteredRows.map(({ procedure, report }) => (
                       <tr
                         key={procedure.id}
-                        className="border-b last:border-b-0 hover:bg-slate-50"
+                        className="border-b border-[#E0D9C6] last:border-b-0 hover:bg-[#E6EFF1]"
                         data-testid={`patient-procedure-row-${procedure.id}`}
                       >
                         <td className="px-3 py-2 text-sm">
@@ -510,7 +519,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                             {t(statusLabelKey(procedure.status))}
                           </Badge>
                         </td>
-                        <td className="px-3 py-2 text-sm text-muted-foreground">
+                        <td className="px-3 py-2 text-sm text-[#5C6770]">
                           {t('patientProcedures.minutesShort', {
                             count: Math.round(procedure.durationSeconds / 60),
                           })}
@@ -531,7 +540,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                             </Badge>
                           ) : (
                             <span
-                              className="text-xs text-muted-foreground"
+                              className="text-xs text-[#5C6770]"
                               data-testid={`patient-procedure-no-report-${procedure.id}`}
                             >
                               {t('patientProcedures.noReport')}
@@ -545,6 +554,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                               size="sm"
                               onClick={() => handleOpenProcedure(procedure.id)}
                               data-testid={`patient-procedure-open-${procedure.id}`}
+                              className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                             >
                               {t('patientProcedures.openProcedure')}
                             </Button>
@@ -554,6 +564,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                                 size="sm"
                                 onClick={() => void handleOpenReport(report.id)}
                                 data-testid={`patient-procedure-open-pdf-${procedure.id}`}
+                                className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                               >
                                 <FileText className="size-3.5 mr-1" aria-hidden="true" />
                                 {t('patientProcedures.openPdf')}
@@ -572,7 +583,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
 
         <div className="flex items-center justify-between text-sm">
           <span
-            className="text-muted-foreground"
+            className="text-[#5C6770]"
             data-testid="patient-procedures-pagination-range"
           >
             {total === 0
@@ -592,6 +603,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
               disabled={page <= 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               data-testid="patient-procedures-prev"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               {t('common.previous')}
             </Button>
@@ -601,6 +613,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
               disabled={page >= totalPages}
               onClick={() => setPage((p) => p + 1)}
               data-testid="patient-procedures-next"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
               {t('common.next')}
             </Button>

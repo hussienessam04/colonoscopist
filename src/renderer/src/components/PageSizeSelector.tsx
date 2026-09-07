@@ -17,7 +17,10 @@ const PAGE_SIZES = [10, 25, 50, 100] as const;
 export default function PageSizeSelector({ value, onChange }: Props): JSX.Element {
   return (
     <Select value={String(value)} onValueChange={(v) => onChange(Number(v))}>
-      <SelectTrigger className="w-32" aria-label="Page size">
+      <SelectTrigger
+        className="w-32 bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
+        aria-label="Page size"
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
