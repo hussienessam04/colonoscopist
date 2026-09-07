@@ -379,8 +379,8 @@ export default function ProcedureRoom(): JSX.Element {
           </div>
         </header>
 
-        <section
-          className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem]'}`}
+<section
+          className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem_20rem]'}`}
         >
           {/* Quick task 20260907-procedure-room-ui-enhance —
               live preview card uses the same warm-ivory
@@ -490,51 +490,50 @@ export default function ProcedureRoom(): JSX.Element {
               </Button>
             </div>
           )}
-        </section>
 
-        {isRecording || screenshotIntake.screenshots.length > 0 ? (
-          // Quick task 20260812 — mid-procedure gallery lives at the bottom
-          // of the page (full width) instead of the right sidebar. Same
-          // useScreenshotIntake.screenshots source; onSeek is a no-op (no
-          // <video> to seek during recording) and onAnnotate is intentionally
-          // not passed (annotations are review-only). The +Capture button
-          // reuses the room's handleScreenshotCapture so the S hotkey and
-          // the timeline button are interchangeable.
-          //
-          // Quick task 20260907-procedure-room-ui-enhance —
-          // gallery card uses the warm-ivory CARD_CHROME + a
-          // small-caps teal header + a mono count badge.
-          <section
-            className={`${CARD_CHROME} p-4`}
-            data-testid="procedure-room-gallery-section"
-          >
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <p className={SMALL_CAPS_LABEL}>Captured screenshots</p>
-                <span
-                  className="font-mono text-xs tabular-nums text-[#5C6770]"
-                  data-testid="procedure-room-gallery-count"
-                >
-                  {screenshotIntake.screenshots.length}
-                </span>
+          {/* Quick task 20260907-procedure-room-screenshots-vertical —
+              Screenshots box now sits as a 3rd column on the right
+              (lg:grid-cols-[minmax(0,1fr)_20rem_20rem]) with a
+              vertical-grid layout for the thumbnails (one per
+              row, 2 columns at full container width). The card
+              scrolls vertically inside its container so the
+              page layout stays compact. */}
+          {!notesCollapsed ? (
+            <aside
+              className="flex flex-col gap-4"
+              data-testid="procedure-room-screenshots-rail"
+            >
+              <div className={RAIL_CARD_CHROME} data-testid="procedure-room-screenshots">
+                <div className="flex items-center justify-between">
+                  <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+                  <span
+                    className="font-mono text-xs tabular-nums text-[#5C6770]"
+                    data-testid="procedure-room-gallery-count"
+                  >
+                    {screenshotIntake.screenshots.length}
+                  </span>
+                </div>
+                <hr className="mt-2 border-[#E0D9C6]" />
+                <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
+                  <ScreenshotTimeline
+                    procedureId={procedureId ?? ''}
+                    patientId={patientIdFromRoute}
+                    mediaBaseUrl={mediaUrl.url}
+                    status={isRecording ? 'recording' : 'completed'}
+                    screenshots={screenshotIntake.screenshots}
+                    onSeek={() => undefined}
+                    onCapture={() => {
+                      void handleScreenshotCapture();
+                    }}
+                    onDelete={handleScreenshotDelete}
+                    testId="procedure-room-gallery"
+                    layout="grid"
+                  />
+                </div>
               </div>
-            </div>
-            <ScreenshotTimeline
-              procedureId={procedureId ?? ''}
-              patientId={patientIdFromRoute}
-              mediaBaseUrl={mediaUrl.url}
-              status={isRecording ? 'recording' : 'completed'}
-              screenshots={screenshotIntake.screenshots}
-              onSeek={() => undefined}
-              onCapture={() => {
-                void handleScreenshotCapture();
-              }}
-              onDelete={handleScreenshotDelete}
-              testId="procedure-room-gallery"
-              layout="row"
-            />
-          </section>
-        ) : null}
+            </aside>
+          ) : null}
+        </section>
       </div>
     </main>
   );
