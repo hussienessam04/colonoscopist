@@ -9,6 +9,7 @@ import { setRoute } from '@/store/route';
 import { session } from '@/store/session';
 import { recordingStore } from '@/store/recording';
 import { screenshotToastStore } from '@/store/screenshot-toast';
+import i18n from '@/i18n';
 import ProcedureRoom from '@/pages/ProcedureRoom';
 import type { RecordingStatus } from '@shared/ipc-contract';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
@@ -348,7 +349,7 @@ describe('ProcedureRoom DeviceLostBanner', () => {
     });
 
     const banner = await screen.findByTestId('device-lost-banner');
-    expect(banner).toHaveTextContent(/Capture device disconnected/);
+    expect(banner).toHaveTextContent(i18n.t('procedure.deviceLostBannerTitle'));
     expect(banner).toHaveTextContent('00:00:05');
     expect(banner).toHaveTextContent(/USB Video Device/);
   });

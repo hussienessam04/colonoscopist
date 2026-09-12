@@ -14,6 +14,7 @@
 // stack stays mono for the clinical-instrument feel.
 
 import { Camera, CircleStop, Pause, Play } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -47,6 +48,7 @@ export function RecordingControlsBar({
   onPauseResumeToggle,
   onCapture,
 }: RecordingControlsBarProps): JSX.Element {
+  const { t } = useTranslation();
   return (
     <div
       // ponytail: sit at the bottom of the preview pane. ivory card
@@ -58,10 +60,10 @@ export function RecordingControlsBar({
     >
       <div className="flex flex-col gap-0.5">
         <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]">
-          Duration
+          {t('procedure.controlsDurationLabel')}
         </p>
         <p
-          aria-label="Procedure duration"
+          aria-label={t('procedure.controlsDurationAriaLabel')}
           className="font-mono text-2xl tabular-nums leading-none text-[#0E3A47]"
           data-testid="procedure-duration"
         >
@@ -71,9 +73,9 @@ export function RecordingControlsBar({
           <p
             className="text-[10px] text-[#8C8478]"
             data-testid="pause-count"
-            aria-label={`Pause count: ${pauseCount}`}
+            aria-label={t('procedure.controlsPauseCount', { count: pauseCount })}
           >
-            Pause #{pauseCount}
+            {t('procedure.controlsPauseCount', { count: pauseCount })}
           </p>
         ) : null}
       </div>
@@ -90,11 +92,11 @@ export function RecordingControlsBar({
             onClick={onRecordToggle}
             disabled={recordingBusy}
             data-testid="stop-recording-button"
-            aria-label="Stop recording (Esc)"
+            aria-label={t('procedure.controlsStopAriaLabel')}
             aria-keyshortcuts="Escape"
           >
             <CircleStop aria-hidden="true" />
-            Stop Recording
+            {t('procedure.stopRecording')}
           </Button>
         ) : (
           <Button
@@ -106,11 +108,11 @@ export function RecordingControlsBar({
             onClick={onRecordToggle}
             disabled={!canRecord || recordingBusy || startInFlight}
             data-testid="record-button"
-            aria-label="Start recording (R)"
+            aria-label={t('procedure.controlsStartAriaLabel')}
             aria-keyshortcuts="R"
           >
             <CircleStop aria-hidden="true" />
-            Start Recording
+            {t('procedure.startRecording')}
           </Button>
         )}
         {isRecording && !isPaused ? (
@@ -119,12 +121,12 @@ export function RecordingControlsBar({
             onClick={onPauseResumeToggle}
             disabled={recordingBusy}
             data-testid="pause-button"
-            aria-label="Pause (Space)"
+            aria-label={t('procedure.controlsPauseAriaLabel')}
             aria-keyshortcuts="Space"
             className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
           >
             <Pause aria-hidden="true" />
-            Pause
+            {t('procedure.pauseRecording')}
           </Button>
         ) : isPaused ? (
           <Button
@@ -132,12 +134,12 @@ export function RecordingControlsBar({
             onClick={onPauseResumeToggle}
             disabled={recordingBusy}
             data-testid="resume-button"
-            aria-label="Resume (Space)"
+            aria-label={t('procedure.controlsResumeAriaLabel')}
             aria-keyshortcuts="Space"
             className="border-[#0E3A47] bg-[#E6EFF1] text-[#0E3A47] hover:border-[#0E3A47] hover:bg-[#dbe7e9]"
           >
             <Play aria-hidden="true" />
-            Resume
+            {t('procedure.resumeRecording')}
           </Button>
         ) : null}
         {isRecording && onCapture ? (
@@ -146,12 +148,12 @@ export function RecordingControlsBar({
             onClick={onCapture}
             disabled={recordingBusy}
             data-testid="capture-screenshot-button"
-            aria-label="Capture screenshot (S)"
+            aria-label={t('procedure.controlsCaptureAriaLabel')}
             aria-keyshortcuts="S"
             className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
           >
             <Camera aria-hidden="true" />
-            Capture
+            {t('procedure.captureButton')}
           </Button>
         ) : null}
       </div>

@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event';
 import { getApi } from '../setup';
 import { initialRoute, setRoute, getRoute } from '@/lib/router';
 import { session } from '@/store/session';
+import i18n from '@/i18n';
 import PatientsList from '@/pages/PatientsList';
 import type { Patient } from '@shared/ipc-contract';
 
@@ -70,7 +71,7 @@ describe('PatientRow — Open Procedure Room entry (G-03-4)', () => {
     await screen.findByText('Alice Carter');
 
     await user.click(screen.getByRole('button', { name: /actions for alice carter/i }));
-    const openProc = await screen.findByRole('menuitem', { name: /open procedure preview/i });
+    const openProc = await screen.findByRole('menuitem', { name: i18n.t('patient.openProcedurePreview') });
     expect(openProc).toBeInTheDocument();
 
     await user.click(openProc);
@@ -89,8 +90,8 @@ describe('PatientRow — Open Procedure Room entry (G-03-4)', () => {
 
     await user.click(screen.getByRole('button', { name: /actions for deleted alice/i }));
     // Edit + Restore are present; Open Procedure Preview is NOT.
-    expect(await screen.findByRole('menuitem', { name: /^edit$/i })).toBeInTheDocument();
-    expect(await screen.findByRole('menuitem', { name: /^restore$/i })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /open procedure preview/i })).toBeNull();
+    expect(await screen.findByRole('menuitem', { name: i18n.t('common.edit') })).toBeInTheDocument();
+    expect(await screen.findByRole('menuitem', { name: i18n.t('patient.restore') })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: i18n.t('patient.openProcedurePreview') })).toBeNull();
   });
 });

@@ -12,6 +12,7 @@
 // from a thumbnail lands within 1ms of the original capture point.
 
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Screenshot } from '@shared/ipc-contract';
 
 export type ScreenshotAnnotationProps = {
@@ -27,6 +28,7 @@ export function ScreenshotAnnotation({
   onSave,
   testId,
 }: ScreenshotAnnotationProps): JSX.Element {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState<string>(screenshot.annotation ?? '');
   const lastSavedRef = useRef<string>(screenshot.annotation ?? '');
@@ -81,7 +83,7 @@ export function ScreenshotAnnotation({
         onBlur={handleBlur}
         onClick={(e) => e.stopPropagation()}
         maxLength={MAX_LEN}
-        aria-label="Annotate screenshot"
+        aria-label={t('screenshot.annotationAriaLabel')}
         data-testid={testId ?? 'screenshot-annotation-input'}
         className="text-xs w-full border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-900"
       />
@@ -95,11 +97,11 @@ export function ScreenshotAnnotation({
         e.stopPropagation();
         setEditing(true);
       }}
-      aria-label="Annotate screenshot"
+      aria-label={t('screenshot.annotationAriaLabel')}
       data-testid={testId ?? 'screenshot-annotation-caption'}
       className="block w-full truncate text-left text-[10px] text-slate-600 hover:text-slate-900"
     >
-      {screenshot.annotation ? screenshot.annotation : 'Add annotation…'}
+      {screenshot.annotation ? screenshot.annotation : t('screenshot.annotationAddPlaceholder')}
     </button>
   );
 }

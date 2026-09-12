@@ -86,7 +86,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
   return (
     <aside className="flex flex-col gap-2 rounded-lg border border-[#E0D9C6] bg-[#EFEAE0] p-4 shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
-        Sections
+        {t('settings.sidebarHeading')}
       </p>
       <Button
         variant={activeTab === 'capture' ? 'default' : 'outline'}
@@ -100,7 +100,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         data-active={activeTab === 'capture' ? 'true' : 'false'}
       >
         <Video className="size-4 mr-2" aria-hidden="true" />
-        Capture
+        {t('settings.captureTitle')}
       </Button>
       <Button
         variant={activeTab === 'profile' ? 'default' : 'outline'}
@@ -114,7 +114,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         data-active={activeTab === 'profile' ? 'true' : 'false'}
       >
         <UserCircle className="size-4 mr-2" aria-hidden="true" />
-        Profile
+        {t('settings.profileTitle')}
       </Button>
       <Button
         variant={activeTab === 'audit' ? 'default' : 'outline'}
@@ -128,7 +128,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         data-active={activeTab === 'audit' ? 'true' : 'false'}
       >
         <FileSearch className="size-4 mr-2" aria-hidden="true" />
-        Audit
+        {t('settings.auditTitle')}
       </Button>
       <Button
         variant={activeTab === 'license' ? 'default' : 'outline'}
@@ -172,7 +172,7 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         data-active={activeTab === 'backup-restore' ? 'true' : 'false'}
       >
         <HardDrive className="size-4 mr-2" aria-hidden="true" />
-        Backup &amp; restore
+        {t('settings.backupTitle')}
       </Button>
       <Button
         variant={activeTab === 'users' ? 'default' : 'outline'}
@@ -183,12 +183,12 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         }
         onClick={() => navigate({ name: 'settings-users' })}
         disabled={!isAdmin}
-        title={isAdmin ? 'Manage users' : 'Admin only'}
+        title={isAdmin ? t('settings.usersManageTooltip') : t('settings.usersAdminOnlyTitle')}
         data-testid="settings-hub-users"
         data-active={activeTab === 'users' ? 'true' : 'false'}
       >
         <Shield className="size-4 mr-2" aria-hidden="true" />
-        Users
+        {t('settings.usersTitle')}
       </Button>
       {/* Quick task 20260912-q4g — About entry sits between
           Users and Storage. No admin gate; every doctor sees
@@ -223,12 +223,12 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
         }
         onClick={() => navigate({ name: 'settings-storage' })}
         disabled={!isAdmin}
-        title={isAdmin ? 'Database location' : 'Admin only'}
+        title={isAdmin ? t('settings.storageLocationTooltip') : t('settings.usersAdminOnlyTitle')}
         data-testid="settings-hub-storage"
         data-active={activeTab === 'storage' ? 'true' : 'false'}
       >
         <Folder className="size-4 mr-2" aria-hidden="true" />
-        Storage
+        {t('settings.storageTitle')}
       </Button>
     </aside>
   );

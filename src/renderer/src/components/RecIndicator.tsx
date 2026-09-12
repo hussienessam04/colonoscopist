@@ -14,6 +14,7 @@
 // top of the preview pane so the doctor can read it at a
 // glance without losing focus on the video.
 
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 export type RecIndicatorProps = {
@@ -29,6 +30,7 @@ export function RecIndicator({
   durationLabel,
   className,
 }: RecIndicatorProps): JSX.Element | null {
+  const { t } = useTranslation();
   if (!visible) return null;
   const isPaused = paused;
   return (
@@ -59,12 +61,12 @@ export function RecIndicator({
         className="text-[10px] font-semibold uppercase leading-none tracking-[0.22em]"
         data-testid="rec-indicator-status"
       >
-        {isPaused ? 'Paused' : 'Recording'}
+        {isPaused ? t('procedure.indicatorPaused') : t('procedure.recordingLabel')}
       </p>
       <span aria-hidden="true" className="text-[#E6EFF1]/40">·</span>
       {durationLabel ? (
         <p
-          aria-label="Elapsed recording duration"
+          aria-label={t('procedure.indicatorDurationAriaLabel')}
           className="font-mono text-[11px] tabular-nums leading-none tracking-tight"
           data-testid="rec-indicator-duration"
         >

@@ -7,6 +7,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '../setup';
 import { getApi } from '../setup';
+import i18n from '@/i18n';
 import { ProcedureNotesReview } from '@/components/ProcedureNotesReview';
 import type { ProcedureNote } from '@shared/ipc-contract';
 
@@ -50,7 +51,7 @@ describe('ProcedureNotesReview', () => {
     // Default-open for completed -> empty state appears after the API resolves.
     await waitFor(() => {
       expect(
-        screen.getByText(/No notes recorded for this procedure\./i),
+        screen.getByText(i18n.t('procedure.notesEmpty')),
       ).toBeInTheDocument();
     });
   });
@@ -100,6 +101,6 @@ describe('ProcedureNotesReview', () => {
     render(<ProcedureNotesReview procedureId="p1" status="completed" />);
 
     expect(screen.queryByRole('textbox')).toBeNull();
-    expect(screen.getByText(/Notes are read-only in Review\./i)).toBeInTheDocument();
+    expect(screen.getByText(i18n.t('procedure.notesReadOnlyHint'))).toBeInTheDocument();
   });
 });

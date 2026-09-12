@@ -72,17 +72,11 @@ export default function PatientRow({
           <DropdownMenuContent align="end">
             {!isDeleted ? (
               <>
-                {/* Per Plan 03-05 (G-03-4): the existing "Open Procedure Preview"
-                    label is preserved verbatim (hardcoded English) so the
-                    pre-existing test contract at
-                    tests/renderer/components/patient-row.test.tsx holds. The
-                    new "View procedures" item (quick task 20260811) flows
-                    through t() so EN + AR bundles cover it. */}
                 <DropdownMenuItem
                   onSelect={() => navigate({ name: 'procedure-preview', patientId: patient.id })}
                   data-testid="open-procedure-room"
                 >
-                  Open Procedure Preview
+                  {t('patient.openProcedurePreview')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={() =>

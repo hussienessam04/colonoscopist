@@ -11,6 +11,7 @@
 //     partial / crashed entries)
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   Accordion,
   AccordionContent,
@@ -44,6 +45,7 @@ export function ProcedureNotesReview({
   status,
   testId,
 }: ProcedureNotesReviewProps): JSX.Element {
+  const { t } = useTranslation();
   const [notes, setNotes] = useState<ProcedureNote[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -84,16 +86,16 @@ export function ProcedureNotesReview({
     >
       <AccordionItem value="notes" data-testid={testId ?? 'procedure-notes-review'}>
         <AccordionTrigger>
-          <span className="flex-1 text-left text-sm">Notes ({notes.length})</span>
+          <span className="flex-1 text-left text-sm">{t('procedure.notesTitle')} ({notes.length})</span>
         </AccordionTrigger>
         <AccordionContent>
           <p className="mb-2 text-xs italic text-muted-foreground">
-            Notes are read-only in Review.
+            {t('procedure.notesReadOnlyHint')}
           </p>
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading notes…</p>
+            <p className="text-sm text-muted-foreground">{t('procedure.notesLoading')}</p>
           ) : notes.length === 0 ? (
-            <p className="text-sm text-slate-500">No notes recorded for this procedure.</p>
+            <p className="text-sm text-slate-500">{t('procedure.notesEmpty')}</p>
           ) : (
             <ul className="space-y-2">
               {notes.map((n) => (

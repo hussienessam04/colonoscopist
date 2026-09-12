@@ -150,7 +150,8 @@
     "columnName": "الاسم",
     "columnGender": "الجنس",
     "columnPhone": "الهاتف",
-    "columnActions": "الإجراءات"
+    "columnActions": "الإجراءات",
+    "openProcedurePreview": "فتح معاينة الإجراء"
   },
   "patientForm": {
     "loading": "جاري التحميل…",
@@ -416,7 +417,21 @@
     "previewStartHint": "انقر متابعة لبدء الإجراء.",
     "previewCollapsePanel": "طي اللوحة الجانبية",
     "previewShowPanel": "إظهار اللوحة الجانبية",
-    "previewBackToPatients": "العودة إلى المرضى"
+    "previewBackToPatients": "العودة إلى المرضى",
+    "controlsPauseCount": "إيقاف مؤقت #{{count}}",
+    "controlsDurationAriaLabel": "مدة الإجراء",
+    "controlsStartAriaLabel": "بدء التسجيل (R)",
+    "controlsStopAriaLabel": "إيقاف التسجيل (Esc)",
+    "controlsPauseAriaLabel": "إيقاف مؤقت (Space)",
+    "controlsResumeAriaLabel": "استئناف (Space)",
+    "controlsCaptureAriaLabel": "التقاط لقطة شاشة (S)",
+    "controlsDurationLabel": "المدة",
+    "indicatorPaused": "متوقف مؤقتاً",
+    "indicatorDurationAriaLabel": "مدة التسجيل المنقضية",
+    "notesReadOnlyHint": "الملاحظات للقراءة فقط في المراجعة.",
+    "notesLoading": "جاري تحميل الملاحظات…",
+    "deviceLostBannerTitle": "انقطع جهاز الالتقاط",
+    "deviceLostDismiss": "إخفاء"
   },
   "report": {
     "pageTitle": "محرر التقرير",
@@ -699,7 +714,10 @@
     "usersRemoveConfirmBody": "سيتم فقدان وصول {{name}}.",
     "tableName": "الاسم",
     "tableLastLogin": "آخر تسجيل دخول",
-    "tableActions": "الإجراءات"
+    "tableActions": "الإجراءات",
+    "sidebarHeading": "الأقسام",
+    "usersManageTooltip": "إدارة المستخدمين",
+    "storageLocationTooltip": "موقع قاعدة البيانات"
   },
   "recovery": {
     "title": "استعادة رمز المسؤول",
@@ -808,7 +826,9 @@
     "cropInvalid": "يجب أن يكون التحديد داخل الصورة",
     "cropFailed": "فشل القص",
     "cropRetry": "إعادة المحاولة",
-    "cropReadOnly": "عرض فقط"
+    "cropReadOnly": "عرض فقط",
+    "annotationAriaLabel": "إضافة تعليق على لقطة الشاشة",
+    "annotationAddPlaceholder": "إضافة تعليق…"
   },
   "pinEntry": {
     "signInAs": "تسجيل الدخول باسم {{name}}",

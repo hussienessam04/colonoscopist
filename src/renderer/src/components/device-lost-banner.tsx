@@ -6,6 +6,7 @@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
+import { useTranslation } from 'react-i18next';
 import type { LastLost } from '@/store/recording';
 
 type DeviceLostBannerProps = {
@@ -17,6 +18,7 @@ export default function DeviceLostBanner({
   lastLost,
   onDismiss,
 }: DeviceLostBannerProps): JSX.Element | null {
+  const { t } = useTranslation();
   if (lastLost === null) return null;
   return (
     <Alert
@@ -24,7 +26,7 @@ export default function DeviceLostBanner({
       data-testid="device-lost-banner"
       className="flex flex-col gap-2"
     >
-      <AlertTitle>Capture device disconnected</AlertTitle>
+      <AlertTitle>{t('procedure.deviceLostBannerTitle')}</AlertTitle>
       <AlertDescription>
         Recording preserved up to{' '}
         <span className="font-mono font-medium">
@@ -39,7 +41,7 @@ export default function DeviceLostBanner({
         className="self-end"
         data-testid="device-lost-dismiss"
       >
-        Dismiss
+        {t('procedure.deviceLostDismiss')}
       </Button>
     </Alert>
   );

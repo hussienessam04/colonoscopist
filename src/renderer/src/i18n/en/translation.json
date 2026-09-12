@@ -150,7 +150,8 @@
     "columnName": "Name",
     "columnGender": "Gender",
     "columnPhone": "Phone",
-    "columnActions": "Actions"
+    "columnActions": "Actions",
+    "openProcedurePreview": "Open Procedure Preview"
   },
   "patientForm": {
     "loading": "Loading…",
@@ -416,7 +417,21 @@
     "previewStartHint": "Click Continue to start the procedure.",
     "previewCollapsePanel": "Collapse side panel",
     "previewShowPanel": "Show side panel",
-    "previewBackToPatients": "Back to patients"
+    "previewBackToPatients": "Back to patients",
+    "controlsPauseCount": "Pause #{{count}}",
+    "controlsDurationAriaLabel": "Procedure duration",
+    "controlsStartAriaLabel": "Start recording (R)",
+    "controlsStopAriaLabel": "Stop recording (Esc)",
+    "controlsPauseAriaLabel": "Pause (Space)",
+    "controlsResumeAriaLabel": "Resume (Space)",
+    "controlsCaptureAriaLabel": "Capture screenshot (S)",
+    "controlsDurationLabel": "Duration",
+    "indicatorPaused": "Paused",
+    "indicatorDurationAriaLabel": "Elapsed recording duration",
+    "notesReadOnlyHint": "Notes are read-only in Review.",
+    "notesLoading": "Loading notes…",
+    "deviceLostBannerTitle": "Capture device disconnected",
+    "deviceLostDismiss": "Dismiss"
   },
   "report": {
     "pageTitle": "Report editor",
@@ -699,7 +714,10 @@
     "usersRemoveConfirmBody": "{{name}} will lose access.",
     "tableName": "Name",
     "tableLastLogin": "Last login",
-    "tableActions": "Actions"
+    "tableActions": "Actions",
+    "sidebarHeading": "Sections",
+    "usersManageTooltip": "Manage users",
+    "storageLocationTooltip": "Database location"
   },
   "recovery": {
     "title": "Recover admin PIN",
@@ -800,7 +818,9 @@
     "cropInvalid": "Selection must be inside the image",
     "cropFailed": "Crop failed",
     "cropRetry": "Retry",
-    "cropReadOnly": "Show only"
+    "cropReadOnly": "Show only",
+    "annotationAriaLabel": "Annotate screenshot",
+    "annotationAddPlaceholder": "Add annotation…"
   },
   "pinEntry": {
     "signInAs": "Sign in as {{name}}",
