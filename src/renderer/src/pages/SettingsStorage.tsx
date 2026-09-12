@@ -244,10 +244,10 @@ export default function SettingsStorage(): JSX.Element {
               className="bg-[#0E3A47] text-white hover:bg-[#0a2C36] disabled:opacity-50"
               data-testid="settings-storage-save"
             >
-              <Save className="size-4 mr-1.5" aria-hidden="true" />
+<Save className="size-4 mr-1.5" aria-hidden="true" />
               {saveOutcome.kind === 'saving'
-                ? t('settings.storage.saving')
-                : t('settings.storage.save')}
+                ? t('common.saving')
+                : t('common.save')}
             </Button>
           </div>
 
