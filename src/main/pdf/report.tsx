@@ -126,8 +126,22 @@ const FOOTER_BAND_IMAGE_STYLE = {
 // typical row fit on page 1 alongside the main row content.
 // @react-pdf/renderer paginates any remaining overflow to
 // page 2.
+//
+// Quick task 20260912-pdf-extras-3-per-row-page1 — shrunk
+// `RIGHT_COL_THUMB_HEIGHT` from 88 → 72. Page 1's vertical
+// budget after the info boxes is dominated by the right
+// column at 5 × 88 = 440pt + 16pt margin = 456pt; with
+// paddingTop (96) + info boxes (~72) + paddingBottom (96)
+// + bands, only ~72pt remained for the extras wrap row —
+// not enough for one row of 3 at 88pt each. Cutting the
+// right column to 5 × 72 + 16 = 376pt frees ~80pt, so the
+// extras wrap row now fits one full row of 3 on page 1
+// (with ~64pt to spare). ponytail: keep RIGHT_COL_THUMB_WIDTH
+// at 110; only the height shrinks so the screenshot's
+// natural landscape aspect ratio still fits with
+// `objectFit: 'contain'` inside the (now shorter) box.
 const RIGHT_COL_THUMB_WIDTH = 110;
-const RIGHT_COL_THUMB_HEIGHT = 88;
+const RIGHT_COL_THUMB_HEIGHT = 72;
 const RIGHT_COL_THUMB_COUNT = 5;
 const EXTRA_THUMB_WIDTH = 110;
 const EXTRA_THUMB_HEIGHT = 88;
