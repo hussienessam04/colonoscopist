@@ -45,11 +45,6 @@ import { session } from '../auth/session';
 import { renderReportPdf } from '../pdf/render-report-pdf';
 import { reportPdfPath } from '../paths';
 import { existsSync, readFileSync } from 'node:fs';
-// Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-26 verbatim: resolve the
-// doctor's preferred language server-side so the renderer never supplies
-// it. Falls back doctor_profile.language → users.language → 'en'.
-import { doctorProfileRepo } from '../db/doctor-profile-repo';
-import { userRepo } from '../db/users';
 import { licenseGated } from '../license';
 
 function fromZodError(err: z.ZodError, fallbackField?: string): IpcErrorException {
@@ -348,17 +343,10 @@ export function registerReportsIpc(): void {
     try {
       const userId = requireSession();
       const { id } = safeParse(reportIdSchema, raw, 'id');
-      // Phase 7 / Plan 07-04 — I18N-03 + RPT-06 + D-26: resolve the
-      // language server-side from the report's doctor profile.
-      // The renderer's IPC contract is unchanged — main owns the
-      // language lookup so the renderer can't spoof AR / EN output.
-      const reportRow = reportsRepo.getById(id);
-      let language: 'en' | 'ar' = 'en';
-      if (reportRow) {
-        const profile = doctorProfileRepo.get(reportRow.doctorId);
-        const user = userRepo.get(reportRow.doctorId);
-        language = profile?.language ?? user?.language ?? 'en';
-      }
+      // PDF reports always render in English regardless of UI language.
+      // The renderer's i18n language is decoupled from the clinical document
+      // per the doctor's explicit preference.
+      const language: 'en' | 'ar' = 'en';
       const result = await renderReportPdf(id, { language });
       audit({
         action: 'report.pdf_regenerated',

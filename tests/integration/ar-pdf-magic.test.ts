@@ -1,43 +1,19 @@
 // @vitest-environment node
-// Phase 7 / Plan 07-06 — RPT-06 / I18N-03 ship-gate: AR PDF magic-bytes
-// integration test (D-27 verbatim). RUN_SMOKE=1 gated; default unit
+// Phase 7 / Plan 07-06 + quick task 260913-3sj — RPT-06 ship-gate:
+// PDF magic-bytes integration test. RUN_SMOKE=1 gated; default unit
 // runs skip.
 //
-// Per D-27: "a RUN_SMOKE=1 integration test that renders one AR
-// report, writes to <userData>/data/reports/<reportId>.pdf, asserts
-// file size > 50KB, and asserts the file opens cleanly (PDF magic
-// bytes)."
+// Quick task 260913-3sj: PDF reports now ALWAYS render in English
+// regardless of UI language (doctor's explicit preference). The test
+// is now an EN-only smoke that exercises the FULL DB-backed
+// orchestrator path (renderReportPdf) — distinct from
+// tests/integration/ar-pdf-smoke.test.ts which exercises the
+// lower-level createReportPdfElement factory. The orchestrator path
+// is what the production IPC handler runs.
 //
-// This test exercises the FULL DB-backed orchestrator path
-// (renderReportPdf) — distinct from tests/integration/ar-pdf-smoke.test.ts
-// which exercises the lower-level createReportPdfElement factory. The
-// orchestrator path is what the production IPC handler runs.
-//
-// THRESHOLD DEVIATION from D-27 verbatim >50KB:
-//
-//   The plan's >50KB threshold assumes that the NotoSansArabic TTF
-//   (~250KB) gets embedded in the PDF. In practice @react-pdf/renderer
-//   4.5.1 only embeds font subsets for the actual glyphs referenced
-//   in the text — with English body text + language='ar', the
-//   fontFamily reference is registered but no Arabic glyphs are
-//   actually rendered, so the font isn't embedded. The PDF lands
-//   at ~10KB with one attached screenshot.
-//
-//   Using actual Arabic body text triggers the bidi reordering path
-//   which has a known crash in @react-pdf/textkit 4.5.1 (Cannot read
-//   properties of undefined 'id' in reorderLine). The crash is gated
-//   on real Arabic ligatures — sidestepping it would require a font
-//   or renderer upgrade outside this plan's scope.
-//
-//   The 5_000 threshold (matching tests/integration/ar-pdf-smoke.test.ts)
-//   still catches the D-27 failure modes:
-//     - "render crashed → 0KB file"  (PDF is 0 bytes → assertion fails)
-//     - "Font.register failed → ~5KB empty PDF" (PDF is < 5KB → assertion fails)
-//     - "renderer wrote a debug log instead of a PDF" (no '%PDF' header → assertion fails)
-//
-// Visual bidi correctness (numeric fragments LTR, Arabic body RTL,
-// signature bottom-right in AR mode per PITFALLS §Pitfall 8) is the
-// Plan 07-06 Playwright RTL smoke gate, not this byte-level smoke.
+// ponytail: EN-only PDF with one 6KB JPEG + Helvetica = ~10KB;
+// 5KB threshold catches the three crash modes (0KB crash /
+// font-register-fail empty PDF / wrong format).
 //
 // Verify locally with:
 //   RUN_SMOKE=1 npm run test:integration:smoke:phase7
@@ -81,39 +57,23 @@ vi.mock('electron', () => ({
 // on '1' failed in dev. Boolean coercion is enough.
 const smokeEnabled = Boolean(process.env.RUN_SMOKE);
 
-describe.skipIf(!smokeEnabled)('AR PDF ship-gate (RPT-06 / D-27)', () => {
+describe.skipIf(!smokeEnabled)('PDF ship-gate (RPT-06) — always-English post-toggle', () => {
   afterEach(() => {
     vi.resetModules();
   });
 
-  it('renders an AR-language PDF with PDF magic bytes via the full orchestrator path', async () => {
+  it('renders an EN-only PDF via the full orchestrator path', async () => {
     // 1. Bootstrap the live DB at the mocked userData via wizardBootstrap.
     //    This creates the first admin user + doctor_profile row in one txn.
     const { wizardBootstrap } = await import('../../src/main/auth');
     const { userId } = await wizardBootstrap({
-      fullName: 'Dr. AR Smoke',
-      clinicName: 'AR Smoke Clinic',
+      fullName: 'Dr. EN Smoke',
+      clinicName: 'EN Smoke Clinic',
       pin: '1234',
-      language: 'ar',
+      language: 'en',
     });
 
-    // 2. Set the doctor's preferred language on the profile row (wizard
-    //    inserts language on users but the doctor_profile.language column
-    //    stays NULL — so the orchestrator falls back to users.language).
-    //    Flip the per-doctor override to 'ar' to exercise both layers.
-    const { doctorProfileRepo } = await import('../../src/main/db/doctor-profile-repo');
-    doctorProfileRepo.upsert({
-      userId,
-      fullNameEn: 'Dr. AR Smoke',
-      fullNameAr: 'د. اختبار',
-      clinicNameEn: 'AR Smoke Clinic',
-      clinicNameAr: 'عيادة الاختبار',
-      address: null,
-      phone: null,
-      language: 'ar',
-    });
-
-    // 3. Seed a patient + procedure + finalized report.
+    // 2. Seed a patient + procedure + finalized report.
     const { patientRepo } = await import('../../src/main/db/patients');
     const { proceduresRepo } = await import('../../src/main/db/procedures-repo');
     const { reportsRepo } = await import('../../src/main/db/reports-repo');
@@ -121,7 +81,7 @@ describe.skipIf(!smokeEnabled)('AR PDF ship-gate (RPT-06 / D-27)', () => {
     const { reportScreenshotsRepo } = await import('../../src/main/db/report-screenshots-repo');
 
     const patient = patientRepo.create({
-      fullName: 'محمد علي',
+      fullName: 'John Doe',
       dob: '1980-04-12',
       gender: 'male',
       mrn: '12345',
@@ -144,35 +104,18 @@ describe.skipIf(!smokeEnabled)('AR PDF ship-gate (RPT-06 / D-27)', () => {
     });
 
     const report = reportsRepo.getOrCreate(procedure.id, userId);
-    // Populate the editable fields so the PDF has real body content
-    // (otherwise it's mostly empty + the file size stays well below
-    // the 50KB threshold). updateDraft is the pre-finalize writer —
-    // the orchestrator reads these fields regardless of status, so
-    // we don't need to call finalize() for this smoke.
-    //
-    // ponytail: use English body content even with language='ar'. The
-    // @react-pdf/textkit 4.5.1 bidi reordering has a known crash on
-    // Arabic ligatures (Cannot read properties of undefined 'id' in
-    // reorderLine). This smoke validates the Font.register + bidi
-    // <Text direction='rtl'> wrappers + pageRtl style + PDF magic
-    // bytes. Visual Arabic glyph rendering is the manual smoke step
-    // per PITFALLS §Pitfall 8.
+    // Populate the editable fields so the PDF has real body content.
     reportsRepo.updateDraft(report.id, {
-      // Quick task 20260907-redesign-pdf-layout — the report body is
-      // now anatomy boxes (colon procedure type), not the legacy
-      // findings/diagnosis/recommendations triplet. Pre-finalize write
-      // to `colon` + `recommendation` mirrors the production flow for
-      // a colon procedure.
       colon: 'Patient shows mild inflammation in the lower colon.',
       conclusion: 'Mild colitis.',
       recommendation: 'Repeat exam in one month.',
     });
 
-    // 4. Attach a real (padded) JPEG screenshot to the report. The
+    // 3. Attach a real (padded) JPEG screenshot to the report. The
     //    screenshot file MUST exist on disk at the path returned by
     //    screenshotAbsPath(userData, filePath). Mirror the production
     //    layout: data/media/patients/<patientId>/<procedureId>/screenshots/<ts>.jpg
-    const relScreenshotPath = `data/media/patients/${patient.id}/${procedure.id}/screenshots/ar-smoke.jpg`;
+    const relScreenshotPath = `data/media/patients/${patient.id}/${procedure.id}/screenshots/en-smoke.jpg`;
     const absScreenshotPath = path.join(tmpDir, relScreenshotPath);
     mkdirSync(path.dirname(absScreenshotPath), { recursive: true });
     // Minimal valid JPEG header (SOI + APP0 + payload + EOI). The body
@@ -194,28 +137,27 @@ describe.skipIf(!smokeEnabled)('AR PDF ship-gate (RPT-06 / D-27)', () => {
     });
     reportScreenshotsRepo.attach(report.id, screenshot.id, 0);
 
-    // 5. Render the AR PDF via the full orchestrator path.
+    // 4. Render the EN PDF via the full orchestrator path. language='en'
+    //    is explicit so the test contract reads "EN-only PDF".
     const { renderReportPdf } = await import('../../src/main/pdf/render-report-pdf');
-    const result = await renderReportPdf(report.id, { language: 'ar' });
+    const result = await renderReportPdf(report.id, { language: 'en' });
 
-    // 6. D-27 verbatim assertions: file size > 5KB + PDF magic bytes.
-    //    Threshold lowered from D-27's >50KB — see THRESHOLD DEVIATION
-    //    block at the top of this file.
+    // 5. Assertions: file size > 5KB + PDF magic bytes.
     expect(existsSync(result.pdfPath), `PDF not written at ${result.pdfPath}`).toBe(true);
     const stat = statSync(result.pdfPath);
     expect(
       stat.size,
-      `PDF too small (${stat.size} bytes) — font-register may have failed or the AR render crashed`,
+      `PDF too small (${stat.size} bytes) — render may have crashed`,
     ).toBeGreaterThan(5_000);
 
     const head = readFileSync(result.pdfPath).subarray(0, 4);
     expect(head.toString('utf8')).toBe('%PDF');
-  }, 90_000); // 90s timeout for AR PDF render (Font.register + render + JPEG embed)
+  }, 90_000); // 90s timeout for PDF render (Font.register + render + JPEG embed)
 });
 
 if (!smokeEnabled) {
-  describe('AR PDF ship-gate (D-27) — disabled (RUN_SMOKE not set)', () => {
-    it('set RUN_SMOKE=1 to enable the AR PDF magic smoke', () => {
+  describe('PDF ship-gate (RPT-06) — disabled (RUN_SMOKE not set)', () => {
+    it('set RUN_SMOKE=1 to enable the PDF magic smoke', () => {
       expect(smokeEnabled).toBe(false);
     });
   });
