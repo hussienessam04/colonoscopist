@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Camera, NotebookPen, Video } from 'lucide-react';
+import { ArrowLeft, Camera, NotebookPen, PanelLeft, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -66,7 +66,11 @@ export default function ProcedureRoom(): JSX.Element {
   const [timerMs, setTimerMs] = useState(0);
   const [startInFlight, setStartInFlight] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const [notesCollapsed, setNotesCollapsed] = useState(false);
+  // Quick task 20260912-procedure-room-notes-collapsed-default —
+  // notes starts COLLAPSED so the live preview claims the full
+  // room width by default. The doctor opens it on demand via a
+  // floating pill on the left edge of the preview.
+  const [notesCollapsed, setNotesCollapsed] = useState(true);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const startInFlightRef = useRef(false);
   // ponytail: when recording, the preview is the MJPEG <img> at previewUrl;
@@ -452,7 +456,17 @@ export default function ProcedureRoom(): JSX.Element {
         </header>
 
 <section
-          className={`grid gap-5 ${notesCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_20rem_20rem]'}`}
+          className={
+            // Quick task 20260912-procedure-room-notes-collapsed-default —
+            // notes is the FIRST column when expanded; preview takes the
+            // center; screenshots stays on the right. When notes is
+            // collapsed, the preview reclaims the room (1fr + screenshots).
+            // notesCollapsed === true → [preview | screenshots]
+            // notesCollapsed === false → [notes | preview | screenshots]
+            notesCollapsed
+              ? 'grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]'
+              : 'grid gap-5 lg:grid-cols-[20rem_minmax(0,1fr)_20rem]'
+          }
         >
           {/* Quick task 20260907-procedure-room-ui-enhance —
               live preview card uses the same warm-ivory
@@ -548,11 +562,48 @@ export default function ProcedureRoom(): JSX.Element {
                 onPauseResumeToggle={handlePauseResumeToggle}
                 onCapture={handleScreenshotCapture}
               />
+              {/* Quick task 20260912-procedure-room-notes-collapsed-default —
+                  vertical "Notes" rail-tab on the LEFT edge of the
+                  preview. Only visible when the notes panel is
+                  collapsed. Vertical orientation reads as a rail
+                  affordance rather than competing with the
+                  horizontal buttons in the header. Sits inside the
+                  preview card so it's positioned relative to the
+                  preview frame's bounding box. */}
+              {notesCollapsed ? (
+                <button
+                  type="button"
+                  onClick={() => setNotesCollapsed(false)}
+                  aria-label="Show notes panel"
+                  aria-expanded="false"
+                  data-testid="procedure-room-show-notes"
+                  className="absolute left-0 top-1/2 z-20 hidden -translate-y-1/2 items-center gap-1 rounded-r-md border border-l-0 border-[#E0D9C6] bg-[#FBF7EE] py-3 pl-1 pr-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0E3A47] shadow-[0_8px_20px_-12px_rgba(14,58,71,0.35)] transition-colors hover:bg-[#E6EFF1] lg:flex"
+                >
+                  <PanelLeft className="size-3.5" aria-hidden="true" />
+                  <span
+                    style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
+                    className="leading-none"
+                  >
+                    Notes
+                  </span>
+                </button>
+              ) : null}
             </div>
           </div>
 
+          {/* Quick task 20260912-procedure-room-notes-collapsed-default —
+              Notes panel is the FIRST column. Independent of the
+              screenshots rail — collapsing notes does NOT hide
+              screenshots. The "Hide notes" button in the header
+              collapses back to the wide-preview layout. The
+              DeviceLostBanner lives at the top of the screenshots
+              rail below so the disconnect warning is always
+              rendered (independent of notes state). */}
           {!notesCollapsed ? (
-            <aside className={`flex flex-col gap-4 ${RAIL_CARD_CHROME}`}>
+            <aside
+              className={`flex flex-col gap-4 ${RAIL_CARD_CHROME}`}
+              data-testid="procedure-room-notes-rail"
+            >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <NotebookPen className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
@@ -563,101 +614,86 @@ export default function ProcedureRoom(): JSX.Element {
                   size="sm"
                   onClick={() => setNotesCollapsed(true)}
                   aria-label="Collapse notes panel"
+                  data-testid="procedure-room-hide-notes"
                   className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
-                  Hide notes
+                  Hide
                 </Button>
               </div>
               <ProcedureNotesPanel procedureId={procedureId} />
-              <DeviceLostBanner
-                lastLost={lastLost}
-                onDismiss={() => recordingStore.clearLastLost()}
-              />
-            </aside>
-          ) : (
-            <div className="flex items-start justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setNotesCollapsed(false)}
-                aria-label="Show notes panel"
-                className={SECONDARY_OUTLINE_BUTTON}
-              >
-                Show notes
-              </Button>
-            </div>
-          )}
-
-          {/* Quick task 20260907-procedure-room-screenshots-vertical —
-              Screenshots box now sits as a 3rd column on the right
-              (lg:grid-cols-[minmax(0,1fr)_20rem_20rem]) with a
-              vertical-grid layout for the thumbnails (one per
-              row, 2 columns at full container width). The card
-              scrolls vertically inside its container so the
-              page layout stays compact. */}
-          {!notesCollapsed ? (
-            <aside
-              className="flex flex-col gap-4"
-              data-testid="procedure-room-screenshots-rail"
-            >
-              <div className={RAIL_CARD_CHROME} data-testid="procedure-room-screenshots">
-                <div className="flex items-center justify-between">
-                  <p className={SMALL_CAPS_LABEL}>Screenshots</p>
-                  <span
-                    className="font-mono text-xs tabular-nums text-[#5C6770]"
-                    data-testid="procedure-room-gallery-count"
-                  >
-                    {screenshotIntake.screenshots.length}
-                  </span>
-                </div>
-                <hr className="mt-2 border-[#E0D9C6]" />
-                {/* Quick task 20260912-procedure-room-ui-enhance —
-                    the gallery container keeps its `procedure-room-gallery`
-                    testid in BOTH the populated + empty state so existing
-                    tests that scope queries to the gallery node keep
-                    working. Inside, ScreenshotTimeline or the empty-state
-                    placeholder renders depending on screenshot count. */}
-                <div
-                  className="mt-2 max-h-[60vh] overflow-y-auto pr-1"
-                  data-testid="procedure-room-gallery"
-                >
-                  {screenshotIntake.screenshots.length === 0 ? (
-                    <div
-                      className="flex flex-col items-center justify-center gap-2 py-10 text-center"
-                      data-testid="procedure-room-gallery-empty"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className="grid size-10 place-items-center rounded-full border border-[#E0D9C6] bg-white text-[#0E3A47]"
-                      >
-                        <Camera className="size-4" />
-                      </span>
-                      <p className="text-xs leading-snug text-[#5C6770]">
-                        Screenshots appear here during the procedure.
-                        <br />
-                        Press <kbd className="rounded border border-[#E0D9C6] bg-white px-1 font-mono text-[10px] text-[#0E3A47]">S</kbd>{' '}
-                        to capture.
-                      </p>
-                    </div>
-                  ) : (
-                    <ScreenshotTimeline
-                      procedureId={procedureId ?? ''}
-                      patientId={patientIdFromRoute}
-                      mediaBaseUrl={mediaUrl.url}
-                      status={isRecording ? 'recording' : 'completed'}
-                      screenshots={screenshotIntake.screenshots}
-                      onSeek={() => undefined}
-                      onCapture={() => {
-                        void handleScreenshotCapture();
-                      }}
-                      onDelete={handleScreenshotDelete}
-                      layout="grid"
-                    />
-                  )}
-                </div>
-              </div>
             </aside>
           ) : null}
+
+          {/* Screenshots rail — always visible (independent of
+              notes state). Sits on the right of the layout. The
+              DeviceLostBanner lives at the top of this rail so the
+              disconnect warning is always rendered (independent of
+              whether the notes panel is collapsed). */}
+          <aside
+            className="flex flex-col gap-4"
+            data-testid="procedure-room-screenshots-rail"
+          >
+            <DeviceLostBanner
+              lastLost={lastLost}
+              onDismiss={() => recordingStore.clearLastLost()}
+            />
+            <div className={RAIL_CARD_CHROME} data-testid="procedure-room-screenshots">
+              <div className="flex items-center justify-between">
+                <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+                <span
+                  className="font-mono text-xs tabular-nums text-[#5C6770]"
+                  data-testid="procedure-room-gallery-count"
+                >
+                  {screenshotIntake.screenshots.length}
+                </span>
+              </div>
+              <hr className="mt-2 border-[#E0D9C6]" />
+              {/* Quick task 20260912-procedure-room-ui-enhance —
+                  the gallery container keeps its `procedure-room-gallery`
+                  testid in BOTH the populated + empty state so existing
+                  tests that scope queries to the gallery node keep
+                  working. Inside, ScreenshotTimeline or the empty-state
+                  placeholder renders depending on screenshot count. */}
+              <div
+                className="mt-2 max-h-[60vh] overflow-y-auto pr-1"
+                data-testid="procedure-room-gallery"
+              >
+                {screenshotIntake.screenshots.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center gap-2 py-10 text-center"
+                    data-testid="procedure-room-gallery-empty"
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="grid size-10 place-items-center rounded-full border border-[#E0D9C6] bg-white text-[#0E3A47]"
+                    >
+                      <Camera className="size-4" />
+                    </span>
+                    <p className="text-xs leading-snug text-[#5C6770]">
+                      Screenshots appear here during the procedure.
+                      <br />
+                      Press <kbd className="rounded border border-[#E0D9C6] bg-white px-1 font-mono text-[10px] text-[#0E3A47]">S</kbd>{' '}
+                      to capture.
+                    </p>
+                  </div>
+                ) : (
+                  <ScreenshotTimeline
+                    procedureId={procedureId ?? ''}
+                    patientId={patientIdFromRoute}
+                    mediaBaseUrl={mediaUrl.url}
+                    status={isRecording ? 'recording' : 'completed'}
+                    screenshots={screenshotIntake.screenshots}
+                    onSeek={() => undefined}
+                    onCapture={() => {
+                      void handleScreenshotCapture();
+                    }}
+                    onDelete={handleScreenshotDelete}
+                    layout="grid"
+                  />
+                )}
+              </div>
+            </div>
+          </aside>
         </section>
       </div>
       {/* Quick task 20260912-procedure-room-exit-warning — the

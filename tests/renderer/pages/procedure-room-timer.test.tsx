@@ -420,6 +420,11 @@ describe('ProcedureRoom DeviceLostBanner', () => {
         'function',
       ),
     );
+    // Quick task 20260912-procedure-room-notes-collapsed-default —
+    // notes starts collapsed by default in production. Open the
+    // panel so the test can locate both notes + banner DOM nodes.
+    const showNotes = await screen.findByTestId('procedure-room-show-notes');
+    fireEvent.click(showNotes);
     await act(async () => {
       (window as unknown as { __pushRecordingStatus: (s: RecordingStatus) => void }).__pushRecordingStatus({
         status: 'lost',
@@ -431,7 +436,10 @@ describe('ProcedureRoom DeviceLostBanner', () => {
     const notesPanel = await screen.findByLabelText(/procedure note input/i);
     const banner = await screen.findByTestId('device-lost-banner');
     // ponytail: compare via compareDocumentPosition — the banner should
-    // FOLLOW the notes panel in document order.
+    // FOLLOW the notes panel in document order. With notes on the LEFT
+    // (first column) and the screenshots rail on the RIGHT (third
+    // column, contains the banner at the top), the banner naturally
+    // follows the notes in DOM order.
     const pos = notesPanel.compareDocumentPosition(banner);
     expect(pos & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
