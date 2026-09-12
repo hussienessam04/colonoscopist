@@ -1,4 +1,4 @@
-import { app } from 'electron';
+import { app, dialog } from 'electron';
 import { createMainWindow } from './window';
 import { registerAuthIpc } from './ipc/auth';
 import { registerUsersIpc } from './ipc/users';
@@ -29,6 +29,7 @@ import {
   shutdownMediaServer,
 } from './recorder/init';
 import { Recorder } from './recorder/recorder';
+import { recorderRegistry } from './recorder/registry';
 import { getLicenseStatus } from './license';
 
 const APP_NAME = 'Colonoscopist';
@@ -132,8 +133,91 @@ app.whenReady().then(() => {
 
   void scanForOrphans();
 
-  createMainWindow();
+  // Quick task 20260912-procedure-room-exit-warning — capture the
+  // BrowserWindow reference returned by createMainWindow() so we
+  // can attach the close-guard below.
+  mainWindowRef = createMainWindow();
   logStartup('app-ready');
+});
+
+// Quick task 20260912-procedure-room-exit-warning — module-level
+// reference to the main BrowserWindow. Set inside
+// `app.whenReady().then(...)` above; the close-guard attaches
+// here at module load time (Electron's `close` event fires
+// after `whenReady`, so the assignment is guaranteed before
+// the guard ever runs).
+let mainWindowRef: import('electron').BrowserWindow | null = null;
+
+// Quick task 20260912-procedure-room-exit-warning — intercept
+// the main window's `close` event so the doctor gets the same
+// "Continue recording / Stop recording & finalize" prompt when
+// they close the app mid-recording. Without this guard the
+// recorder would silently finalize as `partial` (per D-03) and
+// leave the doctor's in-flight recording looking abandoned. The
+// matching in-app dialog for the "Back to Preview" button lives
+// in renderer/src/pages/ProcedureRoom.tsx; both prompts share the
+// same wording so the experience is consistent whichever exit
+// route the doctor takes.
+//
+// Re-entrancy guard: once the doctor picks "Stop recording &
+// finalize" we set `forceClose = true` and call
+// `mainWindow.close()` again. Electron re-fires `close`, but the
+// guard sees `forceClose` and skips the dialog.
+let forceClose = false;
+function attachRecordingCloseGuard(): void {
+  if (!mainWindowRef) return;
+  const win = mainWindowRef;
+  win.on('close', (event) => {
+    if (forceClose) return;
+    const midRecording = recorderRegistry
+      .values()
+      .filter((r) => {
+        const state = r.getState();
+        return (
+          state === 'starting' ||
+          state === 'recording' ||
+          state === 'paused' ||
+          state === 'stopping'
+        );
+      });
+    if (midRecording.length === 0) return;
+
+    event.preventDefault();
+    const choice = dialog.showMessageBoxSync(win, {
+      type: 'warning',
+      buttons: ['Continue recording', 'Stop recording & finalize'],
+      defaultId: 0,
+      cancelId: 0,
+      title: 'Recording in progress',
+      message: 'A procedure recording is currently running.',
+      detail:
+        'Closing the app now will finalize the recording as completed. ' +
+        'Choose "Continue recording" to keep capturing, or "Stop recording & finalize" to end the procedure here.',
+      noLink: true,
+    });
+    if (choice === 1) {
+      // Stop every in-flight recorder. We use the recorder's
+      // own stop() (not the IPC handler) because we're inside
+      // the close event and the renderer is about to disappear.
+      // recorder.stop() is idempotent and any leftover
+      // .partial.mp4 files are reclaimed on the next boot by
+      // scanForOrphans().
+      void Promise.all(
+        midRecording.map((recorder) => recorder.stop().catch(() => undefined)),
+      ).finally(() => {
+        forceClose = true;
+        win.close();
+      });
+    }
+    // choice === 0 → do nothing, the window stays open.
+  });
+}
+// Defer attaching the close guard until the window exists. We
+// hook `app.on('browser-window-created')` so the guard runs as
+// soon as createMainWindow() lands, regardless of the order
+// inside whenReady().
+app.on('browser-window-created', () => {
+  attachRecordingCloseGuard();
 });
 
 app.on('window-all-closed', () => {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, NotebookPen, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import ConfirmDialog from '@/components/ConfirmDialog';
 import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import DeviceLostBanner from '@/components/device-lost-banner';
 import { RecordingControlsBar } from '@/components/RecordingControlsBar';
@@ -51,6 +52,12 @@ export default function ProcedureRoom(): JSX.Element {
   const [preset, setPreset] = useState<QualityPreset>();
   const deviceInitRef = useRef(false);
   const preview = useVideoPreview(selectedBrowserId, preset);
+
+  // Quick task 20260912-procedure-room-exit-warning — the
+  // dialog that pops when the doctor hits "Back to Preview"
+  // while a recording is in flight. The dialog is also surfaced
+  // by the main process on window close (see main/index.ts).
+  const [exitConfirmOpen, setExitConfirmOpen] = useState(false);
 
   const recordingState = useRecordingState();
   const timer = useTimerSnapshot();
@@ -313,6 +320,41 @@ export default function ProcedureRoom(): JSX.Element {
     return () => window.removeEventListener('keydown', handler);
   }, [isRecording, recordingState.status, procedureId]);
 
+  // Quick task 20260912-procedure-room-exit-warning — while
+  // a recording is in flight, intercept the browser's `beforeunload`
+  // so closing the window (X button, Alt+F4, etc.) shows the
+  // native prompt. The user gets a chance to cancel; if they
+  // confirm, the main process's `mainWindow.on('close')` handler
+  // takes over (see main/index.ts) and finalizes the recorder
+  // cleanly. We don't preventDefault on the Electron side here
+  // because Electron's BrowserWindow will fire `will-prevent-unload`
+  // when we set returnValue, which our main process hooks into.
+  useEffect(() => {
+    if (!isRecording) return;
+    function beforeUnloadHandler(e: BeforeUnloadEvent): void {
+      e.preventDefault();
+      // ponytail: Electron honours returnValue as the dialog message.
+      // Modern browsers ignore the string but still show their own
+      // generic prompt when preventDefault() is called.
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
+  }, [isRecording]);
+
+  // Quick task 20260912-procedure-room-exit-warning — clicking
+  // "Stop recording & finalize" on the ConfirmDialog reuses the
+  // existing record toggle (which calls `recording.stop` on the
+  // main process). The existing `useEffect` watching
+  // `recordingState.status === 'stopped'` (line ~150) already
+  // navigates to `procedure-review` after a clean stop, so the
+  // doctor lands on the review screen with the recording finalized.
+  function handleStopAndExit(): void {
+    setExitConfirmOpen(false);
+    if (!procedureId) return;
+    void window.api.recording.stop({ procedureId }).catch(() => undefined);
+  }
+
   const canRecord = !!(procedureId && selectedCanonical && preset);
 
   return (
@@ -338,7 +380,7 @@ export default function ProcedureRoom(): JSX.Element {
               ) : null}
             </h1>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
             {/* Quick task 20260907-procedure-room-ui-enhance —
                 live mono elapsed timer (signature element).
                 Shows the recording elapsed time in the header
@@ -350,32 +392,45 @@ export default function ProcedureRoom(): JSX.Element {
             >
               {timerLabel}
             </span>
-            {!isRecording ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  navigate({
-                    name: 'procedure-preview',
-                    patientId: patientIdFromRoute,
-                    procedureId: procedureId ?? undefined,
-                  })
+            {/* Quick task 20260912-procedure-room-exit-warning —
+                "Back to Preview" button is now ALWAYS visible
+                (the keyboard-shortcuts hint used to replace it
+                while recording). The doctor needs the button to
+                deliberately leave the room while a recording is
+                in flight — clicking it during recording opens
+                the ConfirmDialog (Continue recording / Stop
+                recording & finalize) instead of navigating
+                silently. The shortcuts hint sits next to the
+                button (right-aligned) when recording so both
+                stay visible without crowding the timer. */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (isRecording) {
+                  setExitConfirmOpen(true);
+                  return;
                 }
-                data-testid="procedure-room-back"
-                className={SECONDARY_OUTLINE_BUTTON}
-              >
-                <ArrowLeft aria-hidden="true" />
-                Back to Preview
-              </Button>
-            ) : (
+                navigate({
+                  name: 'procedure-preview',
+                  patientId: patientIdFromRoute,
+                  procedureId: procedureId ?? undefined,
+                });
+              }}
+              data-testid="procedure-room-back"
+              className={SECONDARY_OUTLINE_BUTTON}
+            >
+              <ArrowLeft aria-hidden="true" />
+              Back to Preview
+            </Button>
+            {isRecording ? (
               <span className="text-xs text-[#5C6770]" aria-live="polite">
-                Shortcuts: <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
+                <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
                 pause/resume · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
-                stop · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">R</kbd>{' '}
-                record · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
+                stop · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
                 screenshot
               </span>
-            )}
+            ) : null}
           </div>
         </header>
 
@@ -535,6 +590,23 @@ export default function ProcedureRoom(): JSX.Element {
           ) : null}
         </section>
       </div>
+      {/* Quick task 20260912-procedure-room-exit-warning — the
+      "are you sure you want to leave?" dialog. Opens when the
+      doctor clicks "Back to Preview" while a recording is in
+      flight. The same wording is mirrored by the main process
+      `dialog.showMessageBox` call in main/index.ts for the
+      window-close path so the doctor gets a consistent prompt
+      whichever exit route they take. */}
+      <ConfirmDialog
+        open={exitConfirmOpen}
+        title="Recording in progress"
+        description="A procedure recording is currently running. Leaving now will close the recording and mark the procedure as completed. Continue recording to keep capturing, or stop recording & finalize to end the procedure here."
+        confirmLabel="Stop recording & finalize"
+        cancelLabel="Continue recording"
+        destructive
+        onConfirm={handleStopAndExit}
+        onCancel={() => setExitConfirmOpen(false)}
+      />
     </main>
   );
 }

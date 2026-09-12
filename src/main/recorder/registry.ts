@@ -38,19 +38,22 @@ export const recorderRegistry = {
     }
     globalRegistry.set(procedureId, recorder);
   },
-
   get(procedureId: string): Recorder | undefined {
     return globalRegistry.get(procedureId);
   },
-
   has(procedureId: string): boolean {
     return globalRegistry.has(procedureId);
   },
-
   delete(procedureId: string): void {
     globalRegistry.delete(procedureId);
   },
-
+  // Quick task 20260912-procedure-room-exit-warning — main
+  // process hooks this from `mainWindow.on('close')` to scan for
+  // any in-flight recorder before showing the
+  // "Continue recording / Stop recording & finalize" prompt.
+  values(): Recorder[] {
+    return Array.from(globalRegistry.values());
+  },
   clear(): void {
     globalRegistry.clear();
   },
