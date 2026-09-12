@@ -127,15 +127,15 @@ export default function SettingsStorage(): JSX.Element {
   return (
     <SettingsLayout
       activeTab="storage"
-      title={t('settings.storage.title')}
-      subtitle={t('settings.storage.subtitle')}
+      title={t('settings.storageTitle')}
+      subtitle={t('settings.storageDescription')}
     >
       <Card data-testid="settings-storage-card" className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
-        <CardHeader>
-          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
-            {t('settings.storage.toggleTitle')}
-          </CardTitle>
-        </CardHeader>
+          <CardHeader>
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+              {t('settings.storageToggleTitle')}
+            </CardTitle>
+          </CardHeader>
         <CardContent className="space-y-4">
           {/* Toggle */}
           <label
@@ -151,12 +151,12 @@ export default function SettingsStorage(): JSX.Element {
               data-testid="settings-storage-toggle"
             />
             <div className="flex-1 space-y-1">
-              <p className="text-sm font-medium text-[#13202E]">
-                {t('settings.storage.toggleLabel')}
-              </p>
-              <p className="text-xs text-[#5C6770]">
-                {t('settings.storage.toggleHelp')}
-              </p>
+                <p className="text-sm font-medium text-[#13202E]">
+                  {t('settings.storageToggleLabel')}
+                </p>
+                <p className="text-xs text-[#5C6770]">
+                  {t('settings.storageToggleHelp')}
+                </p>
             </div>
           </label>
 
@@ -165,7 +165,7 @@ export default function SettingsStorage(): JSX.Element {
             <div className="space-y-3 rounded-md border border-[#E0D9C6] bg-white p-4">
               <div className="flex items-center justify-between gap-3">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
-                  {t('settings.storage.pathTitle')}
+                  {t('settings.storagePathTitle')}
                 </p>
                 <Button
                   type="button"
@@ -177,7 +177,7 @@ export default function SettingsStorage(): JSX.Element {
                   data-testid="settings-storage-pick-folder"
                 >
                   <Folder className="size-4 mr-1.5" aria-hidden="true" />
-                  {t('settings.storage.pickFolder')}
+                  {t('settings.storagePickFolder')}
                 </Button>
               </div>
               <p
@@ -188,11 +188,11 @@ export default function SettingsStorage(): JSX.Element {
                 }
                 data-testid="settings-storage-path-display"
               >
-                {pathDraft ?? t('settings.storage.noPathPicked')}
-              </p>
-              <p className="text-xs text-[#5C6770]">
-                {t('settings.storage.pathHelp')}
-              </p>
+                  {pathDraft ?? t('settings.storageNoPathPicked')}
+                </p>
+                <p className="text-xs text-[#5C6770]">
+                  {t('settings.storagePathHelp')}
+                </p>
             </div>
           ) : null}
 
@@ -202,15 +202,15 @@ export default function SettingsStorage(): JSX.Element {
             data-testid="settings-storage-restart-warning"
           >
             <p className="font-semibold uppercase tracking-[0.12em]">
-              {t('settings.storage.warningTitle')}
+              {t('settings.storageWarningTitle')}
             </p>
             <p className="mt-1">
-              {t('settings.storage.warningBody')}
+              {t('settings.storageWarningBody')}
             </p>
             {location ? (
               <p className="mt-2 font-mono text-[11px] text-[#5C6770]">
                 <MapPin className="mr-1 inline-block size-3" aria-hidden="true" />
-                {t('settings.storage.currentlyUsing', {
+                {t('settings.storageCurrentlyUsing', {
                   path: location.effectivePath,
                 })}
               </p>
@@ -230,7 +230,7 @@ export default function SettingsStorage(): JSX.Element {
                 data-testid="settings-storage-reset"
               >
                 <RotateCcw className="size-4 mr-1.5" aria-hidden="true" />
-                {t('settings.storage.reset')}
+                {t('settings.storageReset')}
               </Button>
             ) : null}
             <Button
