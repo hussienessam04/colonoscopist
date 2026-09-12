@@ -19,6 +19,16 @@
 // other settings page. The Hub is the only page whose Back goes to
 // `patients` (instead of `settings-hub`); backLabel is "Back to patients"
 // to make that explicit.
+//
+// Quick task 20260912-shared-database-optional — the Hub now mentions
+// every sidebar entry (Capture / Profile / Audit / License / Backup &
+// Restore / Users / Storage). License + Storage were missing from the
+// description block + the section paragraphs; the user reported "the
+// text appears is the keys instead of the text" because the Hub's
+// strings were hardcoded English instead of going through t(). Now
+// every string here resolves through i18n (EN + AR).
+
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useRoute } from '@/lib/router';
@@ -27,6 +37,7 @@ import { useDoctorProfile } from '@/hooks/useDoctorProfile';
 import { useEffect, useState } from 'react';
 
 export default function SettingsHub(): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const { profile } = useDoctorProfile();
   // ponytail: capture the clinic name preview at mount. The hook's
@@ -40,32 +51,41 @@ export default function SettingsHub(): JSX.Element {
 
   return (
     <SettingsLayout
-      title="Settings"
-      subtitle="Choose a section from the sidebar."
+      title={t('settings.hubTitle')}
+      subtitle={t('settings.hubDescription')}
       backTo={{ name: 'patients' }}
       backTestId="settings-hub-back"
-      backLabel="Back to patients"
+      backLabel={t('settings.hubBackLabel')}
     >
-      <Card className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
+      <Card
+        className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]"
+        data-testid="settings-hub-overview"
+      >
         <CardHeader>
-          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">Workspace</CardTitle>
+          <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+            {t('settings.hubCardTitle')}
+          </CardTitle>
           <CardDescription className="text-[#5C6770]">
-            Capture, Profile, Audit, and Backup &amp; restore are
-            available to every authenticated doctor; Users is available
-            to the first admin.
+            {t('settings.hubCardDescription')}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-3 text-sm text-[#5C6770]">
           <p>
-            <span className="font-medium text-[#13202E]">Capture</span> — pick
-            a default device, choose a quality preset, and verify the live
-            preview before saving.
+            <span className="font-medium text-[#13202E]">
+              {t('settings.captureTitle')}
+            </span>{' '}
+            — {t('settings.hubCaptureDescription')}
           </p>
           <p data-testid="settings-hub-profile-card">
-            <span className="font-medium text-[#13202E]">Profile</span> —{' '}
+            <span className="font-medium text-[#13202E]">
+              {t('settings.profileTitle')}
+            </span>{' '}
+            —{' '}
             {previewClinicName === ''
-              ? 'add your clinic + doctor details for the report header.'
-              : `report header currently shows ${previewClinicName}.`}{' '}
+              ? t('settings.hubProfileAddDescription')
+              : t('settings.hubProfileShowDescription', {
+                  name: previewClinicName,
+                })}{' '}
             <Button
               variant="link"
               size="sm"
@@ -73,24 +93,38 @@ export default function SettingsHub(): JSX.Element {
               onClick={() => navigate({ name: 'profile-edit' })}
               data-testid="settings-hub-profile-link"
             >
-              Open profile editor
+              {t('settings.profileOpen')}
             </Button>
           </p>
           <p>
-            <span className="font-medium text-[#13202E]">Audit</span> —
-            review the read + write log for every action the system
-            recorded, filter by date or doctor, and export for a periodic
-            compliance review.
+            <span className="font-medium text-[#13202E]">
+              {t('settings.auditTitle')}
+            </span>{' '}
+            — {t('settings.auditDescription')}
           </p>
           <p>
-            <span className="font-medium text-[#13202E]">Backup &amp; restore</span> —
-            snapshot the entire patient database + media to a zip on the
-            workstation, or unpack a previous backup into a staging folder
-            for review before activating.
+            <span className="font-medium text-[#13202E]">
+              {t('license.pageTitle')}
+            </span>{' '}
+            — {t('license.pageDescription')}
           </p>
           <p>
-            <span className="font-medium text-[#13202E]">Users</span> — add
-            or remove staff and reset PINs (first admin only).
+            <span className="font-medium text-[#13202E]">
+              {t('settings.backupTitle')}
+            </span>{' '}
+            — {t('settings.backupDescription')}
+          </p>
+          <p>
+            <span className="font-medium text-[#13202E]">
+              {t('settings.usersTitle')}
+            </span>{' '}
+            — {t('settings.usersDescription')}
+          </p>
+          <p>
+            <span className="font-medium text-[#13202E]">
+              {t('settings.storageTitle')}
+            </span>{' '}
+            — {t('settings.storageDescription')}
           </p>
         </CardContent>
       </Card>
