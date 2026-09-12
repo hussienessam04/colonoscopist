@@ -801,5 +801,35 @@
     "cropFailed": "Crop failed",
     "cropRetry": "Retry",
     "cropReadOnly": "Show only"
+  },
+  "pinEntry": {
+    "signInAs": "Sign in as {{name}}",
+    "lockedBadge": "Locked",
+    "lockedAriaLabel": "Account locked",
+    "backAriaLabel": "Back to user list",
+    "errorIncorrect": "Incorrect PIN",
+    "errorRateLimited": "Try again in",
+    "errorLocked": "Account locked — contact admin",
+    "errorSignInFailed": "Sign-in failed",
+    "errorEncryptionUnavailable": "Encryption unavailable — see logs",
+    "signingIn": "Signing in…",
+    "enterButton": "Enter"
+  },
+  "partialAlert": {
+    "title": "Partial recording",
+    "deviceDisconnectedPrefix": "Recording stopped because the capture device disconnected. The mp4 was preserved up to",
+    "endedUnexpectedly": "Recording ended unexpectedly. The mp4 was preserved."
+  },
+  "trim": {
+    "done": "Done",
+    "inFrame": "In frame",
+    "outFrame": "Out frame",
+    "inFrameAlt": "Frame at in-point",
+    "outFrameAlt": "Frame at out-point",
+    "inLabel": "In:",
+    "outLabel": "· Out:",
+    "unavailableOnPartial": "Trim is unavailable on partial recordings.",
+    "overCapPrefix": "Trimming is unavailable for recordings longer than",
+    "overCapSuffix": "(browser seek-by-keyframe cap; v1.1 will add a re-encode path)."
   }
 }

@@ -4,6 +4,7 @@
 // Live countdown for rate-limit + Locked badge per UAT G-2-3.
 
 import { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ type Props = {
 };
 
 export default function PinEntry({ user, onBack, onSuccess }: Props): JSX.Element {
+  const { t } = useTranslation();
   const [pin, setPin] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -91,26 +93,26 @@ export default function PinEntry({ user, onBack, onSuccess }: Props): JSX.Elemen
       }
       // LoginResult tagged union.
       if (result.code === 'IPC_AUTH_FAILED') {
-        setError('Incorrect PIN');
+        setError(t('pinEntry.errorIncorrect'));
         setPin('');
         setEnterDisabled(true);
         inputRef.current?.focus();
       } else if (result.code === 'IPC_RATE_LIMITED') {
         const retryAt = result.retryAt ?? Date.now() + 1000;
         startCountdown(retryAt);
-        setError('Try again in');
+        setError(t('pinEntry.errorRateLimited'));
       } else if (result.code === 'IPC_LOCKED') {
         setLocked(true);
-        setError('Account locked — contact admin');
+        setError(t('pinEntry.errorLocked'));
       } else {
-        setError('Sign-in failed');
+        setError(t('pinEntry.errorSignInFailed'));
       }
     } catch (err) {
       // IPC_ERROR_UNAVAILABLE rises as a generic Error with the code attached.
       if (err instanceof IpcErrorException && err.ipc.code === 'IPC_ENCRYPTION_UNAVAILABLE') {
-        setError('Encryption unavailable — see logs');
+        setError(t('pinEntry.errorEncryptionUnavailable'));
       } else {
-        const msg = err instanceof Error ? err.message : 'Sign-in failed';
+        const msg = err instanceof Error ? err.message : t('pinEntry.errorSignInFailed');
         setError(msg);
       }
       setPin('');
@@ -138,26 +140,26 @@ export default function PinEntry({ user, onBack, onSuccess }: Props): JSX.Elemen
           onBack();
         }}
         className="self-start inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-        aria-label="Back to user list"
+        aria-label={t('pinEntry.backAriaLabel')}
       >
         <ArrowLeft className="size-4" />
-        Back
+        {t('common.back')}
       </button>
 
       <div className="flex flex-col items-center gap-2 text-center">
-        <h2 className="text-lg font-semibold">Sign in as {user.fullName}</h2>
-        <p className="text-xs text-muted-foreground">Enter your 4-digit PIN</p>
+        <h2 className="text-lg font-semibold">{t('pinEntry.signInAs', { name: user.fullName })}</h2>
+        <p className="text-xs text-muted-foreground">{t('auth.pinDescription')}</p>
       </div>
 
       {locked && (
         <div
           role="status"
-          aria-label="Account locked"
+          aria-label={t('pinEntry.lockedAriaLabel')}
           className="inline-flex items-center justify-center gap-1.5 self-center rounded-md bg-destructive px-2.5 py-1 text-xs font-medium text-destructive-foreground"
           data-testid="locked-badge"
         >
           <Lock className="size-3.5" />
-          Locked
+          {t('pinEntry.lockedBadge')}
         </div>
       )}
 
@@ -192,7 +194,7 @@ export default function PinEntry({ user, onBack, onSuccess }: Props): JSX.Elemen
         onClick={() => void submit()}
         disabled={enterDisabledNow}
       >
-        {submitting ? 'Signing in…' : 'Enter'}
+        {submitting ? t('pinEntry.signingIn') : t('pinEntry.enterButton')}
       </Button>
     </div>
   );

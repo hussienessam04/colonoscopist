@@ -809,5 +809,35 @@
     "cropFailed": "فشل القص",
     "cropRetry": "إعادة المحاولة",
     "cropReadOnly": "عرض فقط"
+  },
+  "pinEntry": {
+    "signInAs": "تسجيل الدخول باسم {{name}}",
+    "lockedBadge": "مقفل",
+    "lockedAriaLabel": "الحساب مقفل",
+    "backAriaLabel": "العودة إلى قائمة المستخدمين",
+    "errorIncorrect": "رمز الدخول غير صحيح",
+    "errorRateLimited": "حاول مرة أخرى خلال",
+    "errorLocked": "الحساب مقفل — تواصل مع المسؤول",
+    "errorSignInFailed": "فشل تسجيل الدخول",
+    "errorEncryptionUnavailable": "التشفير غير متاح — راجع السجلات",
+    "signingIn": "جاري تسجيل الدخول…",
+    "enterButton": "دخول"
+  },
+  "partialAlert": {
+    "title": "تسجيل جزئي",
+    "deviceDisconnectedPrefix": "توقف التسجيل بسبب انقطاع جهاز الالتقاط. تم الحفاظ على ملف mp4 حتى",
+    "endedUnexpectedly": "انتهى التسجيل بشكل غير متوقع. تم الحفاظ على ملف mp4."
+  },
+  "trim": {
+    "done": "تم",
+    "inFrame": "إطار البداية",
+    "outFrame": "إطار النهاية",
+    "inFrameAlt": "إطار عند نقطة البداية",
+    "outFrameAlt": "إطار عند نقطة النهاية",
+    "inLabel": "البداية:",
+    "outLabel": "· النهاية:",
+    "unavailableOnPartial": "القص غير متاح للتسجيلات الجزئية.",
+    "overCapPrefix": "القص غير متاح للتسجيلات الأطول من",
+    "overCapSuffix": "(حد متصفح البحث بالإطار الرئيسي؛ ستضاف إعادة التشفير في الإصدار 1.1)."
   }
 }

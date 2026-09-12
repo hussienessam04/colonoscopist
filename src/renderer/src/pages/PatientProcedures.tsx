@@ -340,7 +340,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     {patient.mrn}
                   </span>
                   <span>
-                    <span className="font-medium text-foreground">DOB:</span>{' '}
+                    <span className="font-medium text-foreground">{t('common.dob')}:</span>{' '}
                     {patient.dob}
                   </span>
                   <span>

@@ -24,6 +24,7 @@
 // would break the suite compilation.
 
 import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Loader2, Scissors } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,6 +73,7 @@ export function TrimControls({
   videoRef,
   captureFrame,
 }: TrimControlsProps): JSX.Element {
+  const { t } = useTranslation();
   const overDurationCap = durationMs > MAX_TRIM_DURATION_MS;
   // D-13 — partial recordings disable Apply at the renderer so the
   // IPC's `Cannot trim a partial recording` rejection never surfaces.
@@ -131,7 +133,7 @@ export function TrimControls({
   return (
     <Card data-testid="trim-controls">
       <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
-        <CardTitle className="text-base font-medium">Trim</CardTitle>
+        <CardTitle className="text-base font-medium">{t('procedure.trimTitle')}</CardTitle>
         <Button
           variant={trimMode ? 'default' : 'outline'}
           size="sm"
@@ -140,7 +142,7 @@ export function TrimControls({
           data-testid="trim-mode-toggle"
         >
           <Scissors aria-hidden="true" />
-          {trimMode ? 'Done' : 'Trim'}
+          {trimMode ? t('trim.done') : t('procedure.trimTitle')}
         </Button>
       </CardHeader>
       {trimMode ? (
@@ -149,12 +151,12 @@ export function TrimControls({
             <div className="flex gap-2" data-testid="trim-previews">
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-wide text-slate-500">
-                  In frame
+                  {t('trim.inFrame')}
                 </span>
                 {inFrameDataUrl ? (
                   <img
                     src={inFrameDataUrl}
-                    alt="Frame at in-point"
+                    alt={t('trim.inFrameAlt')}
                     data-testid="trim-in-preview"
                     className="h-16 w-24 rounded border border-slate-300 object-cover"
                   />
@@ -167,12 +169,12 @@ export function TrimControls({
               </div>
               <div className="flex flex-col gap-1">
                 <span className="text-[10px] uppercase tracking-wide text-slate-500">
-                  Out frame
+                  {t('trim.outFrame')}
                 </span>
                 {outFrameDataUrl ? (
                   <img
                     src={outFrameDataUrl}
-                    alt="Frame at out-point"
+                    alt={t('trim.outFrameAlt')}
                     data-testid="trim-out-preview"
                     className="h-16 w-24 rounded border border-slate-300 object-cover"
                   />
@@ -186,11 +188,11 @@ export function TrimControls({
             </div>
           ) : null}
           <div className="text-xs text-slate-600" data-testid="trim-range-labels">
-            In:{' '}
+            {t('trim.inLabel')}{' '}
             <span className="font-mono" data-testid="trim-in-label">
               {formatDurationHHMMSS(inMs)}
             </span>{' '}
-            · Out:{' '}
+            {t('trim.outLabel')}{' '}
             <span className="font-mono" data-testid="trim-out-label">
               {formatDurationHHMMSS(outMs)}
             </span>
@@ -204,7 +206,7 @@ export function TrimControls({
             data-testid="trim-apply"
           >
             {applying ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            Apply
+            {t('common.apply')}
           </Button>
           <Button
             variant="outline"
@@ -216,18 +218,17 @@ export function TrimControls({
             data-testid="trim-restore"
           >
             {restoring ? <Loader2 className="animate-spin" aria-hidden="true" /> : null}
-            Restore original
+            {t('procedure.trimRestore')}
           </Button>
           {status === 'partial' ? (
             <p className="text-xs text-muted-foreground">
-              Trim is unavailable on partial recordings.
+              {t('trim.unavailableOnPartial')}
             </p>
           ) : null}
           {overDurationCap ? (
             <p className="text-xs text-muted-foreground" data-testid="trim-overduration-note">
-              Trimming is unavailable for recordings longer than{' '}
-              {formatDurationHHMMSS(MAX_TRIM_DURATION_MS)} (browser seek-by-keyframe
-              cap; v1.1 will add a re-encode path).
+              {t('trim.overCapPrefix', { cap: formatDurationHHMMSS(MAX_TRIM_DURATION_MS) })}{' '}
+              {t('trim.overCapSuffix')}
             </p>
           ) : null}
         </CardContent>

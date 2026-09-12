@@ -16,6 +16,7 @@
 //   - `lastKnownTimestampMs ?? 0` — the recording store clears lastLost on
 //     'stopped', so the fallback reads 0 ("00:00:00") instead of "NaN".
 
+import { useTranslation } from 'react-i18next';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { formatDurationHHMMSS } from '@/lib/format-duration';
 
@@ -30,6 +31,7 @@ export function DestructivePartialAlert({
   videoPath,
   lastKnownTimestampMs,
 }: DestructivePartialAlertProps): JSX.Element | null {
+  const { t } = useTranslation();
   if (status !== 'partial') return null;
   const isDeviceLost = !!videoPath && videoPath.endsWith('.partial.mp4');
   return (
@@ -38,19 +40,18 @@ export function DestructivePartialAlert({
       data-testid="procedure-review-partial-alert"
       className="flex flex-col gap-2"
     >
-      <AlertTitle>Partial recording</AlertTitle>
+      <AlertTitle>{t('partialAlert.title')}</AlertTitle>
       <AlertDescription>
         {isDeviceLost ? (
           <>
-            Recording stopped because the capture device disconnected. The mp4 was
-            preserved up to{' '}
+            {t('partialAlert.deviceDisconnectedPrefix')}{' '}
             <span className="font-mono font-medium">
               {formatDurationHHMMSS(lastKnownTimestampMs ?? 0)}
             </span>
             .
           </>
         ) : (
-          <>Recording ended unexpectedly. The mp4 was preserved.</>
+          <>{t('partialAlert.endedUnexpectedly')}</>
         )}
       </AlertDescription>
     </Alert>
