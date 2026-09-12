@@ -323,10 +323,21 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     },
     // Screenshots wrap row — overflow thumbnails (those that
     // didn't fit in the right column above) render as a
-    // horizontal wrap row below the signature block.
+    // horizontal wrap row above the footer band.
     // `flexWrap: 'wrap'` lets the thumbnails flow onto
     // multiple lines; @react-pdf/renderer paginates any
     // further overflow to the next page.
+    //
+    // Quick task 20260912-pdf-extras-pin-above-footer — kept
+    // the row in normal body flow on purpose. An earlier
+    // attempt pinned it with `position: absolute, bottom: 80`
+    // so it would sit flush against the footer band, but that
+    // breaks multi-page reports: a tall main row (lots of
+    // anatomy text) overflows to page 2 while the absolutely
+    // positioned extras stay stranded on page 1. The doctor
+    // wants the extras to follow the body content — if the
+    // text overflows, the pics go to page 2 with it. The
+    // natural flow gives us that for free.
     extraRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -725,6 +736,9 @@ export function createReportPdfElement(
       ),
 
       // 5. Extra screenshots (5+) — wrap-row below the main row.
+      //    Kept in normal body flow (NOT position: absolute) so
+      //    the extras follow the main row onto page 2 if the
+      //    text overflows. See extraRow style comment.
       extraThumbs.length > 0
         ? React.createElement(
             P.View,
