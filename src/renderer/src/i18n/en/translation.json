@@ -519,7 +519,21 @@
     "usersRemoveConfirm": "Remove this user?",
     "usersResetPin": "Reset PIN",
     "usersResetPinNewLabel": "New PIN",
-    "usersResetPinButton": "Reset PIN"
+    "usersResetPinButton": "Reset PIN",
+    "storageTitle": "Storage",
+    "storageDescription": "Optional — share the same database across two devices (e.g. record on the OR laptop, write the report from your room laptop) by pointing both at a shared network folder. Default stays local.",
+    "storageToggleTitle": "Shared database",
+    "storageToggleLabel": "Share database across devices",
+    "storageToggleHelp": "When on, both devices read + write the same SQLite file from a folder you choose (SMB share, NFS mount, OneDrive folder, etc.). The other device must also have Colonoscopist pointed at the same folder.",
+    "storagePathTitle": "Shared folder",
+    "storagePickFolder": "Choose folder",
+    "storageNoPathPicked": "No folder chosen yet.",
+    "storagePathHelp": "Pick a folder that BOTH devices can read + write to. SQLite locks the file during writes, so the other device will wait briefly when one is recording.",
+    "storageWarningTitle": "Restart required",
+    "storageWarningBody": "Changes to the database location take effect on the next app launch (Quit + reopen). The current boot keeps reading from the previous location until then.",
+    "storageCurrentlyUsing": "Currently using: {{path}}",
+    "storageReset": "Reset to local",
+    "storageSave": "Save"
   },
   "recovery": {
     "title": "Recover admin PIN",

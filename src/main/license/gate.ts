@@ -64,6 +64,13 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // bytes (so the renderer can build a blob: URL for the crop modal).
   // Same rationale as SCREENSHOTS_CROP: routine read on existing data.
   IPC.SCREENSHOTS_GET_BLOB,
+  // Quick task 20260912-shared-database-optional — opt-in shared
+  // database. The toggle is a one-shot admin action; the doctor
+  // needs to configure storage before / during the wizard. Gate
+  // would lock them out of the only way to set the DB location.
+  IPC.STORAGE_GET_LOCATION,
+  IPC.STORAGE_SET_LOCATION,
+  IPC.STORAGE_PICK_FOLDER,
   // Phase 8 / Plan 15 (G-08-8) — main-process clipboard write. Routine
   // action; happens whenever the doctor copies the machine id. Not
   // gating this would block a normal workflow for an expired license.

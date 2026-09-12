@@ -339,6 +339,22 @@ export function mockApi(): MockApi {
         code: 'IPC_LICENSE_CANCELLED' as const,
       }),
     },
+    // Quick task 20260912-shared-database-optional — default
+    // storage location is "local" (enabled=false, sharedPath=null).
+    // Tests that exercise the toggle override these per-test.
+    storage: {
+      getLocation: vi.fn().mockResolvedValue({
+        enabled: false,
+        sharedPath: null,
+        effectivePath: '/mock/userData',
+        localPath: '/mock/userData',
+      }),
+      setLocation: vi.fn().mockResolvedValue({
+        ok: true,
+        requiresRestart: true,
+      }),
+      pickFolder: vi.fn().mockResolvedValue({ path: null }),
+    },
   };
   (window as unknown as { api: MockApi }).api = api;
   return api;

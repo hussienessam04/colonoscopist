@@ -18,6 +18,9 @@ import { registerReportTemplatesIpc } from './ipc/report-templates';
 import { registerBackupIpc } from './ipc/backup';
 import { registerRestoreIpc } from './ipc/restore';
 import { registerLicenseIpc } from './ipc/license';
+// Quick task 20260912-shared-database-optional — opt-in shared
+// DB across devices (Settings → Storage).
+import { registerStorageIpc } from './ipc/storage';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -59,6 +62,11 @@ app.whenReady().then(() => {
   // renderer's first `license.status()` IPC call returns instantly
   // instead of paying the verify cost on the renderer hot path.
   registerLicenseIpc();
+  // Quick task 20260912-shared-database-optional — register
+  // BEFORE auth/wizard handlers so the doctor can configure
+  // storage during the first-launch flow without an active
+  // session (channel is in EXEMPT_CHANNELS below).
+  registerStorageIpc();
   void getLicenseStatus()
     .then(() => logStartup('license-status-cached'))
     .catch((err: unknown) =>

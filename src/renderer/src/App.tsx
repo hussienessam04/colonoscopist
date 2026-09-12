@@ -11,6 +11,7 @@ import PatientsList from './pages/PatientsList';
 import PatientForm from './pages/PatientForm';
 import SettingsUsers from './pages/SettingsUsers';
 import SettingsCapture from './pages/SettingsCapture';
+import SettingsStorage from './pages/SettingsStorage';
 import SettingsHub from './pages/SettingsHub';
 import ProcedureRoom from './pages/ProcedureRoom';
 import ProcedurePreview from './pages/ProcedurePreview';
@@ -136,6 +137,14 @@ export default function App(): JSX.Element {
       break;
     case 'backup-restore':
       routeElement = <BackupRestore />;
+      break;
+    case 'settings-storage':
+      // Quick task 20260912-shared-database-optional —
+      // Settings → Storage page (opt-in shared DB across
+      // devices). Admin-only (toggling the shared DB affects
+      // every record on this workstation); the sidebar button
+      // is disabled for non-admins.
+      routeElement = <SettingsStorage />;
       break;
     case 'license':
       routeElement = <License />;

@@ -177,6 +177,19 @@ export const IPC = {
   // This channel is EXEMPT from the IPC gate (Plan 04 also adds it to
   // EXEMPT_CHANNELS in src/main/license/gate.ts).
   LICENSE_PICK_AND_ACTIVATE: 'license:pick-and-activate',
+  // Quick task 20260912-shared-database-optional — three
+  // channels that drive the opt-in shared-database toggle. The
+  // renderer hits GET on mount; SET writes the JSON config and
+  // the toggle takes effect on the next app launch (the IPC
+  // contract returns `requiresRestart: true` so the renderer
+  // can show the warning banner); PICK_FOLDER opens the OS
+  // folder picker and returns the chosen absolute path (or
+  // null on cancel). All three are EXEMPT from the gate (set
+  // in src/main/license/gate.ts) so the doctor can configure
+  // storage without an active session.
+  STORAGE_GET_LOCATION: 'storage:get-location',
+  STORAGE_SET_LOCATION: 'storage:set-location',
+  STORAGE_PICK_FOLDER: 'storage:pick-folder',
 } as const;
 
 // Phase 7 / Plan 07-01 — Restore preview shape returned by
@@ -875,7 +888,53 @@ export interface IpcContract {
     activate: (input: LicenseActivateInput) => Promise<LicenseActivateResult>;
     pickAndActivate: () => Promise<LicenseActivateResult | { ok: false; code: 'IPC_LICENSE_CANCELLED' }>;
   };
+  // Quick task 20260912-shared-database-optional — opt-in
+  // shared database across devices. `getLocation` returns the
+  // current toggle + paths; `setLocation` writes the JSON
+  // config (takes effect on next app launch); `pickFolder`
+  // opens the OS folder picker for the doctor to choose a
+  // shared SMB / NFS / OneDrive-mounted folder.
+  storage: {
+    getLocation: () => Promise<StorageLocationResult>;
+    setLocation: (input: StorageSetLocationInput) => Promise<StorageSetLocationResult>;
+    pickFolder: () => Promise<StoragePickFolderResult>;
+  };
 }
+
+// Quick task 20260912-shared-database-optional — payload shapes
+// for the storage IPC. Kept at module scope (not inside the
+// IpcContract interface) so they can be reused by the main-side
+// handler + renderer hook.
+export type StorageLocationResult = {
+  enabled: boolean;
+  sharedPath: string | null;
+  // Always populated — the resolved data root for the CURRENT
+  // boot (i.e. based on the config that was on disk when main
+  // started). Lets the renderer show a "currently using X"
+  // banner next to the toggle for the soon-to-be-pending state.
+  effectivePath: string;
+  localPath: string;
+};
+
+export type StorageSetLocationInput = {
+  enabled: boolean;
+  sharedPath: string | null;
+};
+
+export type StorageSetLocationResult = {
+  ok: boolean;
+  reason?: 'missing' | 'not-directory' | 'not-writable';
+  // Always true — the toggle takes effect on the next launch.
+  // Returned so the renderer can show the warning banner even
+  // if the doctor toggles and the success path doesn't include
+  // any other signal.
+  requiresRestart: true;
+};
+
+export type StoragePickFolderResult = {
+  // null when the doctor cancels the OS picker.
+  path: string | null;
+};
 
 declare global {
   interface Window {

@@ -1,12 +1,31 @@
 // Centralised userData path resolution (SET-03 foundation).
 // Phase 2 adds dbPath() + mediaDir() for the data layer + Phase 4 video storage.
-
+//
+// Quick task 20260912-shared-database-optional — `dataRoot()` reads
+// the doctor-config JSON to decide whether to use the local
+// `<userData>/data` (default) or a shared folder path (opt-in
+// toggle). Everything below flows from `dataRoot()` so flipping
+// the toggle moves the entire data subtree atomically.
 import { app } from 'electron';
 import { mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { getDataLocationConfig } from './storage/data-location-config';
+
+// Quick task 20260912-shared-database-optional — the effective
+// root for everything below `data/`. Local by default; the shared
+// path takes over when the doctor toggles "Share database across
+// devices" on in Settings → Storage. The toggle takes effect on
+// the next app launch (per the data-location-config file header).
+export function dataRoot(): string {
+  const cfg = getDataLocationConfig();
+  if (cfg.enabled && cfg.sharedPath) {
+    return cfg.sharedPath;
+  }
+  return app.getPath('userData');
+}
 
 export function dataDir(): string {
-  const dir = path.join(app.getPath('userData'), 'data');
+  const dir = path.join(dataRoot(), 'data');
   mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -99,12 +118,20 @@ export function reportPdfPath(reportId: string): string {
 // screenshots table stores userData-relative `file_path` (per
 // Anti-Pattern 2); the PDF template runs in main so it has direct FS
 // access and can resolve the absolute path here. Never used for writes.
+//
+// Quick task 20260912-shared-database-optional — joins against
+// `dataRoot()` (not `app.getPath('userData')` directly) so a
+// screenshot stored by device A still resolves when device B
+// reads the same row from the shared DB. Stored paths are
+// RELATIVE to the data root (e.g. `data/media/...`); the resolver
+// stays the same for both local + shared modes because both
+// device roots have a `data/` subtree.
 export function screenshotAbsPath(
   _patientId: string,
   _procedureId: string,
   filePath: string,
 ): string {
-  return path.join(app.getPath('userData'), filePath);
+  return path.join(dataRoot(), filePath);
 }
 
 // Phase 7 / Plan 07-01 — Restore staging directory (D-14).

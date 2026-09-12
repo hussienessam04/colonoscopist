@@ -34,7 +34,12 @@ export type Route =
   // Phase 8 / Plan 05 — License sub-page (LIC-03). Reached via
   // SettingsSidebar; the boot-time <LicenseGate> modal navigates here
   // on the 'Activate now' button click. The route carries no params.
-  | { name: 'license' };
+  | { name: 'license' }
+  // Quick task 20260912-shared-database-optional — opt-in
+  // shared database location (Settings → Storage). Reached via
+  // SettingsSidebar. No params — the page reads the current
+  // toggle + paths via `window.api.storage.getLocation`.
+  | { name: 'settings-storage' };
 
 export const initialRoute: Route = { name: 'login' };
 

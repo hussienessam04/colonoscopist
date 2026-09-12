@@ -208,6 +208,15 @@ const api: IpcContract = {
     activate: (input) => ipcRenderer.invoke(IPC.LICENSE_ACTIVATE, input),
     pickAndActivate: () => ipcRenderer.invoke(IPC.LICENSE_PICK_AND_ACTIVATE),
   },
+  // Quick task 20260912-shared-database-optional — opt-in
+  // shared DB across devices. Pairs with the Settings → Storage
+  // page. pickFolder opens the OS dialog in main; the renderer
+  // never composes a path.
+  storage: {
+    getLocation: () => ipcRenderer.invoke(IPC.STORAGE_GET_LOCATION),
+    setLocation: (input) => ipcRenderer.invoke(IPC.STORAGE_SET_LOCATION, input),
+    pickFolder: () => ipcRenderer.invoke(IPC.STORAGE_PICK_FOLDER),
+  },
 };
 
 try {
