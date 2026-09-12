@@ -37,8 +37,11 @@ import PatientProcedures from './pages/PatientProcedures';
 // The modal is mounted ABOVE the route switch so it fires on
 // `state: 'unactivated'` or `state: 'expired'` regardless of which
 // authenticated route is active.
-import LicenseGate from './components/LicenseGate';
+import LicenseGate from '@/components/LicenseGate';
 import License from './pages/License';
+// Quick task 20260912-q4g — Settings → About card (app name,
+// version, developer contact). Mirrors License.tsx pattern.
+import SettingsAbout from './pages/SettingsAbout';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -148,6 +151,12 @@ export default function App(): JSX.Element {
       break;
     case 'license':
       routeElement = <License />;
+      break;
+    case 'settings-about':
+      // Quick task 20260912-q4g — Settings → About (app name +
+      // developer contact + version). Admin-irrelevant (every
+      // doctor sees it), so no gate beyond authentication.
+      routeElement = <SettingsAbout />;
       break;
     case 'patient-procedures':
       routeElement = <PatientProcedures patientId={route.patientId} />;

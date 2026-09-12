@@ -583,7 +583,7 @@
     "loading": "Loading license status…",
     "modalTitle": "Activate Colonoscopist",
     "modalUnactivatedBody": "Welcome to Colonoscopist. To continue using the app, please activate your license or start the 14-day trial.",
-    "modalExpiredBody": "Your 14-day trial has ended. Please email your machine ID to Colonoscopist support for a license file.",
+    "modalExpiredBody": "Your 14-day trial has ended. Please email your machine ID to hussienessam04@gmail.com to request a license file.",
     "continueWithTrial": "Start trial",
     "activateNow": "Activate now",
     "sidebarBadgeLicensed": "Licensed · Perpetual",
@@ -594,6 +594,20 @@
     "sidebarBadgeUnactivated": "Not activated",
     "emptyStateMessage": "License required — open Settings → License to activate.",
     "emptyStateOpenLicense": "Open License settings"
+  },
+  "about": {
+    "sidebarEntry": "About",
+    "pageTitle": "About Colonoscopist",
+    "pageDescription": "App identity, version, and developer contact for support or feedback.",
+    "appNameLabel": "App",
+    "appName": "Colonoscopist",
+    "versionLabel": "Version",
+    "versionValue": "{{version}}",
+    "developerLabel": "Developer",
+    "developerName": "Hussien Essam",
+    "phoneLabel": "Phone",
+    "emailLabel": "Email",
+    "description": "Offline-first colonoscopy workstation — record, capture findings, and generate clinic-branded PDF reports without an internet connection."
   },
   "screenshot": {
     "cropButton": "Crop",

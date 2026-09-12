@@ -28,7 +28,7 @@
 // new `activeTab === 'license'` value; the route union's `{name:
 // 'license'}` was added to lib/router.ts so the navigate() call compiles.
 
-import { FileSearch, Folder, HardDrive, KeyRound, Shield, UserCircle, Video } from 'lucide-react';
+import { FileSearch, Folder, HardDrive, Info, KeyRound, Shield, UserCircle, Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
@@ -46,7 +46,15 @@ export type SettingsTab =
   // Quick task 20260912-shared-database-optional — opt-in
   // shared DB location (network folder). Sits alongside Backup
   // since both are "infrastructure" settings.
-  | 'storage';
+  | 'storage'
+  // Quick task 20260912-q4g — About card (app name, version,
+  // developer contact). Sits right BEFORE Storage so the
+  // sidebar reads Capture → Profile → Audit → License → Backup
+  // & restore → Users → About → Storage. Per user instruction:
+  // Storage stays the last position since it's "infrastructure
+  // they set once then forget". Not admin-gated — every doctor
+  // sees it.
+  | 'about';
 
 // Plan 08-13 / UI audit Blocker 3 — the `sidebarBadge*` keys had no usage
 // site. The License entry now renders a colour dot + the state label so a
@@ -181,6 +189,24 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <Shield className="size-4 mr-2" aria-hidden="true" />
         Users
+      </Button>
+      {/* Quick task 20260912-q4g — About entry sits between
+          Users and Storage. No admin gate; every doctor sees
+          the developer contact. Storage stays at the END per
+          user instruction (infrastructure they set once). */}
+      <Button
+        variant={activeTab === 'about' ? 'default' : 'outline'}
+        className={
+          activeTab === 'about'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
+        onClick={() => navigate({ name: 'settings-about' })}
+        data-testid="settings-hub-about"
+        data-active={activeTab === 'about' ? 'true' : 'false'}
+      >
+        <Info className="size-4 mr-2" aria-hidden="true" />
+        {t('about.sidebarEntry')}
       </Button>
       {/* Quick task 20260912-shared-database-optional — Storage
           entry sits at the END of the sidebar so it doesn't

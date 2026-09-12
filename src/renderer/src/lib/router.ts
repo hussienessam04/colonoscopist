@@ -39,7 +39,12 @@ export type Route =
   // shared database location (Settings → Storage). Reached via
   // SettingsSidebar. No params — the page reads the current
   // toggle + paths via `window.api.storage.getLocation`.
-  | { name: 'settings-storage' };
+  | { name: 'settings-storage' }
+  // Quick task 20260912-q4g — Settings → About card (app name,
+  // version, developer contact). Reached via SettingsSidebar;
+  // no params. Keeps the cluster contiguous with the other
+  // quick-task Settings variants.
+  | { name: 'settings-about' };
 
 export const initialRoute: Route = { name: 'login' };
 

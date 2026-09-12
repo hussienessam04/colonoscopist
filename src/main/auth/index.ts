@@ -262,7 +262,7 @@ export function recoveryRequest(): RecoveryResponse {
     accepted: true,
     verificationDeferred: true,
     machineFingerprint: 'tbd-phase-8',
-    mailto: 'mailto:licensing@colonoscopist.example?subject=Admin%20PIN%20recovery&body=fingerprint:',
+    mailto: 'mailto:hussienessam04@gmail.com?subject=Admin%20PIN%20recovery&body=fingerprint:',
   };
 }
 

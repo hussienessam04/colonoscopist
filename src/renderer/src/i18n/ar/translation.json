@@ -587,7 +587,7 @@
     "loading": "جاري تحميل حالة الترخيص…",
     "modalTitle": "تفعيل Colonoscopist",
     "modalUnactivatedBody": "مرحباً بك في Colonoscopist. لمتابعة استخدام التطبيق، يرجى تفعيل الترخيص أو بدء الفترة التجريبية البالغة 14 يوماً.",
-    "modalExpiredBody": "انتهت الفترة التجريبية البالغة 14 يوماً. يرجى إرسال معرّف الجهاز إلى دعم Colonoscopist للحصول على ملف ترخيص.",
+    "modalExpiredBody": "انتهت الفترة التجريبية البالغة 14 يوماً. يرجى إرسال معرّف الجهاز إلى hussienessam04@gmail.com لطلب ملف ترخيص.",
     "continueWithTrial": "ابدأ الفترة التجريبية",
     "activateNow": "تفعيل الآن",
     "sidebarBadgeLicensed": "مفعّل · دائم",
@@ -602,6 +602,20 @@
     "sidebarBadgeUnactivated": "غير مفعّل",
     "emptyStateMessage": "الترخيص مطلوب — افتح الإعدادات → الترخيص للتفعيل.",
     "emptyStateOpenLicense": "افتح إعدادات الترخيص"
+  },
+  "about": {
+    "sidebarEntry": "حول",
+    "pageTitle": "حول Colonoscopist",
+    "pageDescription": "هوية التطبيق والإصدار وبيانات التواصل مع المطور للدعم والملاحظات.",
+    "appNameLabel": "التطبيق",
+    "appName": "Colonoscopist",
+    "versionLabel": "الإصدار",
+    "versionValue": "{{version}}",
+    "developerLabel": "المطور",
+    "developerName": "حسين عصام",
+    "phoneLabel": "الهاتف",
+    "emailLabel": "البريد الإلكتروني",
+    "description": "محطة عمل تنظير قولون تعمل دون اتصال بالإنترنت — التسجيل، التقاط النتائج، وإصدار تقارير PDF مخصصة للعيادة بدون الحاجة إلى الإنترنت."
   },
   "screenshot": {
     "cropButton": "قص",

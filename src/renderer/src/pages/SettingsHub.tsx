@@ -120,6 +120,15 @@ export default function SettingsHub(): JSX.Element {
             </span>{' '}
             — {t('settings.usersDescription')}
           </p>
+          {/* Quick task 20260912-q4g — About paragraph sits between
+              Users and Storage so the hub's description block
+              mirrors the sidebar order. */}
+          <p>
+            <span className="font-medium text-[#13202E]">
+              {t('about.sidebarEntry')}
+            </span>{' '}
+            — {t('about.pageDescription')}
+          </p>
           <p>
             <span className="font-medium text-[#13202E]">
               {t('settings.storageTitle')}
