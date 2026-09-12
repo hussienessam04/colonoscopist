@@ -140,11 +140,24 @@ const FOOTER_BAND_IMAGE_STYLE = {
 // at 110; only the height shrinks so the screenshot's
 // natural landscape aspect ratio still fits with
 // `objectFit: 'contain'` inside the (now shorter) box.
+//
+// Quick task 20260912-pdf-extras-atomic-row — shrunk further:
+// right column 72 → 64pt and extras 88 → 72pt. Combined with
+// margin tweaks (right thumb marginBottom 4 → 2, extra thumb
+// marginBottom 6 → 4, extraRow marginBottom 6 → 4,
+// mainRow marginBottom 6 → 4, infoBox marginBottom 6 → 4,
+// anatomyBox marginBottom 4 → 3), page 1 now has ~200pt for
+// the extras wrap row after the info boxes + main row —
+// enough for 2 rows of 3 (72pt + margins = 156pt) with
+// ~48pt to spare. Combined with the `wrap={false}` prop on
+// the extras wrap row View (see JSX below), the wrap row is
+// atomic: either ALL extras land on page 1 or ALL extras
+// land on page 2 (per the doctor's request).
 const RIGHT_COL_THUMB_WIDTH = 110;
-const RIGHT_COL_THUMB_HEIGHT = 72;
+const RIGHT_COL_THUMB_HEIGHT = 64;
 const RIGHT_COL_THUMB_COUNT = 5;
 const EXTRA_THUMB_WIDTH = 110;
-const EXTRA_THUMB_HEIGHT = 88;
+const EXTRA_THUMB_HEIGHT = 72;
 
 export type AttachedScreenshot = {
   screenshotId: number;
@@ -238,18 +251,21 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       color: '#0f172a',
     },
     // Info box 1 (Instrument + Pre-medication, 2 columns).
+    // Quick task 20260912-pdf-extras-atomic-row — marginBottom
+    // 6 → 4 (a bit tighter so the report mostly fits on one
+    // page; the info box itself is still readable).
     infoBox2: {
       flexDirection: 'row',
       borderWidth: 1,
       borderColor: '#94a3b8',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     // Info box 2 (Name + Age + Date, 3 columns).
     infoBox3: {
       flexDirection: 'row',
       borderWidth: 1,
       borderColor: '#94a3b8',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     // Each column inside an info box (border-right separates columns).
     infoCol: {
@@ -276,9 +292,11 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       direction: 'ltr' as const,
     },
     // Main row — text boxes on the left, screenshot stack on the right.
+    // Quick task 20260912-pdf-extras-atomic-row — marginBottom
+    // 6 → 4 (a bit tighter; saves 2pt).
     mainRow: {
       flexDirection: 'row',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     textColumn: {
       flex: 1,
@@ -294,9 +312,12 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     // (matches the reference image where the boxes are separated
     // by gaps, not lines). The padding + marginBottom spacing
     // remain so the boxes stay visually distinct.
+    //
+    // Quick task 20260912-pdf-extras-atomic-row — marginBottom
+    // 4 → 3 (saves ~4pt across the 4 procedure-type boxes).
     anatomyBox: {
       padding: 6,
-      marginBottom: 4,
+      marginBottom: 3,
     },
     anatomyTitle: {
       fontWeight: 'bold',
@@ -311,10 +332,12 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
       direction: 'rtl' as const,
     },
     // Right-column screenshot thumbnail.
+    // Quick task 20260912-pdf-extras-atomic-row — marginBottom
+    // 4 → 2 (saves ~10pt across the 5 right-column thumbs).
     rightThumbWrap: {
       width: RIGHT_COL_THUMB_WIDTH,
       height: RIGHT_COL_THUMB_HEIGHT,
-      marginBottom: 4,
+      marginBottom: 2,
     },
     rightThumb: {
       width: RIGHT_COL_THUMB_WIDTH,
@@ -325,8 +348,7 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     // didn't fit in the right column above) render as a
     // horizontal wrap row above the footer band.
     // `flexWrap: 'wrap'` lets the thumbnails flow onto
-    // multiple lines; @react-pdf/renderer paginates any
-    // further overflow to the next page.
+    // multiple lines.
     //
     // Quick task 20260912-pdf-extras-pin-above-footer — kept
     // the row in normal body flow on purpose. An earlier
@@ -338,16 +360,33 @@ function getStyles(P: PdfPrimitives): ReturnType<PdfPrimitives['StyleSheet']['cr
     // wants the extras to follow the body content — if the
     // text overflows, the pics go to page 2 with it. The
     // natural flow gives us that for free.
+    //
+    // Quick task 20260912-pdf-extras-atomic-row — the View
+    // rendering this style now passes `wrap={false}` to
+    // @react-pdf/renderer (see JSX below). Per react-pdf
+    // docs (https://react-pdf.org/docs/v4/advanced/page-wrapping
+    // §"Disabling component wrapping"): wrap={false} transforms
+    // a breakable View into an unbreakable one — if the View
+    // doesn't fit on the current page, it's rendered on the
+    // next page as a whole. Combined with the moderate
+    // shrinking of right-column + extras thumb sizes + margins
+    // (also part of this quick task), page 1 typically fits 2
+    // rows of extras (6 thumbs) with room to spare; if a
+    // report has more extras, the entire wrap row moves to
+    // page 2 instead of awkwardly splitting (1 thumb on page
+    // 1, rest on page 2). marginBottom 6 → 4 (saves 2pt).
     extraRow: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      marginBottom: 6,
+      marginBottom: 4,
     },
     extraThumbWrap: {
       width: EXTRA_THUMB_WIDTH,
       height: EXTRA_THUMB_HEIGHT,
       marginRight: 6,
-      marginBottom: 6,
+      // Quick task 20260912-pdf-extras-atomic-row — marginBottom
+      // 6 → 4 (saves 2pt per thumb across up to 9 extras).
+      marginBottom: 4,
       // Quick task 20260907-pdf-polish-recommendation-borders —
       // border dropped (matches the reference image).
     },
@@ -738,12 +777,20 @@ export function createReportPdfElement(
       // 5. Extra screenshots (5+) — wrap-row below the main row.
       //    Kept in normal body flow (NOT position: absolute) so
       //    the extras follow the main row onto page 2 if the
-      //    text overflows. See extraRow style comment.
+      //    text overflows. `wrap={false}` makes the View atomic
+      //    — per react-pdf docs, "if the View doesn't fit on the
+      //    current page, it's rendered on the next page as a
+      //    whole". So either ALL extras land on page 1 (when
+      //    they fit after the info boxes + main row + signature)
+      //    or ALL extras land on page 2 — never split (1 thumb
+      //    on page 1, rest on page 2). See extraRow style
+      //    comment for the page-1 vertical budget math.
       extraThumbs.length > 0
         ? React.createElement(
             P.View,
             {
               style: styles.extraRow,
+              wrap: false,
               'data-testid': 'report-pdf-extra-screenshots',
             },
             ...extraThumbs.map((s) =>
