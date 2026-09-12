@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, NotebookPen, Video } from 'lucide-react';
+import { ArrowLeft, Camera, NotebookPen, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import ConfirmDialog from '@/components/ConfirmDialog';
@@ -7,6 +7,7 @@ import ProcedureNotesPanel from '@/components/procedure-notes-panel';
 import DeviceLostBanner from '@/components/device-lost-banner';
 import { RecordingControlsBar } from '@/components/RecordingControlsBar';
 import { RecIndicator } from '@/components/RecIndicator';
+import { ConsoleFrame } from '@/components/ConsoleFrame';
 import { FramingGuide } from '@/components/FramingGuide';
 import { ScreenshotTimeline } from '@/components/ScreenshotTimeline';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
@@ -358,7 +359,12 @@ export default function ProcedureRoom(): JSX.Element {
   const canRecord = !!(procedureId && selectedCanonical && preset);
 
   return (
-    <main className="min-h-screen bg-slate-50 p-6">
+    // Quick task 20260912-procedure-room-ui-enhance — background
+    // moved from `bg-slate-50` to the warm ivory `#F7F1E6` the
+    // rest of the app uses. The procedure room was the only
+    // page still wearing slate; this brings it into the
+    // clinical-workstation palette.
+    <main className="min-h-screen bg-[#F7F1E6] p-6 font-sans text-[#13202E]">
       {/* Quick task 20260907-procedure-room-ui-enhance —
           dropped `mx-auto max-w-7xl` so the page spans full
           width (matches ProcedureReview + the Report Editor). */}
@@ -381,17 +387,28 @@ export default function ProcedureRoom(): JSX.Element {
             </h1>
           </div>
           <div className="flex flex-col items-end gap-2 sm:flex-row sm:items-center">
-            {/* Quick task 20260907-procedure-room-ui-enhance —
-                live mono elapsed timer (signature element).
-                Shows the recording elapsed time in the header
-                so the doctor sees it without looking at the
-                preview pane. Clinical-instrumentation feel. */}
-            <span
-              data-testid="procedure-room-elapsed-timer"
-              className="font-mono text-sm tabular-nums text-[#0E3A47]"
-            >
-              {timerLabel}
-            </span>
+            {/* Quick task 20260912-procedure-room-ui-enhance —
+                the header timer gets an instrument-style
+                treatment: a mono number with a small-caps
+                "Duration" eyebrow + a thin teal underline that
+                animates in only while recording. Keeps the
+                header quiet when idle so the preview frame is
+                the focal point. */}
+            <div className="flex flex-col items-end gap-0.5">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]">
+                Duration
+              </p>
+              <span
+                data-testid="procedure-room-elapsed-timer"
+                className={
+                  isRecording
+                    ? 'relative font-mono text-base tabular-nums font-medium text-[#0E3A47] after:absolute after:-bottom-1 after:left-0 after:right-0 after:h-[2px] after:rounded-full after:bg-[#0E3A47] after:animate-pulse'
+                    : 'font-mono text-base tabular-nums text-[#5C6770]'
+                }
+              >
+                {timerLabel}
+              </span>
+            </div>
             {/* Quick task 20260912-procedure-room-exit-warning —
                 "Back to Preview" button is now ALWAYS visible
                 (the keyboard-shortcuts hint used to replace it
@@ -444,7 +461,19 @@ export default function ProcedureRoom(): JSX.Element {
               itself — Chromium native controls need the
               dark backdrop. */}
           <div className={`overflow-hidden ${CARD_CHROME}`}>
-            <div className="relative aspect-video bg-slate-900">
+            {/* Quick task 20260912-procedure-room-ui-enhance —
+                the live preview frame picks up a subtle teal
+                accent border when recording so the room reads
+                as "an active console" not "a paused patient
+                card". When idle the border stays the default
+                hairline. */}
+            <div
+              className={
+                isRecording
+                  ? 'relative aspect-video overflow-hidden border border-[#0E3A47]/35 bg-slate-900 ring-1 ring-[#0E3A47]/15 transition-colors'
+                  : 'relative aspect-video overflow-hidden bg-slate-900 transition-colors'
+              }
+            >
               {isRecording && previewUrl ? (
                 <img
                   ref={previewImgRef}
@@ -474,7 +503,20 @@ export default function ProcedureRoom(): JSX.Element {
                 />
               )}
               <FramingGuide />
-              <RecIndicator visible={recordingState.status === 'recording'} paused={isPaused} />
+              {/* Quick task 20260912-procedure-room-ui-enhance —
+                  the new instrument strip + corner brackets. The
+                  console frame (corner brackets) pulses teal
+                  while recording and dims back to ivory/45%
+                  when idle. The RecIndicator now renders the
+                  full STATUS · REC · DURATION readout at the
+                  top of the frame in the clinical palette
+                  (teal, no generic red). */}
+              <ConsoleFrame active={isRecording} />
+              <RecIndicator
+                visible={recordingState.status === 'recording' || recordingState.status === 'paused'}
+                paused={isPaused}
+                durationLabel={isRecording || isPaused ? timerLabel : undefined}
+              />
               {!defaultLoaded ? (
                 <div className="absolute inset-0 grid place-items-center text-sm text-slate-400">
                   Finding capture devices…
@@ -569,21 +611,49 @@ export default function ProcedureRoom(): JSX.Element {
                   </span>
                 </div>
                 <hr className="mt-2 border-[#E0D9C6]" />
-                <div className="mt-2 max-h-[60vh] overflow-y-auto pr-1">
-                  <ScreenshotTimeline
-                    procedureId={procedureId ?? ''}
-                    patientId={patientIdFromRoute}
-                    mediaBaseUrl={mediaUrl.url}
-                    status={isRecording ? 'recording' : 'completed'}
-                    screenshots={screenshotIntake.screenshots}
-                    onSeek={() => undefined}
-                    onCapture={() => {
-                      void handleScreenshotCapture();
-                    }}
-                    onDelete={handleScreenshotDelete}
-                    testId="procedure-room-gallery"
-                    layout="grid"
-                  />
+                {/* Quick task 20260912-procedure-room-ui-enhance —
+                    the gallery container keeps its `procedure-room-gallery`
+                    testid in BOTH the populated + empty state so existing
+                    tests that scope queries to the gallery node keep
+                    working. Inside, ScreenshotTimeline or the empty-state
+                    placeholder renders depending on screenshot count. */}
+                <div
+                  className="mt-2 max-h-[60vh] overflow-y-auto pr-1"
+                  data-testid="procedure-room-gallery"
+                >
+                  {screenshotIntake.screenshots.length === 0 ? (
+                    <div
+                      className="flex flex-col items-center justify-center gap-2 py-10 text-center"
+                      data-testid="procedure-room-gallery-empty"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="grid size-10 place-items-center rounded-full border border-[#E0D9C6] bg-white text-[#0E3A47]"
+                      >
+                        <Camera className="size-4" />
+                      </span>
+                      <p className="text-xs leading-snug text-[#5C6770]">
+                        Screenshots appear here during the procedure.
+                        <br />
+                        Press <kbd className="rounded border border-[#E0D9C6] bg-white px-1 font-mono text-[10px] text-[#0E3A47]">S</kbd>{' '}
+                        to capture.
+                      </p>
+                    </div>
+                  ) : (
+                    <ScreenshotTimeline
+                      procedureId={procedureId ?? ''}
+                      patientId={patientIdFromRoute}
+                      mediaBaseUrl={mediaUrl.url}
+                      status={isRecording ? 'recording' : 'completed'}
+                      screenshots={screenshotIntake.screenshots}
+                      onSeek={() => undefined}
+                      onCapture={() => {
+                        void handleScreenshotCapture();
+                      }}
+                      onDelete={handleScreenshotDelete}
+                      layout="grid"
+                    />
+                  )}
                 </div>
               </div>
             </aside>
