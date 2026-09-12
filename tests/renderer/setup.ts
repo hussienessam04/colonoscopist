@@ -13,7 +13,11 @@ import { session } from '@/store/session';
 // tests import components directly without going through main.tsx, so the
 // init never runs. Importing the i18n module here ensures the bundles
 // load + the default language (en) is active for every renderer test.
-import '@/i18n';
+//
+// Quick task 20260912-q4g — explicit changeLanguage('en') in beforeEach
+// so tests that call i18n.changeLanguage('ar') (e.g. wizard AR-radio
+// branch) don't leak AR strings into the next test's render.
+import i18n from '@/i18n';
 
 type MockApi = {
   auth: {
@@ -368,6 +372,9 @@ beforeEach(() => {
   mockApi();
   setRoute(initialRoute);
   session.reset();
+  // Quick task 20260912-q4g — reset i18n language to en so tests that
+  // call i18n.changeLanguage('ar') don't pollute subsequent tests.
+  void i18n.changeLanguage('en');
 });
 
 afterEach(() => {

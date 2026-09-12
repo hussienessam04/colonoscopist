@@ -344,7 +344,7 @@ export default function PatientProcedures({ patientId }: { patientId: string }):
                     {patient.dob}
                   </span>
                   <span>
-                    <span className="font-medium text-foreground">Gender:</span>{' '}
+                    <span className="font-medium text-foreground">{t('patientProcedures.genderLabel')}:</span>{' '}
                     {patient.gender ?? '—'}
                   </span>
                 </p>

@@ -4,6 +4,7 @@
 // "Forgot admin PIN?" affordance renders <RecoveryFilePicker /> per D-04 + Fix 7.
 
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import UserPicker from '@/components/UserPicker';
 import PinEntry from '@/components/PinEntry';
@@ -13,6 +14,7 @@ import { session } from '@/store/session';
 import type { UserPublic } from '@shared/ipc-contract';
 
 export default function Login(): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const [users, setUsers] = useState<UserPublic[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,14 +43,14 @@ export default function Login(): JSX.Element {
     <main className="min-h-screen grid place-items-center bg-slate-50 p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign in</CardTitle>
+          <CardTitle>{t('auth.title')}</CardTitle>
           <CardDescription>
-            {selected ? 'Enter your 4-digit PIN' : 'Tap your name to continue'}
+            {selected ? t('auth.pinDescription') : t('auth.description')}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
-            <p className="text-sm text-muted-foreground text-center">Loading users…</p>
+            <p className="text-sm text-muted-foreground text-center">{t('auth.loadingUsers')}</p>
           ) : selected ? (
             <PinEntry
               user={selected}
@@ -57,7 +59,7 @@ export default function Login(): JSX.Element {
             />
           ) : users.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center">
-              No users yet — restart the app to complete first-time setup.
+              {t('auth.noUsers')}
             </p>
           ) : (
             <div className="flex flex-col gap-3">

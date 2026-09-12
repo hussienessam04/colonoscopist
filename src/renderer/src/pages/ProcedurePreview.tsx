@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowRight, Camera, CircleDot, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -37,15 +38,16 @@ const PRIMARY_TEAL_BUTTON =
   "bg-[#0E3A47] text-white hover:bg-[#0B2C36] shadow-inner";
 
 function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Element {
+  const { t } = useTranslation();
   return (
     <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
       <div className="flex max-w-md flex-col items-center gap-3">
         <Camera aria-hidden="true" className="size-9 text-slate-400" />
         <p className="font-medium">
-          No device selected — go to Settings → Capture to pick one
+          {t('procedure.previewNoDeviceBody')}
         </p>
         <Button variant="secondary" onClick={openSettings}>
-          Open Settings
+          {t('procedure.previewOpenSettings')}
         </Button>
       </div>
     </div>
@@ -53,6 +55,7 @@ function NoDeviceState({ openSettings }: { openSettings: () => void }): JSX.Elem
 }
 
 export default function ProcedurePreview(): JSX.Element {
+  const { t } = useTranslation();
   const routeState = useRoute();
   const route = routeState.current;
   const navigate = routeState.navigate;
@@ -162,7 +165,7 @@ export default function ProcedurePreview(): JSX.Element {
       .catch((err: unknown) => {
         setCreating(false);
         setProcedureError(
-          err instanceof Error ? err.message : 'Could not prepare the procedure row.',
+          err instanceof Error ? err.message : t('procedure.previewPrepareFailed'),
         );
       });
   }
@@ -179,9 +182,9 @@ export default function ProcedurePreview(): JSX.Element {
                 kicker text ("Preview") is intentionally distinct
                 from the h1 ("Preview & setup") so existing tests
                 that search for /preview/i don't match both. */}
-            <p className={SMALL_CAPS_FIELD}>Preview</p>
+            <p className={SMALL_CAPS_FIELD}>{t('procedure.previewLabel')}</p>
             <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
-              Preview &amp; setup
+              {t('procedure.previewPageTitle')}
             </h1>
           </div>
           <Button
@@ -192,7 +195,7 @@ export default function ProcedurePreview(): JSX.Element {
             className={SECONDARY_OUTLINE_BUTTON}
           >
             <ArrowRight className="size-4 mr-1 rotate-180" aria-hidden="true" />
-            Back to patients
+            {t('procedure.previewBackToPatients')}
           </Button>
         </header>
 
@@ -223,13 +226,13 @@ export default function ProcedurePreview(): JSX.Element {
                 <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
                   <div className="flex max-w-md flex-col items-center gap-3">
                     <Video aria-hidden="true" className="size-9 text-rose-400" />
-                    <p className="font-medium">Could not open the capture device.</p>
+                    <p className="font-medium">{t('procedure.previewNoDeviceBodyHint')}</p>
                     <p className="text-xs text-slate-300">{preview.error.message}</p>
                     <Button
                       variant="secondary"
                       onClick={() => preview.start()}
                     >
-                      Retry
+                      {t('procedure.reviewRetry')}
                     </Button>
                   </div>
                 </div>
@@ -242,7 +245,7 @@ export default function ProcedurePreview(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <Camera className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
-                  <p className={SMALL_CAPS_LABEL}>Capture device</p>
+                  <p className={SMALL_CAPS_LABEL}>{t('procedure.previewCaptureDeviceLabel')}</p>
                   {/* Quick task 20260907-procedure-preview-ui-enhance —
                       signature element: live status pill that
                       echoes the live/streaming state in mono +
@@ -257,14 +260,14 @@ export default function ProcedurePreview(): JSX.Element {
                       className={`size-3 ${isRunning ? "text-[#0E3A47] animate-pulse" : "text-slate-400"}`}
                       aria-hidden="true"
                     />
-                    {isRunning ? "Live" : "Idle"}
+                    {isRunning ? t('procedure.previewLive') : t('procedure.previewIdle')}
                   </span>
                 </div>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setNotesCollapsed(true)}
-                  aria-label="Collapse side panel"
+                  aria-label={t('procedure.previewCollapsePanel')}
                   className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
                   Hide
@@ -286,14 +289,14 @@ export default function ProcedurePreview(): JSX.Element {
                     tests using `findByLabelText(/capture device/i)`
                     still resolve. */}
                 <label htmlFor="procedure-device" className="sr-only">
-                  Capture device
+                  {t('procedure.previewCaptureDeviceLabel')}
                 </label>
                 <Select
                   value={selectedBrowserId ?? ''}
                   onValueChange={(v) => setSelectedBrowserId(v || null)}
                 >
                   <SelectTrigger id="procedure-device" className="w-full">
-                    <SelectValue placeholder="Pick a capture device" />
+                    <SelectValue placeholder={t('procedure.previewPickDevice')} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
@@ -309,7 +312,7 @@ export default function ProcedurePreview(): JSX.Element {
                   </SelectContent>
                 </Select>
                 <p className="font-mono text-[11px] tabular-nums text-[#5C6770]">
-                  {selectedCanonical ? `Using: ${selectedCanonical}` : 'Pick a device to enable preview'}
+                  {selectedCanonical ? t('procedure.previewUsing', { device: selectedCanonical }) : t('procedure.previewPickToEnable')}
                 </p>
               </div>
 
@@ -318,11 +321,11 @@ export default function ProcedurePreview(): JSX.Element {
                 data-testid="preview-step"
               >
                 <Video className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
-                <p className={SMALL_CAPS_FIELD}>Preview</p>
+                <p className={SMALL_CAPS_FIELD}>{t('procedure.previewLabel')}</p>
                 <span
                   className="ml-auto font-mono text-[11px] tabular-nums text-[#13202E]"
                 >
-                  {isRunning ? "Streaming live feed" : "Idle"}
+                  {isRunning ? t('procedure.previewStreamingLive') : t('procedure.previewIdle')}
                 </span>
               </div>
 
@@ -333,7 +336,7 @@ export default function ProcedurePreview(): JSX.Element {
                 size="lg"
                 className={`mt-2 w-full ${PRIMARY_TEAL_BUTTON}`}
               >
-                {creating ? 'Preparing…' : 'Continue to recording'}
+                {creating ? t('procedure.previewPreparing') : t('procedure.previewContinue')}
                 <ArrowRight aria-hidden="true" className="ml-1 size-4" />
               </Button>
               {procedureError ? (
@@ -348,10 +351,10 @@ export default function ProcedurePreview(): JSX.Element {
               {gated ? <EmptyStateCard /> : null}
               <p className="text-xs text-[#5C6770]">
                 {creating
-                  ? 'Preparing procedure row…'
+                  ? t('procedure.previewPreparingHint')
                   : procedureId
-                    ? 'Procedure row ready. Continue once you are happy with the framing.'
-                    : 'Click Continue to start the procedure.'}
+                    ? t('procedure.previewReadyHint')
+                    : t('procedure.previewStartHint')}
               </p>
             </aside>
           ) : (
@@ -360,10 +363,10 @@ export default function ProcedurePreview(): JSX.Element {
                 variant="outline"
                 size="sm"
                 onClick={() => setNotesCollapsed(false)}
-                aria-label="Show side panel"
+                aria-label={t('procedure.previewShowPanel')}
                 className={SECONDARY_OUTLINE_BUTTON}
               >
-                Show side panel
+                {t('procedure.previewShowPanel')}
               </Button>
             </div>
           )}

@@ -321,12 +321,12 @@ export default function PatientsList(): JSX.Element {
               <table className="w-full">
                 <thead className="sticky top-0 z-10 bg-[#FBF7EE] shadow-[0_1px_0_0_hsl(var(--border))]">
                   <tr className="border-b text-left text-xs uppercase text-[#8C8478]">
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Name</th>
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">DOB</th>
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Gender</th>
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">MRN</th>
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">Phone</th>
-                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em] text-right">Actions</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">{t('patient.columnName')}</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">{t('common.dob')}</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">{t('patient.columnGender')}</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">{t('common.mrn')}</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em]">{t('patient.columnPhone')}</th>
+                    <th className="px-3 py-2 bg-[#FBF7EE] text-[#8C8478] text-xs uppercase tracking-[0.18em] text-right">{t('patient.columnActions')}</th>
                   </tr>
                 </thead>
                 <tbody>

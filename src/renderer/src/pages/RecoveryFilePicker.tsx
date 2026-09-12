@@ -5,6 +5,7 @@
 //      (Phase 8 owns the actual Ed25519 verify — typed deferred response).
 
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,6 +19,7 @@ import {
 import { toast } from 'sonner';
 
 export default function RecoveryFilePicker(): JSX.Element {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [emailPending, setEmailPending] = useState(false);
   const [filePending, setFilePending] = useState(false);
@@ -27,14 +29,14 @@ export default function RecoveryFilePicker(): JSX.Element {
     try {
       const res = await window.api.auth.recoveryRequest();
       if (res?.mailto) {
-        toast.success('Recovery email queued — vendor will reply with a `.recover` file.', {
+        toast.success(t('recovery.toastSuccessWithMailto'), {
           description: res.mailto,
         });
       } else {
-        toast.success('Recovery email queued — vendor will reply with a `.recover` file.');
+        toast.success(t('recovery.toastSuccessNoMailto'));
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Recovery request failed';
+      const msg = err instanceof Error ? err.message : t('recovery.toastRequestFailed');
       toast.error(msg);
     } finally {
       setEmailPending(false);
@@ -49,15 +51,13 @@ export default function RecoveryFilePicker(): JSX.Element {
       // hand-off honestly without claiming verification.
       const res = await window.api.auth.acceptRecoveryFile();
       if (res.accepted && res.verificationDeferred) {
-        toast.success(
-          'Recovery file accepted. License verification will complete in Phase 8.',
-        );
+        toast.success(t('recovery.toastFileSuccessDeferred'));
       } else {
-        toast.success('Recovery file accepted.');
+        toast.success(t('recovery.toastFileSuccess'));
       }
       setOpen(false);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Recovery file failed';
+      const msg = err instanceof Error ? err.message : t('recovery.toastFileFailed');
       toast.error(msg);
     } finally {
       setFilePending(false);
@@ -68,16 +68,14 @@ export default function RecoveryFilePicker(): JSX.Element {
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="link" size="sm" className="text-muted-foreground">
-          Forgot admin PIN?
+          {t('recovery.triggerForgot')}
         </Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Recover admin PIN</DialogTitle>
+          <DialogTitle>{t('recovery.dialogTitle')}</DialogTitle>
           <DialogDescription>
-            Request a recovery file from the vendor. Once you receive the
-            <code className="mx-1 rounded bg-muted px-1 py-0.5 text-xs">.recover</code>
-            file, select it to unlock the admin PIN.
+            {t('recovery.dialogDescription')}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex flex-col gap-2 sm:flex-row">
@@ -87,14 +85,14 @@ export default function RecoveryFilePicker(): JSX.Element {
             onClick={() => void handleEmail()}
             disabled={emailPending || filePending}
           >
-            {emailPending ? 'Sending…' : 'Email vendor'}
+            {emailPending ? t('recovery.sending') : t('recovery.emailButton')}
           </Button>
           <Button
             type="button"
             onClick={() => void handleFile()}
             disabled={emailPending || filePending}
           >
-            {filePending ? 'Selecting…' : 'Select recovery file'}
+            {filePending ? t('recovery.selecting') : t('recovery.selectFileButton')}
           </Button>
         </DialogFooter>
       </DialogContent>

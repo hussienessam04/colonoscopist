@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Save, Settings, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,6 +61,7 @@ function buildPreviewPreset(form: PresetForm): QualityPreset | undefined {
 }
 
 export default function SettingsCapture(): JSX.Element {
+  const { t } = useTranslation();
   const { browser, loading: bridgeLoading, lookup, pickBrowserId } = useCaptureDeviceMap();
 
   const [savedDeviceId, setSavedDeviceId] = useState<string | null>(null);
@@ -183,7 +185,7 @@ export default function SettingsCapture(): JSX.Element {
       );
       if (savedDevice === null) {
         toast.error(
-          'License required to save capture settings. Activate your license first.',
+          t('settings.captureSaveLicenseRequired'),
         );
         return;
       }
@@ -192,13 +194,13 @@ export default function SettingsCapture(): JSX.Element {
       );
       if (savedPreset === null) {
         toast.error(
-          'License required to save capture settings. Activate your license first.',
+          t('settings.captureSaveLicenseRequired'),
         );
         return;
       }
-      toast.success('Capture settings saved.');
+      toast.success(t('settings.captureSaveSuccess'));
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to save capture settings.';
+      const message = err instanceof Error ? err.message : t('settings.captureSaveFailed');
       toast.error(message);
     } finally {
       setSaving(false);
@@ -207,8 +209,8 @@ export default function SettingsCapture(): JSX.Element {
 
   return (
     <SettingsLayout
-      title="Capture"
-      subtitle="Pick a default device and a quality preset. Preview verifies the configuration before saving."
+      title={t('settings.captureTitle')}
+      subtitle={t('settings.captureDescription')}
       activeTab="capture"
       headerAction={
         // Quick task 260812-n0h — Save moved from the right controls aside
@@ -222,7 +224,7 @@ export default function SettingsCapture(): JSX.Element {
           className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
         >
           <Save className="size-4 mr-1" aria-hidden="true" />
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('common.saving') : t('common.save')}
         </Button>
       }
     >
@@ -239,7 +241,7 @@ export default function SettingsCapture(): JSX.Element {
             />
             {!isPreviewing ? (
               <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-slate-400">
-                Choose a device and a preset, then start the preview to verify the configuration.
+                {t('settings.previewHint')}
               </div>
             ) : null}
           </div>
@@ -248,9 +250,11 @@ export default function SettingsCapture(): JSX.Element {
         <aside className="flex flex-col gap-5 rounded-xl border border-[#E0D9C6] bg-[#FBF7EE] p-5 shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <div className="flex flex-col gap-2">
             <p className="text-sm text-[#5C6770]">
-              Last used: {savedDeviceId ?? 'None'}
+              {savedDeviceId
+                ? t('settings.captureLastUsed', { device: savedDeviceId })
+                : t('settings.captureLastUsedNone')}
             </p>
-            <Label htmlFor="settings-capture-device">Capture device</Label>
+            <Label htmlFor="settings-capture-device">{t('settings.captureDeviceLabel')}</Label>
             <Select
               value={selectedBrowserId ?? undefined}
               onValueChange={handleDeviceChange}
@@ -258,10 +262,10 @@ export default function SettingsCapture(): JSX.Element {
             >
               <SelectTrigger
                 id="settings-capture-device"
-                aria-label="Capture device"
+                aria-label={t('settings.captureDeviceLabel')}
                 className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
               >
-                <SelectValue placeholder="Select a device" />
+                <SelectValue placeholder={t('settings.captureDevicePlaceholder')} />
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
@@ -278,14 +282,14 @@ export default function SettingsCapture(): JSX.Element {
           {noSavedDevice ? (
             <p className="text-sm text-[#8C8478]">
               <Settings aria-hidden="true" className="mr-1 inline-block size-4" />
-              No device saved yet. Pick one to enable Save.
+              {t('settings.captureNoSavedYet')}
             </p>
           ) : null}
 
           {gated ? <EmptyStateCard /> : null}
 
           <fieldset className="flex flex-col gap-2 accent-[#0E3A47]">
-            <legend className="text-sm font-medium">Quality preset</legend>
+            <legend className="text-sm font-medium">{t('settings.qualityPresetLabel')}</legend>
             <div className="flex flex-col gap-1 text-sm">
               <label className="flex items-center gap-2">
                 <input
@@ -296,7 +300,7 @@ export default function SettingsCapture(): JSX.Element {
                   onChange={() => setKind('sd')}
                   data-testid="preset-sd"
                 />
-                SD analog (EasyCap) — 720×480
+                {t('settings.qualityPresetSd')}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -307,7 +311,7 @@ export default function SettingsCapture(): JSX.Element {
                   onChange={() => setKind('hd')}
                   data-testid="preset-hd"
                 />
-                HD digital (HDMI / DVI) — 1920×1080
+                {t('settings.qualityPresetHd')}
               </label>
               <label className="flex items-center gap-2">
                 <input
@@ -318,38 +322,38 @@ export default function SettingsCapture(): JSX.Element {
                   onChange={() => setKind('custom')}
                   data-testid="preset-custom"
                 />
-                Custom
+                {t('settings.qualityPresetCustom')}
               </label>
             </div>
 
             {form.kind === 'custom' ? (
               <div className="flex flex-col gap-3 rounded-md border border-[#E0D9C6] bg-[#FBF7EE] p-3">
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="settings-capture-resolution">Resolution (W×H)</Label>
+                  <Label htmlFor="settings-capture-resolution">{t('settings.resolutionLabel')}</Label>
                   <Input
                     id="settings-capture-resolution"
                     value={form.resolution}
                     onChange={(event) => setResolution(event.target.value)}
-                    placeholder="1920x1080"
+                    placeholder={t('settings.resolutionPlaceholder')}
                     aria-invalid={!customResolutionValid}
                     data-testid="custom-resolution"
                     className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                   />
                   {!customResolutionValid ? (
                     <p role="alert" className="text-xs text-destructive">
-                      Use W×H like 1920×1080.
+                      {t('settings.resolutionHint')}
                     </p>
                   ) : null}
                 </div>
                 <div className="flex flex-col gap-1">
-                  <Label htmlFor="settings-capture-framerate">Framerate</Label>
+                  <Label htmlFor="settings-capture-framerate">{t('settings.framerateLabel')}</Label>
                   <Select
                     value={String(form.framerate)}
                     onValueChange={(value) => setFramerate(Number(value))}
                   >
                     <SelectTrigger
                       id="settings-capture-framerate"
-                      aria-label="Framerate"
+                      aria-label={t('settings.framerateLabel')}
                       className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30"
                     >
                       <SelectValue />
@@ -358,7 +362,7 @@ export default function SettingsCapture(): JSX.Element {
                       <SelectGroup>
                         {FRAMERATE_OPTIONS.map((option) => (
                           <SelectItem key={option} value={String(option)}>
-                            {option} fps
+                            {t('settings.framerateFps', { count: option })}
                           </SelectItem>
                         ))}
                       </SelectGroup>
@@ -382,7 +386,7 @@ export default function SettingsCapture(): JSX.Element {
                 onClick={preview.stop}
                 className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
-                Stop Preview
+                {t('settings.stopPreview')}
               </Button>
             ) : (
               <Button
@@ -392,7 +396,7 @@ export default function SettingsCapture(): JSX.Element {
                 className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
               >
                 <Video aria-hidden="true" />
-                Start Preview
+                {t('settings.startPreview')}
               </Button>
             )}
           </div>

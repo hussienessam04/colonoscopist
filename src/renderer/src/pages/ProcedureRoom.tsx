@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Camera, NotebookPen, PanelLeft, Video } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -38,6 +39,7 @@ const SECONDARY_OUTLINE_BUTTON =
   "border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]";
 
 export default function ProcedureRoom(): JSX.Element {
+  const { t } = useTranslation();
   const routeState = useRoute();
   const { navigate } = routeState;
   const route = routeState.current;
@@ -199,9 +201,9 @@ export default function ProcedureRoom(): JSX.Element {
     lastCaptureAtRef.current = now;
     const result = await screenshotIntake.capture();
     if (result) {
-      toast.success('Screenshot captured');
+      toast.success(t('procedure.roomCaptureSuccess'));
     } else {
-      toast.error('Failed to capture screenshot');
+      toast.error(t('procedure.roomCaptureFailed'));
     }
   }
 
@@ -213,7 +215,7 @@ export default function ProcedureRoom(): JSX.Element {
     toast(`Screenshot deleted at ${formatDurationHHMMSS(s.timestampInVideoMs)}`, {
       duration: 5_000,
       action: {
-        label: 'Undo',
+        label: t('procedure.roomUndo'),
         onClick: () => {
           screenshotToastStore.undoDelete(s.id);
           void screenshotIntake.refresh();
@@ -248,7 +250,7 @@ export default function ProcedureRoom(): JSX.Element {
         const device = await safeInvoke(window.api.capture.getDefaultDevice());
         if (!device) {
           setStartError(
-            'License required to record. Activate your license in Settings → License.',
+            t('procedure.roomStartErrorLicense'),
           );
           return;
         }
@@ -256,7 +258,7 @@ export default function ProcedureRoom(): JSX.Element {
           window.api.capture.getPreset({ deviceId: device }),
         );
         if (!resolvedPreset) {
-          setStartError('No preset saved for this device. Save one in Settings → Capture.');
+          setStartError(t('procedure.roomStartErrorNoPreset'));
           return;
         }
         const startResult = await window.api.recording.start({
@@ -267,7 +269,7 @@ export default function ProcedureRoom(): JSX.Element {
         });
         setPreviewUrl(startResult.previewUrl);
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Could not start recording.';
+        const msg = err instanceof Error ? err.message : t('procedure.roomStartErrorGeneric');
         setStartError(msg);
       } finally {
         startInFlightRef.current = false;
@@ -380,9 +382,9 @@ export default function ProcedureRoom(): JSX.Element {
                 from the h1 ("Procedure Room") so existing
                 tests that search for /procedure room/i resolve
                 to the h1 uniquely. */}
-            <p className={SMALL_CAPS_FIELD}>Studio</p>
+            <p className={SMALL_CAPS_FIELD}>{t('procedure.roomStudioLabel')}</p>
             <h1 className="mt-1 font-serif text-3xl font-medium tracking-tight text-[#13202E]">
-              {isRecording ? "Recording procedure" : "Procedure Room"}
+              {isRecording ? t('procedure.roomRecordingTitle') : t('procedure.roomPageTitle')}
               {patientIdFromRoute ? (
                 <span className="ml-2 font-sans text-base font-normal text-[#5C6770]">
                   · {procedureIdFromRoute.slice(0, 8)}
@@ -400,7 +402,7 @@ export default function ProcedureRoom(): JSX.Element {
                 the focal point. */}
             <div className="flex flex-col items-end gap-0.5">
               <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-[#8C8478]">
-                Duration
+                {t('procedure.roomDurationLabel')}
               </p>
               <span
                 data-testid="procedure-room-elapsed-timer"
@@ -442,14 +444,14 @@ export default function ProcedureRoom(): JSX.Element {
               className={SECONDARY_OUTLINE_BUTTON}
             >
               <ArrowLeft aria-hidden="true" />
-              Back to Preview
+              {t('procedure.roomBackToPreview')}
             </Button>
             {isRecording ? (
               <span className="text-xs text-[#5C6770]" aria-live="polite">
                 <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Space</kbd>{' '}
-                pause/resume · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
-                stop · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
-                screenshot
+                {t('procedure.roomShortcutSpace')} · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">Esc</kbd>{' '}
+                {t('procedure.roomShortcutEsc')} · <kbd className="rounded border border-[#E0D9C6] bg-white px-1.5 py-0.5 text-[10px]">S</kbd>{' '}
+                {t('procedure.roomShortcutS')}
               </span>
             ) : null}
           </div>
@@ -533,18 +535,18 @@ export default function ProcedureRoom(): JSX.Element {
               />
               {!defaultLoaded ? (
                 <div className="absolute inset-0 grid place-items-center text-sm text-slate-400">
-                  Finding capture devices…
+                  {t('procedure.roomFindingDevices')}
                 </div>
               ) : !selectedCanonical ? (
                 <div className="absolute inset-0 grid place-items-center p-6 text-center text-white">
                   <div className="flex max-w-md flex-col items-center gap-3">
                     <Video className="size-9 text-slate-400" aria-hidden="true" />
-                    <p className="font-medium">No device selected — set a default in Settings → Capture</p>
+                    <p className="font-medium">{t('procedure.roomNoDeviceHint')}</p>
                     <Button
                       variant="secondary"
                       onClick={() => navigate({ name: 'settings-capture' })}
                     >
-                      Open Settings
+                      {t('procedure.roomOpenSettings')}
                     </Button>
                   </div>
                 </div>
@@ -574,7 +576,7 @@ export default function ProcedureRoom(): JSX.Element {
                 <button
                   type="button"
                   onClick={() => setNotesCollapsed(false)}
-                  aria-label="Show notes panel"
+                  aria-label={t('procedure.roomShowNotes')}
                   aria-expanded="false"
                   data-testid="procedure-room-show-notes"
                   className="absolute left-0 top-1/2 z-20 hidden -translate-y-1/2 items-center gap-1 rounded-r-md border border-l-0 border-[#E0D9C6] bg-[#FBF7EE] py-3 pl-1 pr-1.5 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0E3A47] shadow-[0_8px_20px_-12px_rgba(14,58,71,0.35)] transition-colors hover:bg-[#E6EFF1] lg:flex"
@@ -584,7 +586,7 @@ export default function ProcedureRoom(): JSX.Element {
                     style={{ writingMode: 'vertical-rl', textOrientation: 'mixed' }}
                     className="leading-none"
                   >
-                    Notes
+                    {t('procedure.roomNotesLabel')}
                   </span>
                 </button>
               ) : null}
@@ -607,7 +609,7 @@ export default function ProcedureRoom(): JSX.Element {
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <NotebookPen className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
-                  <p className={SMALL_CAPS_LABEL}>Notes</p>
+                  <p className={SMALL_CAPS_LABEL}>{t('procedure.roomNotesLabel')}</p>
                 </div>
                 <Button
                   variant="ghost"
@@ -617,7 +619,7 @@ export default function ProcedureRoom(): JSX.Element {
                   data-testid="procedure-room-hide-notes"
                   className="text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
                 >
-                  Hide
+                  {t('procedure.roomHideNotes')}
                 </Button>
               </div>
               <ProcedureNotesPanel procedureId={procedureId} />
@@ -639,7 +641,7 @@ export default function ProcedureRoom(): JSX.Element {
             />
             <div className={RAIL_CARD_CHROME} data-testid="procedure-room-screenshots">
               <div className="flex items-center justify-between">
-                <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+                <p className={SMALL_CAPS_LABEL}>{t('procedure.roomScreenshotsLabel')}</p>
                 <span
                   className="font-mono text-xs tabular-nums text-[#5C6770]"
                   data-testid="procedure-room-gallery-count"
@@ -670,10 +672,11 @@ export default function ProcedureRoom(): JSX.Element {
                       <Camera className="size-4" />
                     </span>
                     <p className="text-xs leading-snug text-[#5C6770]">
-                      Screenshots appear here during the procedure.
+                      {t('procedure.roomScreenshotsEmptyHint')}
                       <br />
-                      Press <kbd className="rounded border border-[#E0D9C6] bg-white px-1 font-mono text-[10px] text-[#0E3A47]">S</kbd>{' '}
-                      to capture.
+                      {t('procedure.roomCaptureHint').split('S')[0]}
+                      <kbd className="rounded border border-[#E0D9C6] bg-white px-1 font-mono text-[10px] text-[#0E3A47]">S</kbd>
+                      {t('procedure.roomCaptureHint').split('S')[1] ?? ''}
                     </p>
                   </div>
                 ) : (
@@ -705,10 +708,10 @@ export default function ProcedureRoom(): JSX.Element {
       whichever exit route they take. */}
       <ConfirmDialog
         open={exitConfirmOpen}
-        title="Recording in progress"
-        description="A procedure recording is currently running. Leaving now will close the recording and mark the procedure as completed. Continue recording to keep capturing, or stop recording & finalize to end the procedure here."
-        confirmLabel="Stop recording & finalize"
-        cancelLabel="Continue recording"
+        title={t('procedure.roomExitTitle')}
+        description={t('procedure.roomExitBody')}
+        confirmLabel={t('procedure.roomExitConfirm')}
+        cancelLabel={t('procedure.roomExitCancel')}
         destructive
         onConfirm={handleStopAndExit}
         onCancel={() => setExitConfirmOpen(false)}

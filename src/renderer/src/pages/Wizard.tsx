@@ -15,6 +15,7 @@
 
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
+import { useTranslation } from 'react-i18next';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -30,6 +31,7 @@ import i18n from '@/i18n';
 type FormValues = z.infer<typeof wizardInput>;
 
 export default function Wizard(): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const [submitting, setSubmitting] = useState(false);
   // ponytail: language is tracked in local state (not react-hook-form)
@@ -61,7 +63,7 @@ export default function Wizard(): JSX.Element {
       // Log the new admin in immediately so they land on the patient list.
       const loginResult = await window.api.auth.login({ userId: result.userId, pin: values.pin });
       if (!loginResult.ok) {
-        toast.error('Wizard succeeded but auto-login failed. Please sign in manually.');
+        toast.error(t('auth.wizardAutoLoginFailed'));
         await session.refresh();
         navigate({ name: 'login' });
         return;
@@ -72,10 +74,10 @@ export default function Wizard(): JSX.Element {
       // mutates <html dir> + <html lang>; every page that calls
       // useTranslation() re-renders with the AR bundle.
       await i18n.changeLanguage(language);
-      toast.success('Welcome — clinic ready.');
+      toast.success(t('auth.wizardSuccess'));
       navigate({ name: 'patients' });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Wizard failed';
+      const message = err instanceof Error ? err.message : t('auth.wizardFailed');
       toast.error(message);
     } finally {
       setSubmitting(false);
@@ -86,45 +88,45 @@ export default function Wizard(): JSX.Element {
     <main className="min-h-screen grid place-items-center bg-slate-50 p-6">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Set up your clinic</CardTitle>
-          <CardDescription>
-            First-time setup — create the admin PIN. This PIN unlocks the app and lets you add other staff.
-          </CardDescription>
+          <CardTitle>{t('wizard.title')}</CardTitle>
+          <CardDescription>{t('wizard.description')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
             <div className="flex flex-col gap-2">
-              <Label htmlFor="fullName">Your full name</Label>
+              <Label htmlFor="fullName">{t('wizard.fullNameLabel')}</Label>
               <Input
                 id="fullName"
                 autoComplete="name"
+                placeholder={t('wizard.fullNamePlaceholder')}
                 {...register('fullName')}
                 aria-invalid={!!errors.fullName}
               />
               {errors.fullName && (
                 <p role="alert" className="text-sm text-destructive">
-                  {errors.fullName.message ?? 'Full name is required'}
+                  {errors.fullName.message ?? t('wizard.validation.fullNameRequired')}
                 </p>
               )}
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="clinicName">Clinic name</Label>
+              <Label htmlFor="clinicName">{t('wizard.clinicNameLabel')}</Label>
               <Input
                 id="clinicName"
                 autoComplete="organization"
+                placeholder={t('wizard.clinicNamePlaceholder')}
                 {...register('clinicName')}
                 aria-invalid={!!errors.clinicName}
               />
               {errors.clinicName && (
                 <p role="alert" className="text-sm text-destructive">
-                  {errors.clinicName.message ?? 'Clinic name is required'}
+                  {errors.clinicName.message ?? t('wizard.validation.clinicNameRequired')}
                 </p>
               )}
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="pin">4-digit PIN</Label>
+              <Label htmlFor="pin">{t('wizard.pinLabel')}</Label>
               <Input
                 id="pin"
                 type="password"
@@ -132,18 +134,19 @@ export default function Wizard(): JSX.Element {
                 pattern="[0-9]*"
                 maxLength={4}
                 autoComplete="off"
+                placeholder={t('wizard.pinPlaceholder')}
                 {...register('pin')}
                 aria-invalid={!!errors.pin}
               />
               {errors.pin && (
                 <p role="alert" className="text-sm text-destructive">
-                  {errors.pin.message ?? 'PIN must be exactly 4 digits'}
+                  {errors.pin.message ?? t('wizard.validation.pinDigits')}
                 </p>
               )}
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="confirmPin">Confirm PIN</Label>
+              <Label htmlFor="confirmPin">{t('wizard.confirmPinLabel')}</Label>
               <Input
                 id="confirmPin"
                 type="password"
@@ -151,12 +154,13 @@ export default function Wizard(): JSX.Element {
                 pattern="[0-9]*"
                 maxLength={4}
                 autoComplete="off"
+                placeholder={t('wizard.confirmPinPlaceholder')}
                 {...register('confirmPin')}
                 aria-invalid={!!errors.confirmPin}
               />
               {errors.confirmPin && (
                 <p role="alert" className="text-sm text-destructive">
-                  {errors.confirmPin.message ?? 'PINs must match'}
+                  {errors.confirmPin.message ?? t('wizard.validation.pinMatch')}
                 </p>
               )}
             </div>
@@ -171,9 +175,9 @@ export default function Wizard(): JSX.Element {
               data-testid="wizard-step-language"
             >
               <div>
-                <p className="text-sm font-medium">Choose language</p>
+                <p className="text-sm font-medium">{t('wizard.languageLabel')}</p>
                 <p className="text-xs text-muted-foreground">
-                  Pick the language for this clinic. You can change it later in Settings → Profile.
+                  {t('wizard.languageDescription')}
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -187,7 +191,7 @@ export default function Wizard(): JSX.Element {
                     onChange={() => setLanguage('en')}
                     data-testid="wizard-language-en"
                   />
-                  <Label htmlFor="wizard-language-en">English</Label>
+                  <Label htmlFor="wizard-language-en">{t('wizard.languageOptionEnglish')}</Label>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -200,13 +204,13 @@ export default function Wizard(): JSX.Element {
                     onChange={() => setLanguage('ar')}
                     data-testid="wizard-language-ar"
                   />
-                  <Label htmlFor="wizard-language-ar">العربية</Label>
+                  <Label htmlFor="wizard-language-ar">{t('wizard.languageOptionArabic')}</Label>
                 </div>
               </div>
             </div>
 
             <Button type="submit" disabled={submitting} className="mt-2">
-              {submitting ? 'Setting up…' : 'Finish setup'}
+              {submitting ? t('wizard.settingUp') : t('wizard.finishSetup')}
             </Button>
           </form>
         </CardContent>

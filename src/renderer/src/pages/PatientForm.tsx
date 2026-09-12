@@ -6,6 +6,7 @@
 // MRN input on either Create or Edit. EditForm surfaces the existing
 // MRN as a read-only label above the form.
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useForm, Controller, type UseFormReturn } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -35,14 +36,11 @@ type Props = {
 type CreateValues = z.infer<typeof patientInput>;
 type PatchValues = z.infer<typeof patientPatchInput>;
 
-const GENDER_OPTIONS = [
-  { value: '__none__', label: '—' },
-  { value: 'male', label: 'Male' },
-  { value: 'female', label: 'Female' },
-  { value: 'other', label: 'Other' },
-] as const;
+const GENDER_VALUES = ['__none__', 'male', 'female', 'other'] as const;
+type GenderValue = (typeof GENDER_VALUES)[number];
 
 export default function PatientForm({ mode, patientId }: Props): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const [submitting, setSubmitting] = useState(false);
   const [loaded, setLoaded] = useState(mode === 'create');
@@ -91,7 +89,7 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
   if (!loaded) {
     return (
       <main className="min-h-screen grid place-items-center bg-slate-50">
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-slate-500">{t('patientForm.loading')}</p>
       </main>
     );
   }
@@ -108,7 +106,7 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
             className="self-start"
           >
             <ArrowLeft className="size-4 mr-1" />
-            Back to patients
+            {t('patientForm.backToPatients')}
           </Button>
           <EmptyStateCard />
         </div>
@@ -127,11 +125,11 @@ export default function PatientForm({ mode, patientId }: Props): JSX.Element {
           className="self-start"
         >
           <ArrowLeft className="size-4 mr-1" />
-          Back to patients
+          {t('patientForm.backToPatients')}
         </Button>
         <Card>
           <CardHeader>
-            <CardTitle>{isCreate ? 'New patient' : 'Edit patient'}</CardTitle>
+            <CardTitle>{isCreate ? t('patientForm.pageTitleNew') : t('patientForm.pageTitleEdit')}</CardTitle>
           </CardHeader>
           <CardContent>
             {isCreate ? (
@@ -162,6 +160,7 @@ type CreateFormProps = {
 };
 
 function CreateForm({ form, submitting, setSubmitting }: CreateFormProps): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const { handleSubmit, register, control, formState: { errors } } = form;
 
@@ -176,25 +175,32 @@ function CreateForm({ form, submitting, setSubmitting }: CreateFormProps): JSX.E
         phone: values.phone ?? null,
         notes: values.notes ?? null,
       });
-      toast.success('Patient created.');
+      toast.success(t('patientForm.successCreate'));
       navigate({ name: 'patients' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Create failed';
+      const msg = err instanceof Error ? err.message : t('patientForm.failedCreate');
       toast.error(msg);
     } finally {
       setSubmitting(false);
     }
   }
 
+  function genderLabel(value: GenderValue): string {
+    if (value === '__none__') return '—';
+    if (value === 'male') return t('patientForm.genderMale');
+    if (value === 'female') return t('patientForm.genderFemale');
+    return t('patientForm.genderOther');
+  }
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
-      <Field label="Full name" id="fullName" error={errors.fullName?.message}>
+      <Field label={t('patientForm.fullName')} id="fullName" error={errors.fullName?.message}>
         <Input id="fullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} />
       </Field>
-      <Field label="Date of birth" id="dob" error={errors.dob?.message}>
+      <Field label={t('patientForm.dob')} id="dob" error={errors.dob?.message}>
         <Input id="dob" type="date" {...register('dob')} aria-invalid={!!errors.dob} />
       </Field>
-      <Field label="Gender" id="gender" error={errors.gender?.message}>
+      <Field label={t('patientForm.gender')} id="gender" error={errors.gender?.message}>
         <Controller
           control={control}
           name="gender"
@@ -209,9 +215,9 @@ function CreateForm({ form, submitting, setSubmitting }: CreateFormProps): JSX.E
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GENDER_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                  {GENDER_VALUES.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {genderLabel(o)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -220,10 +226,10 @@ function CreateForm({ form, submitting, setSubmitting }: CreateFormProps): JSX.E
           }}
         />
       </Field>
-      <Field label="Phone" id="phone" error={errors.phone?.message}>
+      <Field label={t('patientForm.phone')} id="phone" error={errors.phone?.message}>
         <Input id="phone" {...register('phone')} />
       </Field>
-      <Field label="Notes" id="notes" error={errors.notes?.message}>
+      <Field label={t('patientForm.notes')} id="notes" error={errors.notes?.message}>
         <textarea
           id="notes"
           className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -231,7 +237,7 @@ function CreateForm({ form, submitting, setSubmitting }: CreateFormProps): JSX.E
         />
       </Field>
       <Button type="submit" disabled={submitting} className="mt-2">
-        {submitting ? 'Saving…' : 'Create patient'}
+        {submitting ? t('patientForm.submitSaving') : t('patientForm.submitCreate')}
       </Button>
     </form>
   );
@@ -245,6 +251,7 @@ type EditFormProps = {
 };
 
 function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const { handleSubmit, register, control, formState: { errors } } = form;
   // Auto-fetch the patient's existing MRN to render as a read-only label.
@@ -276,14 +283,21 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
       if (values.notes !== undefined) patch.notes = values.notes;
 
       await window.api.patients.update(patientId, patch);
-      toast.success('Patient updated.');
+      toast.success(t('patientForm.successUpdate'));
       navigate({ name: 'patients' });
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Update failed';
+      const msg = err instanceof Error ? err.message : t('patientForm.failedUpdate');
       toast.error(msg);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function genderLabel(value: GenderValue): string {
+    if (value === '__none__') return '—';
+    if (value === 'male') return t('patientForm.genderMale');
+    if (value === 'female') return t('patientForm.genderFemale');
+    return t('patientForm.genderOther');
   }
 
   return (
@@ -294,18 +308,18 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
           data-testid="patient-mrn-readonly"
         >
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-muted-foreground">
-            MRN
+            {t('patientForm.mrnLabel')}
           </span>
           <span className="font-mono text-sm">{existingMrn}</span>
         </div>
       ) : null}
-      <Field label="Full name" id="fullName" error={errors.fullName?.message}>
+      <Field label={t('patientForm.fullName')} id="fullName" error={errors.fullName?.message}>
         <Input id="fullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} />
       </Field>
-      <Field label="Date of birth" id="dob" error={errors.dob?.message}>
+      <Field label={t('patientForm.dob')} id="dob" error={errors.dob?.message}>
         <Input id="dob" type="date" {...register('dob')} aria-invalid={!!errors.dob} />
       </Field>
-      <Field label="Gender" id="gender" error={errors.gender?.message}>
+      <Field label={t('patientForm.gender')} id="gender" error={errors.gender?.message}>
         <Controller
           control={control}
           name="gender"
@@ -320,9 +334,9 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
                   <SelectValue placeholder="—" />
                 </SelectTrigger>
                 <SelectContent>
-                  {GENDER_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
+                  {GENDER_VALUES.map((o) => (
+                    <SelectItem key={o} value={o}>
+                      {genderLabel(o)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -331,10 +345,10 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
           }}
         />
       </Field>
-      <Field label="Phone" id="phone" error={errors.phone?.message}>
+      <Field label={t('patientForm.phone')} id="phone" error={errors.phone?.message}>
         <Input id="phone" {...register('phone')} />
       </Field>
-      <Field label="Notes" id="notes" error={errors.notes?.message}>
+      <Field label={t('patientForm.notes')} id="notes" error={errors.notes?.message}>
         <textarea
           id="notes"
           className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -342,7 +356,7 @@ function EditForm({ form, patientId, submitting, setSubmitting }: EditFormProps)
         />
       </Field>
       <Button type="submit" disabled={submitting} className="mt-2">
-        {submitting ? 'Saving…' : 'Save changes'}
+        {submitting ? t('patientForm.submitSaving') : t('patientForm.submitUpdate')}
       </Button>
     </form>
   );

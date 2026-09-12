@@ -6,6 +6,7 @@
 // header slot alongside the Back button. The admin-gate `!isAdmin` short
 // circuit still returns the inline Card with a "Back to patients" button.
 import { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -50,6 +51,7 @@ const pinSchema = z
   .refine((d) => d.pin === d.confirmPin, { message: 'PINs must match', path: ['confirmPin'] });
 
 export default function SettingsUsers(): JSX.Element {
+  const { t } = useTranslation();
   const { navigate } = useRoute();
   const { currentUser } = useSession();
   const [users, setUsers] = useState<UserPublic[]>([]);
@@ -66,7 +68,7 @@ export default function SettingsUsers(): JSX.Element {
       return;
     }
     void refresh();
-  }, [isAdmin]);
+  }, [isAdmin, t]);
 
   async function refresh(): Promise<void> {
     setLoading(true);
@@ -74,7 +76,7 @@ export default function SettingsUsers(): JSX.Element {
       const list = await window.api.auth.usersList();
       setUsers(list);
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Failed to load users';
+      const msg = err instanceof Error ? err.message : t('settings.usersAddFailed');
       toast.error(msg);
     } finally {
       setLoading(false);
@@ -86,18 +88,18 @@ export default function SettingsUsers(): JSX.Element {
       <main className="min-h-screen grid place-items-center bg-[#F7F1E6] font-sans text-[#13202E]">
         <Card className="w-full max-w-md border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
           <CardHeader>
-            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">Admin only</CardTitle>
+            <CardTitle className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">{t('settings.usersAdminOnlyTitle')}</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-sm text-[#5C6770] mb-4">
-              Settings → Users is available to the first admin only.
+              {t('settings.usersAdminOnlyBody')}
             </p>
             <Button
               variant="outline"
               onClick={() => navigate({ name: 'patients' })}
               className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
             >
-              Back to patients
+              {t('settings.usersAdminOnlyBack')}
             </Button>
           </CardContent>
         </Card>
@@ -108,7 +110,7 @@ export default function SettingsUsers(): JSX.Element {
   async function handleAdd(values: AddUserForm): Promise<void> {
     try {
       const created = await window.api.users.create({ fullName: values.fullName, pin: values.pin });
-      toast.success(`${created.fullName} added.`);
+      toast.success(t('settings.usersAddSuccess', { name: created.fullName }));
       setAddOpen(false);
       await refresh();
     } catch (err) {
@@ -116,7 +118,7 @@ export default function SettingsUsers(): JSX.Element {
         toast.error(err.ipc.message);
         return;
       }
-      const msg = err instanceof Error ? err.message : 'Add failed';
+      const msg = err instanceof Error ? err.message : t('settings.usersAddFailed');
       toast.error(msg);
     }
   }
@@ -125,14 +127,14 @@ export default function SettingsUsers(): JSX.Element {
     if (!resetTarget) return;
     try {
       await window.api.users.resetPin({ userId: resetTarget.id, newPin: values.pin });
-      toast.success(`${resetTarget.fullName}'s PIN reset.`);
+      toast.success(t('settings.usersResetSuccess', { name: resetTarget.fullName }));
       setResetTarget(null);
     } catch (err) {
       if (err instanceof IpcErrorException) {
         toast.error(err.ipc.message);
         return;
       }
-      const msg = err instanceof Error ? err.message : 'Reset failed';
+      const msg = err instanceof Error ? err.message : t('settings.usersResetFailed');
       toast.error(msg);
     }
   }
@@ -141,7 +143,7 @@ export default function SettingsUsers(): JSX.Element {
     if (!removeTarget) return;
     try {
       await window.api.users.remove({ userId: removeTarget.id });
-      toast.success(`${removeTarget.fullName} removed.`);
+      toast.success(t('settings.usersRemoveSuccess', { name: removeTarget.fullName }));
       setRemoveTarget(null);
       await refresh();
     } catch (err) {
@@ -149,15 +151,15 @@ export default function SettingsUsers(): JSX.Element {
         toast.error(err.ipc.message);
         return;
       }
-      const msg = err instanceof Error ? err.message : 'Remove failed';
+      const msg = err instanceof Error ? err.message : t('settings.usersRemoveFailed');
       toast.error(msg);
     }
   }
 
   return (
     <SettingsLayout
-      title="Users"
-      subtitle="Add or remove staff; reset PINs."
+      title={t('settings.usersTitle')}
+      subtitle={t('settings.usersDescription')}
       activeTab="users"
       headerAction={
         // Quick task 260812-n0h — Add user moved into the header slot,
@@ -166,7 +168,7 @@ export default function SettingsUsers(): JSX.Element {
           <DialogTrigger asChild>
             <Button className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">
               <Plus className="size-4 mr-1" />
-              Add user
+              {t('settings.usersAddButton')}
             </Button>
           </DialogTrigger>
           <AddUserDialog onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
@@ -177,22 +179,22 @@ export default function SettingsUsers(): JSX.Element {
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#E0D9C6] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
-              <th className="px-3 py-2">Name</th>
-              <th className="px-3 py-2">Last login</th>
-              <th className="px-3 py-2 text-right">Actions</th>
+              <th className="px-3 py-2">{t('settings.tableName')}</th>
+              <th className="px-3 py-2">{t('settings.tableLastLogin')}</th>
+              <th className="px-3 py-2 text-right">{t('settings.tableActions')}</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
                 <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#5C6770]">
-                  Loading…
+                  {t('settings.usersLoading')}
                 </td>
               </tr>
             ) : users.length === 0 ? (
               <tr>
                 <td colSpan={3} className="px-3 py-8 text-center text-sm text-[#5C6770]">
-                  No users yet.
+                  {t('settings.usersEmpty')}
                 </td>
               </tr>
             ) : (
@@ -203,7 +205,7 @@ export default function SettingsUsers(): JSX.Element {
                     <td className="px-3 py-2 text-sm font-medium text-[#13202E]">
                       {u.fullName}
                       <span className="ml-2 text-xs text-[#8C8478]">
-                        {u.isFirstAdmin ? 'Admin' : 'Staff'}
+                        {u.isFirstAdmin ? t('settings.usersAdminRole') : t('settings.usersStaffRole')}
                       </span>
                     </td>
                     <td className="px-3 py-2 text-sm text-[#5C6770]">
@@ -218,15 +220,15 @@ export default function SettingsUsers(): JSX.Element {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem onSelect={() => setResetTarget(u)}>
-                            Reset PIN
+                            {t('settings.usersResetMenu')}
                           </DropdownMenuItem>
                           <DropdownMenuItem
                             onSelect={() => setRemoveTarget(u)}
                             disabled={isSelf}
-                            title={isSelf ? 'You cannot remove yourself' : undefined}
+                            title={isSelf ? t('settings.usersRemoveSelfTitle') : undefined}
                             data-testid={`remove-${u.id}`}
                           >
-                            Remove
+                            {t('settings.usersRemoveMenu')}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -248,10 +250,10 @@ export default function SettingsUsers(): JSX.Element {
 
       <ConfirmDialog
         open={removeTarget !== null}
-        title="Remove user?"
-        description={removeTarget ? `${removeTarget.fullName} will lose access.` : ''}
-        confirmLabel="Remove"
-        cancelLabel="Cancel"
+        title={t('settings.usersRemoveConfirmTitle')}
+        description={removeTarget ? t('settings.usersRemoveConfirmBody', { name: removeTarget.fullName }) : ''}
+        confirmLabel={t('settings.usersRemoveMenu')}
+        cancelLabel={t('settings.usersDialogCancel')}
         destructive
         onConfirm={() => void handleRemove()}
         onCancel={() => setRemoveTarget(null)}
@@ -267,6 +269,7 @@ function AddUserDialog({
   onSubmit: (values: AddUserForm) => Promise<void>;
   onCancel: () => void;
 }): JSX.Element {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -279,19 +282,19 @@ function AddUserDialog({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Add user</DialogTitle>
-        <DialogDescription>Create a new staff PIN. They will appear on the sign-in screen.</DialogDescription>
+        <DialogTitle>{t('settings.usersDialogAddTitle')}</DialogTitle>
+        <DialogDescription>{t('settings.usersDialogAddDescription')}</DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="addFullName">Full name</Label>
+          <Label htmlFor="addFullName">{t('profile.fullNameEn')}</Label>
           <Input id="addFullName" autoComplete="name" {...register('fullName')} aria-invalid={!!errors.fullName} className="bg-[#FBF7EE] border-[#E0D9C6] text-[#13202E] placeholder:text-[#A39A86] hover:border-[#A8C5B5] focus:border-[#0E3A47] focus:bg-white focus:ring-1 focus:ring-[#0E3A47]/30" />
           {errors.fullName && (
             <p role="alert" className="text-sm text-destructive">{errors.fullName.message}</p>
           )}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="addPin">4-digit PIN</Label>
+          <Label htmlFor="addPin">{t('settings.usersDialogPinLabel')}</Label>
           <Input
             id="addPin"
             type="password"
@@ -308,8 +311,8 @@ function AddUserDialog({
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">Cancel</Button>
-          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">Add user</Button>
+          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">{t('settings.usersDialogCancel')}</Button>
+          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">{t('settings.usersAddButton')}</Button>
         </DialogFooter>
       </form>
     </DialogContent>
@@ -325,6 +328,7 @@ function ResetPinDialog({
   onSubmit: (values: PinForm) => Promise<void>;
   onCancel: () => void;
 }): JSX.Element {
+  const { t } = useTranslation();
   const {
     register,
     handleSubmit,
@@ -337,12 +341,12 @@ function ResetPinDialog({
   return (
     <DialogContent>
       <DialogHeader>
-        <DialogTitle>Reset PIN for {user.fullName}</DialogTitle>
-        <DialogDescription>Choose a new 4-digit PIN.</DialogDescription>
+        <DialogTitle>{t('settings.usersDialogResetTitle', { name: user.fullName })}</DialogTitle>
+        <DialogDescription>{t('settings.usersDialogResetDescription')}</DialogDescription>
       </DialogHeader>
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="resetPin">New PIN</Label>
+          <Label htmlFor="resetPin">{t('settings.usersDialogNewPinLabel')}</Label>
           <Input
             id="resetPin"
             type="password"
@@ -359,7 +363,7 @@ function ResetPinDialog({
           )}
         </div>
         <div className="flex flex-col gap-2">
-          <Label htmlFor="resetConfirmPin">Confirm PIN</Label>
+          <Label htmlFor="resetConfirmPin">{t('settings.usersDialogConfirmLabel')}</Label>
           <Input
             id="resetConfirmPin"
             type="password"
@@ -376,8 +380,8 @@ function ResetPinDialog({
           )}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">Cancel</Button>
-          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">Reset PIN</Button>
+          <Button type="button" variant="outline" onClick={onCancel} className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]">{t('settings.usersDialogCancel')}</Button>
+          <Button type="submit" className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]">{t('settings.usersDialogResetButton')}</Button>
         </DialogFooter>
       </form>
     </DialogContent>

@@ -741,7 +741,7 @@ export default function ProfileEditor(): JSX.Element {
                 onChange={() => void handleLanguageChange('en')}
                 data-testid="profile-editor-language-en"
               />
-              <Label htmlFor="profile-editor-language-en">English</Label>
+              <Label htmlFor="profile-editor-language-en">{t('profile.languageOptionEnglish')}</Label>
             </div>
             <div className="flex items-center gap-2">
               <input

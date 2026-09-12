@@ -431,7 +431,7 @@ export default function ProcedureReview({
   if (!procedureId) {
     return (
       <main className="min-h-screen bg-slate-50 p-6">
-        <p className="text-sm text-slate-500">Missing procedure id.</p>
+        <p className="text-sm text-slate-500">{t('report.missingProcedureId')}</p>
       </main>
     );
   }
@@ -461,11 +461,11 @@ export default function ProcedureReview({
             {procedure !== null ? (
               <div className="flex items-center gap-3 font-mono text-xs tabular-nums text-[#5C6770]">
                 <span>
-                  <span className={SMALL_CAPS_FIELD}>Started</span>{" "}
+                  <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewStartedLabel')}</span>{" "}
                   {formatTimestamp(procedure.startedAt)}
                 </span>
                 <span>
-                  <span className={SMALL_CAPS_FIELD}>Duration</span>{" "}
+                  <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewDurationLabel')}</span>{" "}
                   {formatDurationHHMMSS(durationMs)}
                 </span>
                 <StatusBadge status={procedure.status} />
@@ -483,7 +483,7 @@ export default function ProcedureReview({
               className={SECONDARY_OUTLINE_BUTTON}
             >
               <ArrowLeft aria-hidden="true" />
-              {procedure ? 'Back to Patient' : 'Back'}
+              {procedure ? t('procedure.reviewBackToPatient') : t('procedure.reviewBackFallback')}
             </Button>
           </div>
         </header>
@@ -571,7 +571,7 @@ export default function ProcedureReview({
               ) : null}
             </div>
             <div className="flex flex-col gap-2">
-              <p className={SMALL_CAPS_LABEL}>Timeline</p>
+              <p className={SMALL_CAPS_LABEL}>{t('procedure.reviewTimelineLabel')}</p>
               <Scrubber
                 durationMs={durationMs}
                 currentMs={currentMs}
@@ -603,7 +603,7 @@ export default function ProcedureReview({
                   visual rhythm without adding color or weight. */}
               <div className="flex items-center gap-2">
                 <NotebookPen className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
-                <p className={SMALL_CAPS_LABEL}>Notes</p>
+                <p className={SMALL_CAPS_LABEL}>{t('procedure.reviewNotesLabel')}</p>
               </div>
               <div className="mt-2">
                 <ProcedureNotesReview
@@ -616,7 +616,7 @@ export default function ProcedureReview({
             <div className={RAIL_CARD_CHROME}>
               <div className="flex items-center gap-2">
                 <Scissors className="size-3.5 text-[#0E3A47]" aria-hidden="true" />
-                <p className={SMALL_CAPS_LABEL}>Trim</p>
+                <p className={SMALL_CAPS_LABEL}>{t('procedure.reviewTrimLabel')}</p>
               </div>
               <div className="mt-2">
                 <TrimControls
@@ -642,27 +642,27 @@ export default function ProcedureReview({
               className={`flex flex-col gap-2 ${CARD_CHROME} p-4`}
               data-testid="procedure-review-metadata"
             >
-              <p className={SMALL_CAPS_LABEL}>Procedure</p>
+              <p className={SMALL_CAPS_LABEL}>{t('procedure.reviewProcedureLabel')}</p>
               {procedure ? (
                 <div className="mt-1 grid grid-cols-1 gap-2 font-mono text-xs tabular-nums text-[#13202E]">
                   <div className="flex items-center gap-2">
                     <User className="size-3 text-[#8C8478]" aria-hidden="true" />
-                    <span className={SMALL_CAPS_FIELD}>Patient</span>{" "}
+                    <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewPatientLabel')}</span>{" "}
                     <span>{patient ? patient.fullName : procedure.patientId.slice(0, 8)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="size-3 text-[#8C8478]" aria-hidden="true" />
-                    <span className={SMALL_CAPS_FIELD}>Started</span>{" "}
+                    <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewStartedLabel')}</span>{" "}
                     <span>{formatTimestamp(procedure.startedAt)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CalendarClock className="size-3 text-[#8C8478]" aria-hidden="true" />
-                    <span className={SMALL_CAPS_FIELD}>Ended</span>{" "}
+                    <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewEndedLabel')}</span>{" "}
                     <span>{formatTimestamp(procedure.endedAt)}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Clock className="size-3 text-[#8C8478]" aria-hidden="true" />
-                    <span className={SMALL_CAPS_FIELD}>Duration</span>{" "}
+                    <span className={SMALL_CAPS_FIELD}>{t('procedure.reviewDurationLabel')}</span>{" "}
                     <span>{formatDurationHHMMSS(durationMs)}</span>
                   </div>
                 </div>
@@ -732,7 +732,7 @@ export default function ProcedureReview({
                 doesn't grow the page vertically. */}
             <div className={RAIL_CARD_CHROME} data-testid="procedure-review-screenshots">
               <div className="flex items-center justify-between">
-                <p className={SMALL_CAPS_LABEL}>Screenshots</p>
+                <p className={SMALL_CAPS_LABEL}>{t('procedure.reviewScreenshotsLabel')}</p>
                 <span
                   className="font-mono text-xs tabular-nums text-[#5C6770]"
                   data-testid="procedure-review-screenshots-count"
