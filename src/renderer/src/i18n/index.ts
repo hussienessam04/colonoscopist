@@ -27,7 +27,7 @@ void i18n.use(LanguageDetector).use(initReactI18next).init({
   // own (double) escaping. Required so AR strings can render exactly
   // the bytes committed to translation.json.
   interpolation: { escapeValue: false },
-  detection: { order: ['htmlTag', 'localStorage', 'navigator'], caches: ['localStorage'] },
+  detection: { order: ['localStorage', 'htmlTag', 'navigator'], caches: ['localStorage'] },
   // ponytail: react already warns on missing keys via MissingMessage
   // in dev. Don't double-warn in prod.
   saveMissing: false,
