@@ -22,7 +22,7 @@
 // once per process (module-scope guard). Language resolution per D-26
 // verbatim: doctor_profile.language → users.language → 'en'.
 
-import { createWriteStream, mkdirSync, statSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { app } from 'electron';
 
@@ -86,12 +86,22 @@ let _notoArabicAvailable: boolean | null = null;
 function registerNotoArabicIfNeeded(reactPdf: typeof import('@react-pdf/renderer')): boolean {
   if (_notoArabicRegistered) return _notoArabicAvailable ?? false;
   _notoArabicRegistered = true;
-  // Resolve relative to this compiled module's location. electron-vite
-  // emits main/* into out/main/, and we copy the fonts/ subdir alongside
-  // via electron-builder's `extraResources`. In dev (electron-vite dev)
-  // __dirname is the source-tree src/main/pdf/, so the same relative
-  // path resolves either way.
-  const ttfPath = path.join(__dirname, 'fonts', 'NotoSansArabic-Regular.ttf');
+  // electron-vite emits main/* into out/main/ regardless of dev/prod
+  // (verified: `electron.vite.config.ts` lines 11-15 set the main entry
+  // to src/main/index.ts with lib mode, so rollup bundles everything
+  // into out/main/index.js — __dirname resolves to out/main/). The TTF
+  // lives at src/main/pdf/fonts/NotoSansArabic-Regular.ttf in source;
+  // we resolve the canonical path first (forward-compatible with a
+  // future copy step / extraResources that lands the font next to
+  // index.js), then fall back to the dev source tree.
+  // ponytail: if the build is ever run as an ASAR bundle, the dev
+  // fallback may break under `app.asar/` — add a third path join at
+  // that time, no other change.
+  const ttfCandidates = [
+    path.join(__dirname, 'fonts', 'NotoSansArabic-Regular.ttf'),
+    path.join(__dirname, '..', '..', 'src', 'main', 'pdf', 'fonts', 'NotoSansArabic-Regular.ttf'),
+  ];
+  const ttfPath = ttfCandidates.find((p) => existsSync(p)) ?? '';
   try {
     reactPdf.Font.register({
       family: 'NotoSansArabic',
