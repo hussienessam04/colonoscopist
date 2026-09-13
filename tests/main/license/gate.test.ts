@@ -224,15 +224,15 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
     }
   });
 
-  it('EXEMPT_CHANNELS contains the 12 channels named in CONTEXT D-08 verbatim + Plan 04 picker channel + Plan 14 crop', async () => {
+  it('EXEMPT_CHANNELS contains the 14 channels named in CONTEXT D-08 verbatim + Plan 04 picker + Plan 14 crop + Quick task additions', async () => {
     const { EXEMPT_CHANNELS } = await import('../../../src/main/license/gate');
-    // Auth (8) + License (3) + Audit (2) = 13
-    // Plan 04 adds `license:pick-and-activate` to D-08's 12 — the user
-    // is actively activating when they invoke this channel.
-    // Plan 14 adds `screenshots:crop` — cropping an already-captured
-    // screenshot is a routine action on existing data (screenshots:add
-    // stays gated, so new capture is still blocked when unlicensed).
-    expect(EXEMPT_CHANNELS.size).toBe(14);
+    // Auth (8) + License (3) + Audit (2) = 13 base channels.
+    // Plan 04 added `license:pick-and-activate` → 14.
+    // Plan 14 added `screenshots:crop` → 15.
+    // Plan 15 (G-08-8) added `screenshots:get-blob` + `clipboard:copy-text` → 17.
+    // Quick task 20260912-shared-database-optional added the 3 storage channels
+    // (get/set/pick) → 19.
+    expect(EXEMPT_CHANNELS.size).toBe(19);
     // Verify the names match exactly (D-08 verbatim + Plan 04's picker).
     const expected = [
       'auth:status',
@@ -249,6 +249,13 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
       'audit:list',
       'audit:log',
       'screenshots:crop',
+      // Plan 15 (G-08-8) — read raw screenshot bytes + clipboard copy.
+      'screenshots:get-blob',
+      'clipboard:copy-text',
+      // Quick task 20260912 — opt-in shared-database toggle + picker.
+      'storage:get-location',
+      'storage:set-location',
+      'storage:pick-folder',
     ];
     for (const ch of expected) {
       expect(EXEMPT_CHANNELS.has(ch)).toBe(true);

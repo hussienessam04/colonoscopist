@@ -67,7 +67,16 @@ vi.mock('electron', () => ({
 }));
 
 vi.mock('../../../src/main/license', async () => {
+  // ponytail: spread the real module first so wizardBootstrap's call to
+  // invalidateLicenseCache (and any other transitive export) resolves
+  // to the real symbol — then override the test's targets + stub the
+  // cache-invalidator as a no-op vi.fn so the test doesn't assert on
+  // cache behavior.
+  const actual = await vi.importActual<typeof import('../../../src/main/license')>(
+    '../../../src/main/license',
+  );
   return {
+    ...actual,
     getLicenseStatus: async () => ({
       state: 'unactivated',
       vendorId: null,
@@ -84,6 +93,7 @@ vi.mock('../../../src/main/license', async () => {
     EXEMPT_CHANNELS: new Set<string>([]),
     loadAndVerifyLicense: (path: string, options?: { fingerprintOverride?: string }) =>
       loadMock.impl(path, options),
+    invalidateLicenseCache: vi.fn(),
   };
 });
 

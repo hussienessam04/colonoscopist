@@ -18,6 +18,7 @@ import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { EXEMPT_CHANNELS } from '../../../src/main/license/gate';
+import { IPC } from '../../../src/shared/ipc-contract';
 
 describe('IPC gate coverage (LIC-04)', () => {
   // Resolve the IPC dir relative to this test file. `__dirname` is the
@@ -37,7 +38,7 @@ describe('IPC gate coverage (LIC-04)', () => {
           /ipcMain\.handle\(\s*(IPC\.[A-Z_]+|'([a-z:-]+)')/,
         );
         if (!handleMatch) continue;
-        const channel = handleMatch[1] ? handleMatch[1].slice(4) : handleMatch[2];
+        const channel = handleMatch[1] ? IPC[handleMatch[1].slice(4) as keyof typeof IPC] : handleMatch[2];
 
         // Exempt check: the EXEMPT_CHANNELS set holds the WIRE form
         // (e.g. 'auth:status'). The script parses it from
