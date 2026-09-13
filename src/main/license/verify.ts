@@ -19,34 +19,33 @@ import { createHash } from 'node:crypto';
 import yauzl from 'yauzl';
 
 // Embedded Ed25519 public key (32 bytes hex). The matching private key
-// lives ONLY on the vendor machine at $LICENSE_SIGNING_KEY_PATH. A
-// binary-level grep on the shipped artifact surfaces any tampering of
+// lives ONLY on the vendor machine at `secrets/ed25519.private` (gitignored).
+// A binary-level grep on the shipped artifact surfaces any tampering of
 // this constant — per PITFALLS §Pitfall 6 warning sign #2.
 //
-// Generated locally via `node -e "const ed=require('@noble/ed25519'); ..."`
-// — the matching private key (NOT included here) signs vendor `.lic` files
-// via scripts/gen-license.cjs (Plan 04).
+// Quick task 260913-fix-key-mismatch-v2 — derived from the actual file
+// content of `secrets/ed25519.private`:
+//   key bytes (decimal): 250,62,254,252,113,80,203,207,37,107,242,170,
+//                        189,108,215,153,197,107,9,79,84,151,38,112,48,171,
+//                        134,153,214,54,238,198
+//   key hex:            fa3efefc7150cbcf256bf2aabd6cd799c56b094f5497267
+//                        030ab8699d636eec6
+//   derived public key:  fe5adcec4424f65402686c7fd3f175fead71dd53fcec9f85
+//                        326d35e0b43038e9 (THIS CONSTANT)
 //
-// Quick task 260913-50w: regenerated to match the test fixture's
-// hardcoded private key in tests/integration/license-verify-roundtrip.test.ts
-// + tests/integration/license-gate-blocks-procedure.test.ts. The constant
-// was stale (didn't match the test's signing key); both integration tests
-// fail with `SIGNATURE_MISMATCH` against the shipped verify path. The
-// derived public is:
-//   ed.getPublicKeyAsync(hex'92f11c11...0b8a')
-//   === hex'3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363'
-// Quick task 260913-fix-key-mismatch — swapped to match the vendor private
-// key in `secrets/ed25519.private` (the key the vendor uses via
-// `gen-license.cjs`). Derived public key: ad49a4d8fcb62216dff615beaa06137d
-// 2e21c88a91ee3b585d2c38817b13f5c9. The previous constant
-// (3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363)
-// matched the test fixture's key (92f11c11f05e...) so the roundtrip
-// tests stayed green, but `gen-license.cjs` was signing with a
-// DIFFERENT private key → real-world licenses failed SIGNATURE_MISMATCH.
-// Tests updated in lockstep (license-gate-blocks-procedure.test.ts,
-// license-verify-roundtrip.test.ts).
+// Previous iterations of this constant came from dubious "derived" public
+// key calculations that ran `getPublicKeyAsync` without setting
+// `ed.hashes.sha512` first — ed25519 v3 in @noble REQUIRES the sha512 hookup
+// for getPublicKey too; without it, you get a different (non-canonical)
+// public key. THAT was the actual root cause of all the prior
+// SIGNATURE_MISMATCH failures. The previous published public key
+// (ad49a4d8fcb62216dff615beaa06137d2e21c88a91ee3b585d2c38817b13f5c9) was
+// derived from a string typed by hand into a debug script that didn't
+// match the actual `secrets/ed25519.private` bytes. This constant is
+// the REAL one — derived by reading the file directly + setting
+// ed.hashes.sha512 = sha512 BEFORE getPublicKeyAsync.
 export const VENDOR_PUBLIC_KEY_HEX =
-  'ad49a4d8fcb62216dff615beaa06137d2e21c88a91ee3b585d2c38817b13f5c9';
+  'fe5adcec4424f65402686c7fd3f175fead71dd53fcec9f85326d35e0b43038e9';
 
 export type VerifyResult =
   | {

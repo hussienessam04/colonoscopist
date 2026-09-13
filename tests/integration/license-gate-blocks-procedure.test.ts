@@ -79,7 +79,7 @@ const handlers = new Map<string, (...args: unknown[]) => unknown>();
 // VENDOR_PUBLIC_KEY_HEX in src/main/license/verify.ts. This makes the
 // integration test exercise the SAME shipped verify path.
 const VENDOR_PRIVATE_HEX =
-  'fa3efefc7150cbcf256b80b2f2aabd6cd76f4f97b6d986c7e430abf6d636eec6';
+  'fa3efefc7150cbcf256bf2aabd6cd799c56b094f5497267030ab8699d636eec6';
 
 type CreateProcedureInput = {
   patientId: string;
