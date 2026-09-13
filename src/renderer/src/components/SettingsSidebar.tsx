@@ -28,7 +28,7 @@
 // new `activeTab === 'license'` value; the route union's `{name:
 // 'license'}` was added to lib/router.ts so the navigate() call compiles.
 
-import { FileSearch, Folder, HardDrive, Info, KeyRound, Shield, UserCircle, Video } from 'lucide-react';
+import { Bug, FileSearch, Folder, HardDrive, Info, KeyRound, Shield, UserCircle, Video } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/store/session';
@@ -54,7 +54,14 @@ export type SettingsTab =
   // Storage stays the last position since it's "infrastructure
   // they set once then forget". Not admin-gated — every doctor
   // sees it.
-  | 'about';
+  | 'about'
+  // Quick task 20260913-5b0 — Diagnostics (workstation bundle
+  // for vendor support). Sits between About and Storage so
+  // the sidebar reads … → Users → About → Diagnostics → Storage.
+  // Not admin-gated — every doctor sees it; the channel is
+  // EXEMPT from the license gate so an expired clinic can
+  // still copy the bundle.
+  | 'diagnostics';
 
 // Plan 08-13 / UI audit Blocker 3 — the `sidebarBadge*` keys had no usage
 // site. The License entry now renders a colour dot + the state label so a
@@ -207,6 +214,25 @@ export function SettingsSidebar({ activeTab }: { activeTab?: SettingsTab }): JSX
       >
         <Info className="size-4 mr-2" aria-hidden="true" />
         {t('about.sidebarEntry')}
+      </Button>
+      {/* Quick task 20260913-5b0 — Diagnostics entry sits
+          BETWEEN About and Storage. No admin gate; every
+          doctor sees it. The IPC channel is EXEMPT from
+          the license gate (gate.ts). Bug icon from the
+          existing lucide-react import. */}
+      <Button
+        variant={activeTab === 'diagnostics' ? 'default' : 'outline'}
+        className={
+          activeTab === 'diagnostics'
+            ? 'justify-start bg-[#0E3A47] text-white hover:bg-[#0B2C36]'
+            : 'justify-start border border-[#E0D9C6] bg-[#FBF7EE] text-[#5C6770] hover:bg-[#E6EFF1] hover:text-[#0E3A47] hover:border-[#0E3A47]'
+        }
+        onClick={() => navigate({ name: 'settings-diagnostics' })}
+        data-testid="settings-hub-diagnostics"
+        data-active={activeTab === 'diagnostics' ? 'true' : 'false'}
+      >
+        <Bug className="size-4 mr-2" aria-hidden="true" />
+        {t('diagnostics.sidebarEntry')}
       </Button>
       {/* Quick task 20260912-shared-database-optional — Storage
           entry sits at the END of the sidebar so it doesn't

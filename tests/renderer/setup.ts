@@ -164,6 +164,14 @@ type MockApi = {
     activate: ReturnType<typeof vi.fn>;
     pickAndActivate: ReturnType<typeof vi.fn>;
   };
+  // Quick task 20260913-5b0 — workstation-level diagnostic bundle
+  // for the Settings → Diagnostics page. Tests that exercise the
+  // page override the mock per-test; the default resolves to a
+  // valid DiagnosticInfo so any renderer test that mounts the
+  // page without per-test seeding doesn't crash.
+  app: {
+    getDiagnostic: ReturnType<typeof vi.fn>;
+  };
 };
 
 export function mockApi(): MockApi {
@@ -358,6 +366,25 @@ export function mockApi(): MockApi {
         requiresRestart: true,
       }),
       pickFolder: vi.fn().mockResolvedValue({ path: null }),
+    },
+    // Quick task 20260913-5b0 — diagnostic info default for renderer
+    // tests. Resolves to a valid DiagnosticInfo so the page renders
+    // without crashing when a test mounts it without per-test seeding.
+    app: {
+      getDiagnostic: vi.fn().mockResolvedValue({
+        appVersion: '0.1.0-test',
+        electronVersion: '32.0.0-test',
+        nodeVersion: '20.0.0-test',
+        chromeVersion: '128.0.0-test',
+        userDataDir: '/mock/userData',
+        logsDir: '/mock/userData/logs',
+        currentLogPath: '/mock/userData/logs/startup.log',
+        logLines: [],
+        storageLocation: null,
+        machineId: 'a'.repeat(64),
+        licenseState: 'unactivated',
+        trialDaysRemaining: null,
+      }),
     },
   };
   (window as unknown as { api: MockApi }).api = api;

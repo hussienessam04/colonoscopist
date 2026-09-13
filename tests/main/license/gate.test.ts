@@ -232,7 +232,8 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
     // Plan 15 (G-08-8) added `screenshots:get-blob` + `clipboard:copy-text` → 17.
     // Quick task 20260912-shared-database-optional added the 3 storage channels
     // (get/set/pick) → 19.
-    expect(EXEMPT_CHANNELS.size).toBe(19);
+    // Quick task 20260913-5b0 — `app:get-diagnostic` → 20.
+    expect(EXEMPT_CHANNELS.size).toBe(20);
     // Verify the names match exactly (D-08 verbatim + Plan 04's picker).
     const expected = [
       'auth:status',
@@ -256,6 +257,8 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
       'storage:get-location',
       'storage:set-location',
       'storage:pick-folder',
+      // Quick task 20260913-5b0 — workstation-level diagnostic bundle.
+      'app:get-diagnostic',
     ];
     for (const ch of expected) {
       expect(EXEMPT_CHANNELS.has(ch)).toBe(true);

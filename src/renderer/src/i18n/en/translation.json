@@ -801,6 +801,27 @@
     "emailLabel": "Email",
     "description": "Offline-first colonoscopy workstation — record, capture findings, and generate clinic-branded PDF reports without an internet connection."
   },
+  "diagnostics": {
+    "sidebarEntry": "Diagnostics",
+    "pageTitle": "Diagnostics",
+    "pageDescription": "Workstation info, log location, and license state for vendor support.",
+    "loading": "Loading diagnostics…",
+    "appVersionLabel": "App version",
+    "electronVersionLabel": "Electron",
+    "nodeVersionLabel": "Node",
+    "chromeVersionLabel": "Chromium",
+    "userDataDirLabel": "User data",
+    "logsDirLabel": "Logs folder",
+    "machineIdLabel": "Machine ID",
+    "licenseStateLabel": "License",
+    "licenseState_licensed": "Licensed",
+    "licenseState_trial": "Trial",
+    "licenseState_expired": "Expired",
+    "licenseState_unactivated": "Not activated",
+    "licenseStateTrial": "Trial",
+    "copyButton": "Copy diagnostics to clipboard",
+    "copySuccess": "Diagnostics copied"
+  },
   "screenshot": {
     "cropButton": "Crop",
     "cropModalTitle": "Crop screenshot",

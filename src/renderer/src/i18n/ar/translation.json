@@ -809,6 +809,27 @@
     "emailLabel": "البريد الإلكتروني",
     "description": "محطة عمل تنظير قولون تعمل دون اتصال بالإنترنت — التسجيل، التقاط النتائج، وإصدار تقارير PDF مخصصة للعيادة بدون الحاجة إلى الإنترنت."
   },
+  "diagnostics": {
+    "sidebarEntry": "التشخيص",
+    "pageTitle": "التشخيص",
+    "pageDescription": "معلومات محطة العمل وموقع السجل وحالة الترخيص لدعم المورّد.",
+    "loading": "جارٍ تحميل بيانات التشخيص…",
+    "appVersionLabel": "إصدار التطبيق",
+    "electronVersionLabel": "إلكترون",
+    "nodeVersionLabel": "Node",
+    "chromeVersionLabel": "Chromium",
+    "userDataDirLabel": "بيانات المستخدم",
+    "logsDirLabel": "مجلد السجلات",
+    "machineIdLabel": "معرّف الجهاز",
+    "licenseStateLabel": "الترخيص",
+    "licenseState_licensed": "مرخّص",
+    "licenseState_trial": "تجريبي",
+    "licenseState_expired": "منتهي",
+    "licenseState_unactivated": "غير مفعّل",
+    "licenseStateTrial": "تجريبي",
+    "copyButton": "نسخ بيانات التشخيص",
+    "copySuccess": "تم نسخ بيانات التشخيص"
+  },
   "screenshot": {
     "cropButton": "قص",
     "cropModalTitle": "قص صورة الشاشة",

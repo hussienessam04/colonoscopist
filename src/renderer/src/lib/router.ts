@@ -44,7 +44,12 @@ export type Route =
   // version, developer contact). Reached via SettingsSidebar;
   // no params. Keeps the cluster contiguous with the other
   // quick-task Settings variants.
-  | { name: 'settings-about' };
+  | { name: 'settings-about' }
+  // Quick task 20260913-5b0 — Settings → Diagnostics (workstation
+  // info + log path + license state for vendor support). Reached
+  // via SettingsSidebar; no params. The page reads runtime state
+  // via `window.api.app.getDiagnostic()`.
+  | { name: 'settings-diagnostics' };
 
 export const initialRoute: Route = { name: 'login' };
 

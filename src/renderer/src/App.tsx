@@ -42,6 +42,9 @@ import License from './pages/License';
 // Quick task 20260912-q4g — Settings → About card (app name,
 // version, developer contact). Mirrors License.tsx pattern.
 import SettingsAbout from './pages/SettingsAbout';
+// Quick task 20260913-5b0 — Settings → Diagnostics (workstation
+// info + log path + license state). Mirrors SettingsAbout pattern.
+import SettingsDiagnostics from './pages/SettingsDiagnostics';
 
 export default function App(): JSX.Element {
   const { route, navigate } = useRoute();
@@ -157,6 +160,13 @@ export default function App(): JSX.Element {
       // developer contact + version). Admin-irrelevant (every
       // doctor sees it), so no gate beyond authentication.
       routeElement = <SettingsAbout />;
+      break;
+    case 'settings-diagnostics':
+      // Quick task 20260913-5b0 — Settings → Diagnostics
+      // (workstation bundle for vendor support). Every doctor
+      // sees it; the IPC channel is EXEMPT from the license
+      // gate so an expired clinic can still copy the bundle.
+      routeElement = <SettingsDiagnostics />;
       break;
     case 'patient-procedures':
       routeElement = <PatientProcedures patientId={route.patientId} />;
