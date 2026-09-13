@@ -290,9 +290,17 @@ export default function SettingsCapture(): JSX.Element {
               // Select's value type stable across the null -> string
               // transition at hydration (avoids React's
               // "changing from uncontrolled to controlled" warning).
+              //
+              // Quick task 260913-rp5 follow-up: do NOT disable when
+              // selectedBrowserId is null — that's a chicken-and-egg
+              // (the user can't pick a device when the picker itself is
+              // disabled before any pick happens). Save + Start Preview
+              // stay correctly gated on `canSave` (selectedBrowserId !==
+              // null) below. The dropdown only disables when there are
+              // no devices to choose from at all.
               value={selectedBrowserId ?? ''}
               onValueChange={handleDeviceChange}
-              disabled={browser.length === 0 || selectedBrowserId === null}
+              disabled={browser.length === 0}
             >
               <SelectTrigger
                 id="settings-capture-device"

@@ -52,6 +52,25 @@ function setSession(): void {
 
 beforeEach(() => {
   setRoute({ name: 'settings-capture' });
+  // happy-dom doesn't ship navigator.mediaDevices — useCaptureDeviceMap
+  // would set browser=[] without this stub, which would disable the
+  // device Select for an unrelated reason. Stub it with one matching
+  // videoinput so the picker is enabled and the test can probe it.
+  const nav = (globalThis as { navigator?: Navigator }).navigator;
+  if (nav && !('mediaDevices' in nav)) {
+    Object.defineProperty(nav, 'mediaDevices', {
+      value: {
+        enumerateDevices: (): MediaDeviceInfo[] => [
+          {
+            deviceId: 'browser-easycap',
+            label: 'EasyCap USB Video',
+            kind: 'videoinput',
+          } as MediaDeviceInfo,
+        ],
+      },
+      configurable: true,
+    });
+  }
 });
 
 afterEach(() => {
@@ -155,6 +174,41 @@ describe('Quick task 260913-rp5 — SettingsCapture recovers from gated-empty-st
         screen.getByText(/no device saved yet/i),
       ).toBeInTheDocument();
     });
+    void session;
+  });
+
+  // Follow-up follow-up: the device picker MUST be enabled even when
+  // no device is saved yet — otherwise the user is stuck (can't pick a
+  // device because the picker is disabled until they pick one). The
+  // Save button stays correctly gated on `canSave` (selectedBrowserId
+  // !== null); the dropdown only disables when there are zero devices
+  // to choose from at all.
+  it('device picker is enabled when devices exist but no saved device is picked yet', async () => {
+    setSession();
+    const api = getApi();
+    api.capture.listDevices.mockResolvedValue([
+      {
+        deviceId: 'EasyCap USB Video',
+        rawName: 'EasyCap USB Video',
+        index: 0,
+        type: 'dshow',
+      },
+    ]);
+    api.capture.getDefaultDevice.mockResolvedValue(null);
+
+    render(<SettingsCapture />);
+
+    await waitFor(() => {
+      expect(api.capture.getDefaultDevice).toHaveBeenCalled();
+    });
+    // The device Select trigger must NOT be disabled so the user can
+    // actually pick a device.
+    const trigger = await waitFor(() =>
+      screen.getByLabelText(/capture device/i),
+    );
+    expect(trigger).not.toBeDisabled();
+    // Save is still correctly gated (no device picked).
+    expect(screen.getByTestId('save-capture')).toBeDisabled();
     void session;
   });
 });
