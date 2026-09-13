@@ -649,7 +649,12 @@ export default function ReportEditor({
     rows: number,
     placeholder: string,
   ): JSX.Element => (
-    <section className="mb-4" data-testid={`report-editor-section-${scope}`}>
+    // ponytail: key={scope} silences React's "each child in a list should
+    // have a unique key prop" warning. anatomyBoxes.map(renderBox, ...) is
+    // the only call site that needs it; the standalone renderBox calls
+    // for conclusion + recommendation are outside a .map() so the key is
+    // a no-op for them.
+    <section key={scope} className="mb-4" data-testid={`report-editor-section-${scope}`}>
       {/* Quick task 20260906-report-editor-procedure-layout-screenshots-grid-bullet-button —
           Templates / Save template stay in the heading row (doctor
           reaches them most often). Bullet moves into the box itself

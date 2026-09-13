@@ -256,9 +256,13 @@ export default function SettingsCapture(): JSX.Element {
             </p>
             <Label htmlFor="settings-capture-device">{t('settings.captureDeviceLabel')}</Label>
             <Select
-              value={selectedBrowserId ?? undefined}
+              // ponytail: empty string instead of `undefined` keeps the
+              // Select's value type stable across the null -> string
+              // transition at hydration (avoids React's
+              // "changing from uncontrolled to controlled" warning).
+              value={selectedBrowserId ?? ''}
               onValueChange={handleDeviceChange}
-              disabled={browser.length === 0}
+              disabled={browser.length === 0 || selectedBrowserId === null}
             >
               <SelectTrigger
                 id="settings-capture-device"
