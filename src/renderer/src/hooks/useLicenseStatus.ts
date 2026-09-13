@@ -19,6 +19,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { LicenseStatus } from '@shared/ipc-contract';
 
+// ponytail: cross-component refresh. Each `useLicenseStatus` call is its
+// own React state instance — when License.tsx calls refresh() after
+// pickAndActivate, the LicenseGate's separate hook instance does NOT
+// see the update (it's in a different component tree). Dispatching
+// `colonoscopist:license-changed` on window lets every mounted instance
+// re-fetch simultaneously. Subscribers clean up their listener on unmount.
+export const LICENSE_CHANGED_EVENT = 'colonoscopist:license-changed';
+
 export type UseLicenseStatusResult = {
   status: LicenseStatus | null;
   loading: boolean;
@@ -49,5 +57,16 @@ export function useLicenseStatus(): UseLicenseStatusResult {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    function onChanged(): void {
+      void refresh();
+    }
+    window.addEventListener(LICENSE_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener(LICENSE_CHANGED_EVENT, onChanged);
+    };
+  }, [refresh]);
+
   return { status, loading, refresh };
 }
+

@@ -27,6 +27,7 @@
 
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { LICENSE_CHANGED_EVENT } from '@/hooks/useLicenseStatus';
 import {
   AlertTriangle,
   Check,
@@ -108,6 +109,10 @@ export default function License(): JSX.Element {
       }
       if (result.ok) {
         toast.success(t('license.loadLicSuccess'));
+        // Broadcast to every mounted useLicenseStatus instance so
+        // LicenseGate (separate component tree, separate hook state)
+        // re-fetches and dismisses the activation modal.
+        window.dispatchEvent(new Event(LICENSE_CHANGED_EVENT));
         await refresh();
         return;
       }
