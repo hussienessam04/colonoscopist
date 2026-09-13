@@ -50,7 +50,14 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Colonoscopist"
     },
-    "portable": {}
+    "portable": {},
+    "publish": {
+      "provider": "github",
+      "owner": "hussienessam",
+      "repo": "colonoscopist",
+      "releaseType": "release",
+      "publishAutoUpdate": true
+    }
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -59,6 +66,8 @@
     "start": "electron-vite preview",
     "package": "npm run build && electron-builder --win nsis",
     "package:portable": "npm run build && electron-builder --win portable",
+    "publish:gh": "electron-builder --publish always",
+    "publish:dry": "electron-builder --publish never",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -92,6 +101,7 @@
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
+    "electron-updater": "^6.8.9",
     "ffmpeg-static": "^5.2.0",
     "i18next": "^26.3.6",
     "i18next-browser-languagedetector": "^8.2.1",
