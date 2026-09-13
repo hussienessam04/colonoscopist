@@ -8,12 +8,11 @@ import path from 'node:path';
 const SRC = path.resolve('src/renderer/public/icon.svg');
 const OUT_DIR = path.resolve('buildResources');
 const OUT = path.join(OUT_DIR, 'icon.ico');
-// 6 sizes — 16 (taskbar) / 24 (HiDPI taskbar) / 32 (Explorer list) /
-// 48 (Explorer tile) / 64 (HiDPI Explorer) / 128 (Start tile). Windows
-// scales the 128 entry to 256 at runtime; the BMP-encoded 256 entry that
-// png-to-ico would produce is 262 KB of uncompressed RGBA which busts the
-// 100 KB ship-gate. (See SUMMARY.md deviations.)
-const SIZES = [16, 24, 32, 48, 64, 128];
+// 7 sizes — 16 (taskbar) / 24 (HiDPI taskbar) / 32 (Explorer list) /
+// 48 (Explorer tile) / 64 (HiDPI Explorer) / 128 (Start tile) /
+// 256 (electron-builder requires 256x256 for the .exe). PNG-encoded so
+// the 256 entry is ~5-15 KB; total ICO stays well under 100 KB.
+const SIZES = [16, 24, 32, 48, 64, 128, 256];
 
 // Custom PNG-in-ICO encoder. png-to-ico wraps each entry as a 32-bit BMP
 // (no compression) — fine for 16/32/48 but 128×128×4 alone is 65 KB and the
