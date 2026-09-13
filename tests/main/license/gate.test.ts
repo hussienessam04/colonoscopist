@@ -233,7 +233,9 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
     // Quick task 20260912-shared-database-optional added the 3 storage channels
     // (get/set/pick) → 19.
     // Quick task 20260913-5b0 — `app:get-diagnostic` → 20.
-    expect(EXEMPT_CHANNELS.size).toBe(20);
+    // Quick task 20260913-64l — 4 auto-update channels
+    // (check/get-state/download/install) → 24.
+    expect(EXEMPT_CHANNELS.size).toBe(24);
     // Verify the names match exactly (D-08 verbatim + Plan 04's picker).
     const expected = [
       'auth:status',
@@ -259,6 +261,11 @@ describe('gate.ts — licenseGated wrapper (LIC-04)', () => {
       'storage:pick-folder',
       // Quick task 20260913-5b0 — workstation-level diagnostic bundle.
       'app:get-diagnostic',
+      // Quick task 20260913-64l — auto-update (electron-updater + GitHub Releases).
+      'app:update-check',
+      'app:update-get-state',
+      'app:update-download',
+      'app:update-install',
     ];
     for (const ch of expected) {
       expect(EXEMPT_CHANNELS.has(ch)).toBe(true);

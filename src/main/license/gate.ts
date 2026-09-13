@@ -79,6 +79,15 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // read for support. A clinic with an expired license should still
   // be able to ship us the diagnostic bundle.
   IPC.APP_GET_DIAGNOSTIC,
+  // Quick task 20260913-64l — auto-update is workstation-level (a
+  // clinic with an expired license should still get notified so they
+  // can apply the patch). All four channels are read/write on the
+  // shared `autoUpdater` singleton; gating any one of them defeats
+  // the update flow.
+  IPC.APP_UPDATE_CHECK,
+  IPC.APP_UPDATE_GET_STATE,
+  IPC.APP_UPDATE_DOWNLOAD,
+  IPC.APP_UPDATE_INSTALL,
 ]);
 
 export type LicenseGateError =

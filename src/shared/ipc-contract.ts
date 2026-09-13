@@ -193,6 +193,14 @@ export const IPC = {
   // Quick task 20260913-5b0 — workstation-level diagnostic bundle for
   // vendor support. EXEMPT from the license gate (see gate.ts).
   APP_GET_DIAGNOSTIC: 'app:get-diagnostic',
+  // Quick task 20260913-64l — auto-update channels (electron-updater).
+  // EXEMPT from the license gate (see gate.ts). State-shape is the
+  // canonical renderer-readable snapshot; `progress` is null when
+  // not actively downloading.
+  APP_UPDATE_CHECK: 'app:update-check',
+  APP_UPDATE_GET_STATE: 'app:update-get-state',
+  APP_UPDATE_DOWNLOAD: 'app:update-download',
+  APP_UPDATE_INSTALL: 'app:update-install',
 } as const;
 
 // Phase 7 / Plan 07-01 — Restore preview shape returned by
@@ -589,6 +597,21 @@ export type DiagnosticInfo = {
   trialDaysRemaining: number | null;
 };
 
+// Quick task 20260913-64l — auto-update state shape returned by
+// APP_UPDATE_GET_STATE. The renderer's useUpdater() hook polls
+// this every 30s. `progress` is null when no download is active;
+// `available` flips true the moment electron-updater sees a newer
+// release in the GitHub Releases feed; `downloaded` flips true when
+// the .exe finishes downloading and `quitAndInstall()` is ready.
+export type AppUpdateState = {
+  available: boolean;
+  downloaded: boolean;
+  progress: { percent: number; transferred: number; total: number } | null;
+  latestVersion: string | null;
+  currentVersion: string;
+  error: string | null;
+};
+
 // What `contextBridge.exposeInMainWorld('api', api)` exposes to the renderer.
 export interface IpcContract {
   auth: {
@@ -928,8 +951,18 @@ export interface IpcContract {
   // Quick task 20260913-5b0 — workstation-level diagnostic bundle
   // (Settings → Diagnostics). Returns the bundle the doctor copies
   // when they email support. EXEMPT from the license gate (gate.ts).
+  //
+  // Quick task 20260913-64l — auto-update channels. The renderer
+  // polls `getState` every 30s via useUpdater() and calls `check`
+  // / `download` / `install` on user action. EXEMPT from the gate.
   app: {
     getDiagnostic: () => Promise<DiagnosticInfo>;
+    update: {
+      check: () => Promise<unknown>;
+      getState: () => Promise<AppUpdateState>;
+      download: () => Promise<void>;
+      install: () => void;
+    };
   };
 }
 

@@ -221,8 +221,18 @@ const api: IpcContract = {
   // for the Settings → Diagnostics page. Single read channel; the
   // page renders the result + a Copy button that writes the JSON
   // to the clipboard via `clipboard.copyText`.
+  //
+  // Quick task 20260913-64l — auto-update bridge. The renderer
+  // polls `update.getState()` every 30s via useUpdater() and calls
+  // `check` / `download` / `install` on user action.
   app: {
     getDiagnostic: () => ipcRenderer.invoke(IPC.APP_GET_DIAGNOSTIC),
+    update: {
+      check: () => ipcRenderer.invoke(IPC.APP_UPDATE_CHECK),
+      getState: () => ipcRenderer.invoke(IPC.APP_UPDATE_GET_STATE),
+      download: () => ipcRenderer.invoke(IPC.APP_UPDATE_DOWNLOAD),
+      install: () => ipcRenderer.invoke(IPC.APP_UPDATE_INSTALL),
+    },
   },
 };
 

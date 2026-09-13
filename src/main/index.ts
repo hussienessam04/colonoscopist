@@ -25,6 +25,9 @@ import { registerStorageIpc } from './ipc/storage';
 // vendor support (Settings → Diagnostics). Registered FIRST so an
 // expired / unactivated clinic can still export the bundle.
 import { registerDiagnosticsIpc } from './ipc/diagnostics';
+// Quick task 20260913-64l — auto-update wiring. The IPC handlers
+// register inside initAutoUpdater() once app.whenReady() fires.
+import { initAutoUpdater } from './auto-update';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
@@ -172,6 +175,13 @@ app.whenReady().then(() => {
   // can attach the close-guard below.
   mainWindowRef = createMainWindow();
   logStartup('app-ready');
+  // Quick task 20260913-64l — wire electron-updater after the main
+  // window exists so the renderer's first APP_UPDATE_GET_STATE poll
+  // returns a populated state (not the initial all-false shape).
+  // initAutoUpdater() short-circuits in dev runs (no GitHub release
+  // exists); in packaged builds it registers the 4 EXEMPT IPC
+  // handlers and kicks the initial checkForUpdates().
+  initAutoUpdater();
 });
 
 // Quick task 20260912-procedure-room-exit-warning — module-level
