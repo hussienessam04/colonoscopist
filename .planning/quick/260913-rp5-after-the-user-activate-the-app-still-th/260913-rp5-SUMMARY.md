@@ -50,3 +50,18 @@ Added `useLicenseChangeRefresh(refresh)` helper hook in `useLicenseStatus.ts` th
 ## Deviations from plan
 
 None. The plan was scoped to 7 files; all 7 modified.
+
+---
+
+# Follow-up commit (260913-rp5-b): user reported bug NOT fixed by the first attempt
+
+The first fix only re-fetched on LICENSE_CHANGED_EVENT. The user's actual report ("after activating, the capture page still shows License required") turned out to be a deeper bug: when the user is licensed but has no USB capture device plugged in, `getDefaultDevice` returns `null` (legitimate) but `safeInvoke` collapses BOTH `{ok:false}` (gate rejection) and `null` (no data) into a single `null` value. Pages then flipped `gated=true` and rendered the misleading EmptyStateCard.
+
+Fix:
+- Added `isGateRejected(raw)` type guard in `lib/ipc-result.ts`
+- Updated 4 affected sites (useCaptureDeviceMap, useProcedures, SettingsCapture hydrate, ProcedureRoom + ProcedurePreview getDefaultDevice) to check the raw IPC shape via isGateRejected before treating null as a gate failure
+- Added a second regression test for the "licensed user with no USB device plugged in" path
+- `useCaptureDeviceMap` test contract narrowed: throws surface the raw error message (gate rejection still surfaces the "License required" message)
+
+Test count: 893 passed, 3 pre-existing unrelated failures (PDF smoke opt-in + Playwright e2e harness).
+
