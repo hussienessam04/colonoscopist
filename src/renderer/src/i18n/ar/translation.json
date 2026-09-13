@@ -880,5 +880,18 @@
     "unavailableOnPartial": "القص غير متاح للتسجيلات الجزئية.",
     "overCapPrefix": "القص غير متاح للتسجيلات الأطول من",
     "overCapSuffix": "(حد متصفح البحث بالإطار الرئيسي؛ ستضاف إعادة التشفير في الإصدار 1.1)."
+  },
+  "update": {
+    "availableTitle": "تحديث متاح",
+    "availableBody": "الإصدار {{version}} جاهز للتنزيل.",
+    "downloadButton": "تنزيل التحديث",
+    "downloadingLabel": "جارٍ التنزيل… {{percent}}%",
+    "downloadedTitle": "تم تنزيل التحديث",
+    "downloadedBody": "أعد تشغيل التطبيق لتطبيق التحديث.",
+    "restartButton": "إعادة التشغيل الآن",
+    "upToDate": "أنت تستخدم أحدث إصدار ({{version}}).",
+    "checkFailed": "تعذّر التحقق من التحديثات. ستتم إعادة المحاولة تلقائياً.",
+    "checkButton": "تحقق الآن",
+    "whatsNew": "عرض ملاحظات الإصدار"
   }
 }

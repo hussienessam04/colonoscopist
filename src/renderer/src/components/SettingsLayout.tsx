@@ -45,6 +45,8 @@ type Props = {
   backTo?: Route;
   /** Override the default back-label. Defaults to "Back". */
   backLabel?: string;
+  /** Optional banner rendered above the content card (e.g. in-progress download). */
+  updateBanner?: ReactNode;
   /** Body content — the page's own layout goes inside the right column. */
   children: ReactNode;
 };
@@ -57,6 +59,7 @@ export function SettingsLayout({
   backTestId = 'settings-layout-back',
   backTo = { name: 'settings-hub' },
   backLabel = 'Back',
+  updateBanner,
   children,
 }: Props): JSX.Element {
   const { navigate } = useRoute();
@@ -88,6 +91,7 @@ export function SettingsLayout({
               </Button>
             </div>
           </header>
+          {updateBanner}
           <div className="relative overflow-hidden rounded-lg border border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]">
             <div
               aria-hidden="true"

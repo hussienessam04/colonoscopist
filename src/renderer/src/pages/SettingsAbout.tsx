@@ -12,12 +12,19 @@
 //   * Mail + Phone icons next to the email/phone values so they read
 //     as clickable affordances (mirrors how License uses KeyRound)
 //
+// Quick task 260913-64l — auto-update card sits ABOVE the app-info
+// card when an update is queued (available / downloaded / error). The
+// card is conditional on the SWR hook's state so the default About
+// page remains visually identical when the clinic is up to date.
+//
 // ponytail: APP_VERSION is hardcoded — bump on release. The grid
 // row renders it as a fourth row so the page has a clear "About this
 // app" identity without an extra Card.
 
-import { Info, Mail, Phone } from 'lucide-react';
+import { Download, Info, Mail, Phone, RefreshCw, RotateCw } from 'lucide-react';
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { toast } from 'sonner';
 
 import {
   Card,
@@ -26,7 +33,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { SettingsLayout } from '@/components/SettingsLayout';
+import { useUpdater } from '@/hooks/useUpdater';
 
 // ponytail: bump APP_VERSION on release. Hardcoded for now (no build
 // pipeline stamp); keeps the About card stable across runs without a
@@ -35,6 +44,15 @@ const APP_VERSION = '1.0';
 
 export default function SettingsAbout(): JSX.Element {
   const { t } = useTranslation();
+  const { state, check, download, install } = useUpdater();
+
+  // Surface update errors as a toast — clinic installs should still
+  // see "Update failed" if the network is down at boot.
+  useEffect(() => {
+    if (state.error) {
+      toast.error(t('update.checkFailed'));
+    }
+  }, [state.error, t]);
 
   return (
     <SettingsLayout
@@ -43,6 +61,70 @@ export default function SettingsAbout(): JSX.Element {
       activeTab="about"
       backTestId="settings-about-back"
     >
+      {(state.available || state.downloaded || state.error) && (
+        <Card
+          data-testid="settings-about-update-card"
+          className={`border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)] ${
+            state.downloaded ? 'border-l-4 border-l-[#0E3A47]' : ''
+          }`}
+        >
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0E3A47]">
+              <Download className="size-4" aria-hidden="true" />
+              {state.downloaded ? t('update.downloadedTitle') : t('update.availableTitle')}
+            </CardTitle>
+            <CardDescription className="text-[#5C6770]">
+              {state.downloaded
+                ? t('update.downloadedBody')
+                : t('update.availableBody', { version: state.latestVersion ?? '?' })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-3">
+            {state.progress ? (
+              <p className="text-sm font-mono text-[#5C6770]" data-testid="settings-about-update-progress">
+                {t('update.downloadingLabel', { percent: Math.round(state.progress.percent) })}
+              </p>
+            ) : (
+              <span className="text-xs text-[#5C6770] font-mono">
+                v{state.latestVersion ?? '?'}
+              </span>
+            )}
+            <div className="flex items-center gap-2">
+              {!state.downloaded && (
+                <Button
+                  onClick={() => void download()}
+                  data-testid="settings-about-update-download"
+                  disabled={Boolean(state.progress)}
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
+                >
+                  <Download className="size-4 mr-1" aria-hidden="true" />
+                  {t('update.downloadButton')}
+                </Button>
+              )}
+              {state.downloaded && (
+                <Button
+                  onClick={install}
+                  data-testid="settings-about-update-install"
+                  className="bg-[#0E3A47] text-white hover:bg-[#0B2C36]"
+                >
+                  <RotateCw className="size-4 mr-1" aria-hidden="true" />
+                  {t('update.restartButton')}
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                onClick={() => void check()}
+                data-testid="settings-about-update-check"
+                className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
+              >
+                <RefreshCw className="size-4 mr-1" aria-hidden="true" />
+                {t('update.checkButton')}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card
         data-testid="settings-about-card"
         className="border-[#E0D9C6] bg-[#FBF7EE] shadow-[0_1px_2px_rgba(19,32,46,0.04),0_8px_24px_-12px_rgba(19,32,46,0.12)]"
@@ -103,6 +185,12 @@ export default function SettingsAbout(): JSX.Element {
               </a>
             </span>
           </div>
+
+          {!state.available && !state.downloaded && (
+            <p className="text-xs text-[#5C6770] pt-2 font-mono" data-testid="settings-about-up-to-date">
+              {t('update.upToDate', { version: state.currentVersion })}
+            </p>
+          )}
 
           <p className="text-xs text-[#5C6770] pt-2" data-testid="settings-about-description">
             {t('about.description')}

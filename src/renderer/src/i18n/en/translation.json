@@ -872,5 +872,18 @@
     "unavailableOnPartial": "Trim is unavailable on partial recordings.",
     "overCapPrefix": "Trimming is unavailable for recordings longer than",
     "overCapSuffix": "(browser seek-by-keyframe cap; v1.1 will add a re-encode path)."
+  },
+  "update": {
+    "availableTitle": "Update available",
+    "availableBody": "Version {{version}} is ready to download.",
+    "downloadButton": "Download update",
+    "downloadingLabel": "Downloading… {{percent}}%",
+    "downloadedTitle": "Update downloaded",
+    "downloadedBody": "Restart the app to apply the update.",
+    "restartButton": "Restart now",
+    "upToDate": "You're on the latest version ({{version}}).",
+    "checkFailed": "Could not check for updates. Will retry automatically.",
+    "checkButton": "Check now",
+    "whatsNew": "View release notes"
   }
 }

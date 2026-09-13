@@ -169,8 +169,19 @@ type MockApi = {
   // page override the mock per-test; the default resolves to a
   // valid DiagnosticInfo so any renderer test that mounts the
   // page without per-test seeding doesn't crash.
+  //
+  // Quick task 20260913-64l — auto-update bridge. Defaults resolve
+  // to an "all-false" AppUpdateState so the SettingsAbout page
+  // renders without per-test seeding (the update card is gated on
+  // `available || downloaded || error` and stays hidden in tests).
   app: {
     getDiagnostic: ReturnType<typeof vi.fn>;
+    update: {
+      check: ReturnType<typeof vi.fn>;
+      getState: ReturnType<typeof vi.fn>;
+      download: ReturnType<typeof vi.fn>;
+      install: ReturnType<typeof vi.fn>;
+    };
   };
 };
 
@@ -370,6 +381,11 @@ export function mockApi(): MockApi {
     // Quick task 20260913-5b0 — diagnostic info default for renderer
     // tests. Resolves to a valid DiagnosticInfo so the page renders
     // without crashing when a test mounts it without per-test seeding.
+    //
+    // Quick task 20260913-64l — auto-update defaults. The state
+    // resolves to an "all-false" shape so the SettingsAbout page
+    // renders without surfacing the update card. Tests that exercise
+    // the update card override getState per-test.
     app: {
       getDiagnostic: vi.fn().mockResolvedValue({
         appVersion: '0.1.0-test',
@@ -385,6 +401,19 @@ export function mockApi(): MockApi {
         licenseState: 'unactivated',
         trialDaysRemaining: null,
       }),
+      update: {
+        check: vi.fn().mockResolvedValue(null),
+        getState: vi.fn().mockResolvedValue({
+          available: false,
+          downloaded: false,
+          progress: null,
+          latestVersion: null,
+          currentVersion: '0.1.0-test',
+          error: null,
+        }),
+        download: vi.fn().mockResolvedValue(undefined),
+        install: vi.fn().mockReturnValue(undefined),
+      },
     },
   };
   (window as unknown as { api: MockApi }).api = api;
