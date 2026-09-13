@@ -66,7 +66,7 @@
     "start": "electron-vite preview",
     "package": "npm run build && electron-builder --win nsis",
     "package:portable": "npm run build && electron-builder --win portable",
-    "publish:gh": "electron-builder --publish always",
+    "publish:gh": "npm run build && electron-builder --publish always",
     "publish:dry": "electron-builder --publish never",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
