@@ -11,9 +11,11 @@
 // lower-level createReportPdfElement factory. The orchestrator path
 // is what the production IPC handler runs.
 //
-// ponytail: EN-only PDF with one 6KB JPEG + Helvetica = ~10KB;
-// 5KB threshold catches the three crash modes (0KB crash /
-// font-register-fail empty PDF / wrong format).
+// ponytail: 1KB threshold (matches `MIN_PDF_BYTES` in
+// `render-report-pdf.ts:75`) — 5KB fails the always-English post-toggle path
+// since the PDF no longer embeds Arabic glyphs. The 1KB floor still catches
+// all three failure modes (0KB crash / font-register-fail empty PDF /
+// wrong format).
 //
 // Verify locally with:
 //   RUN_SMOKE=1 npm run test:integration:smoke:phase7
@@ -142,13 +144,14 @@ describe.skipIf(!smokeEnabled)('PDF ship-gate (RPT-06) — always-English post-t
     const { renderReportPdf } = await import('../../src/main/pdf/render-report-pdf');
     const result = await renderReportPdf(report.id, { language: 'en' });
 
-    // 5. Assertions: file size > 5KB + PDF magic bytes.
+    // 5. Assertions: file size > 1KB (matches MIN_PDF_BYTES in production)
+    //    + PDF magic bytes.
     expect(existsSync(result.pdfPath), `PDF not written at ${result.pdfPath}`).toBe(true);
     const stat = statSync(result.pdfPath);
     expect(
       stat.size,
       `PDF too small (${stat.size} bytes) — render may have crashed`,
-    ).toBeGreaterThan(5_000);
+    ).toBeGreaterThan(1_000);
 
     const head = readFileSync(result.pdfPath).subarray(0, 4);
     expect(head.toString('utf8')).toBe('%PDF');

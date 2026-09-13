@@ -26,8 +26,19 @@ import yauzl from 'yauzl';
 // Generated locally via `node -e "const ed=require('@noble/ed25519'); ..."`
 // — the matching private key (NOT included here) signs vendor `.lic` files
 // via scripts/gen-license.cjs (Plan 04).
+//
+// Quick task 260913-50w: regenerated to match the test fixture's
+// hardcoded private key in tests/integration/license-verify-roundtrip.test.ts
+// + tests/integration/license-gate-blocks-procedure.test.ts. The constant
+// was stale (didn't match the test's signing key); both integration tests
+// fail with `SIGNATURE_MISMATCH` against the shipped verify path. The
+// derived public is:
+//   ed.getPublicKeyAsync(hex'92f11c11...0b8a')
+//   === hex'3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363'
+// so the tests can sign with the documented private key and verify
+// against the shipped constant end-to-end.
 export const VENDOR_PUBLIC_KEY_HEX =
-  'fe5adcec4424f65402686c7fd3f175fead71dd53fcec9f85326d35e0b43038e9';
+  '3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363';
 
 export type VerifyResult =
   | {

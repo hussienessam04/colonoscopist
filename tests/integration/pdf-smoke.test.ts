@@ -155,8 +155,10 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
 
       const outPath = path.join(tmpRoot, 'report.pdf');
       mkdirSync(tmpRoot, { recursive: true });
-      // Use toFile — matches the production renderReportPdf pattern.
-      await instance.toFile(outPath);
+      // ponytail: @react-pdf/renderer 4.x removed instance.toFile — write
+      // the buffer ourselves. Matches the production renderReportPdf path
+      // which writes `await instance.toBuffer()` to disk.
+      writeFileSync(outPath, await instance.toBuffer());
 
       // 1. File exists.
       expect(existsSync(outPath)).toBe(true);
@@ -206,7 +208,7 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
 
       const outPath = path.join(tmpRoot, 'no-assets.pdf');
       mkdirSync(tmpRoot, { recursive: true });
-      await instance.toFile(outPath);
+      writeFileSync(outPath, await instance.toBuffer());
 
       expect(existsSync(outPath)).toBe(true);
       expect(statSync(outPath).size).toBeGreaterThan(5_000);
@@ -255,7 +257,7 @@ describe('PDF render integration (opt-in via RUN_SMOKE=1)', () => {
 
       const outPath = path.join(tmpRoot, 'numeric.pdf');
       mkdirSync(tmpRoot, { recursive: true });
-      await instance.toFile(outPath);
+      writeFileSync(outPath, await instance.toBuffer());
       expect(input.procedureDateLabel).toBe('2026-08-08');
       expect(existsSync(outPath)).toBe(true);
     }),
