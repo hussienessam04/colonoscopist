@@ -8,14 +8,45 @@
   "private": true,
   "productName": "Colonoscopist",
   "build": {
+    "appId": "com.colonoscopist.app",
+    "productName": "Colonoscopist",
+    "directories": {
+      "output": "dist",
+      "buildResources": "buildResources"
+    },
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      "src/main/pdf/fonts/**/*"
+    ],
+    "asar": true,
     "asarUnpack": [
       "**/node_modules/ffmpeg-static/**"
-    ]
+    ],
+    "win": {
+      "target": [
+        { "target": "nsis", "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Colonoscopist"
+    },
+    "portable": {}
   },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "start": "electron-vite preview",
+    "package": "npm run build && electron-builder --win nsis",
+    "package:portable": "npm run build && electron-builder --win portable",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json",
     "typecheck:web": "tsc --noEmit -p tsconfig.web.json",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",
@@ -78,6 +109,7 @@
     "@vitejs/plugin-react": "^4.3.2",
     "autoprefixer": "^10.4.20",
     "electron": "32.3.3",
+    "electron-builder": "^26.15.3",
     "electron-vite": "2.3.0",
     "happy-dom": "^20.11.1",
     "jsdom": "^30.0.1",
