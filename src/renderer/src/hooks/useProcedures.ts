@@ -27,6 +27,7 @@ import type {
   Screenshot,
 } from '@shared/ipc-contract';
 import { safeInvoke } from '@/lib/ipc-result';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { screenshotToastStore } from '@/store/screenshot-toast';
 
 export type UseProceduresResult = {
@@ -114,6 +115,10 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  // Quick task 260913-rp5 — when the user activates the license,
+  // re-fetch so the `gated` flag clears and the procedure data loads.
+  useLicenseChangeRefresh(refresh);
 
   const updateAnnotation = useCallback(
     async (id: number, annotation: string | null): Promise<void> => {

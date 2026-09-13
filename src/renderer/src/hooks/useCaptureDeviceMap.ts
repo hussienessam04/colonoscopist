@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CaptureDevice } from '@shared/ipc-contract';
 import { safeInvoke } from '@/lib/ipc-result';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 
 const comparable = (value: string): string => value.trim().toLocaleLowerCase();
 
@@ -17,7 +18,13 @@ export function useCaptureDeviceMap(): {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  // ponytail: extracted into a stable callback so the LICENSE_CHANGED_EVENT
+  // listener below can re-run the same fetch logic. Quick task 260913-rp5 —
+  // the previous version had `useEffect(() => {...}, [])` which meant the
+  // hook never recovered after activation. Re-fetching on license change
+  // clears the stale "License required — activate to list capture devices."
+  // error and lets the capture page work normally.
+  const refetch = useCallback((): void => {
     let cancelled = false;
     // Plan 08-12 / G-08-6 — wrap capture.listDevices through safeInvoke.
     // On license state 'expired' / 'unactivated' the main-process gate
@@ -26,6 +33,7 @@ export function useCaptureDeviceMap(): {
     // downstream SettingsCapture / ProcedureRoom render the EmptyStateCard
     // path instead of crashing on dshow.find() (which would receive the
     // {ok:false} object as if it were CaptureDevice[]).
+    setLoading(true);
     void safeInvoke(window.api.capture.listDevices())
       .then((dshowDevices) => {
         if (cancelled) return;
@@ -34,6 +42,7 @@ export function useCaptureDeviceMap(): {
           setError('License required — activate to list capture devices.');
           return;
         }
+        setError(null);
         return navigator.mediaDevices.enumerateDevices().then((mediaDevices) => {
           if (cancelled) return;
           setDshow(dshowDevices);
@@ -47,11 +56,18 @@ export function useCaptureDeviceMap(): {
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  // Quick task 260913-rp5 — when the user activates the license, re-fetch
+  // so the stale "License required" error clears and the device list
+  // populates. LICENSE_CHANGED_EVENT fires only from the License sub-page
+  // on successful activation, so this listener is safe to fire on every
+  // event.
+  useLicenseChangeRefresh(refetch);
 
   const namesByBrowserId = useMemo(() => {
     const names = new Map<string, string>();

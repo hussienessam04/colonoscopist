@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowRight, Camera, CircleDot, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { FramingGuide } from '@/components/FramingGuide';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import EmptyStateCard from '@/components/EmptyStateCard';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { useRoute } from '@/store/route';
 import { safeInvoke } from '@/lib/ipc-result';
 import type { Procedure } from '@shared/ipc-contract';
@@ -77,7 +78,13 @@ export default function ProcedurePreview(): JSX.Element {
   // depending on the whole object would cause an infinite start/stop loop).
   const { start: previewStart, stop: previewStop } = preview;
 
-  useEffect(() => {
+  // Quick task 260913-rp5 — extracted the default-device fetch into a
+  // stable callback so the LICENSE_CHANGED_EVENT listener can re-run it
+  // when the user activates. The previous version had
+  // `useEffect(() => {...}, [])` which meant the page never recovered
+  // after activation: savedDevice stayed null and the no-device overlay
+  // kept showing.
+  const refetchDefaultDevice = useCallback((): void => {
     let cancelled = false;
     void window.api.capture
       .getDefaultDevice()
@@ -90,10 +97,13 @@ export default function ProcedurePreview(): JSX.Element {
       .finally(() => {
         if (!cancelled) setDefaultLoaded(true);
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    refetchDefaultDevice();
+  }, [refetchDefaultDevice]);
+
+  useLicenseChangeRefresh(refetchDefaultDevice);
 
   useEffect(() => {
     if (loading || !defaultLoaded || deviceInitRef.current) return;
@@ -127,6 +137,16 @@ export default function ProcedurePreview(): JSX.Element {
 
   const ready = !loading && defaultLoaded;
   const hasSelection = selectedBrowserId !== null;
+
+  // Quick task 260913-rp5 — clear `gated` when the user activates so
+  // the EmptyStateCard disappears and they can click Continue to
+  // recording again. The hook-level useCaptureDeviceMap also re-fetches
+  // automatically; this clears the local "procedures.create was
+  // rejected" flag specifically.
+  useLicenseChangeRefresh(() => {
+    setGated(false);
+    setProcedureError(null);
+  });
 
   function openSettings(): void {
     navigate({ name: 'settings-capture' });

@@ -70,3 +70,33 @@ export function useLicenseStatus(): UseLicenseStatusResult {
   return { status, loading, refresh };
 }
 
+// useLicenseChangeRefresh — quick task 260913-rp5.
+//
+// When the user activates the license, the License sub-page dispatches
+// LICENSE_CHANGED_EVENT. Every useLicenseStatus instance re-fetches.
+//
+// Other renderer hooks / inline useEffects that gate their IPC reads on
+// license state (useCaptureDeviceMap, useProcedures, ProcedureRoom's
+// getDefaultDevice / getPreset, ProcedurePreview's setGated,
+// SettingsCapture's setGated, ProcedureReview's patient fetch) set a
+// `gated` flag when the gate rejects. The flag stays stuck at true
+// unless something triggers a re-fetch.
+//
+// This helper wires the missing link: any caller can register a refresh
+// callback that fires when LICENSE_CHANGED_EVENT arrives. The callback
+// re-runs the IPC read; if the new license state is 'licensed' the
+// gated flag clears naturally.
+export function useLicenseChangeRefresh(
+  refresh: () => void | Promise<void>,
+): void {
+  useEffect(() => {
+    function onChanged(): void {
+      void refresh();
+    }
+    window.addEventListener(LICENSE_CHANGED_EVENT, onChanged);
+    return () => {
+      window.removeEventListener(LICENSE_CHANGED_EVENT, onChanged);
+    };
+  }, [refresh]);
+}
+

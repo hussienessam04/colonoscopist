@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Camera, NotebookPen, PanelLeft, Video } from 'lucide-react';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { screenshotToastStore } from '@/store/screenshot-toast';
@@ -80,7 +81,12 @@ export default function ProcedureRoom(): JSX.Element {
   // discriminates by element type, so the same hook drives both paths.
   const previewImgRef = useRef<HTMLImageElement | null>(null);
 
-  useEffect(() => {
+  // Quick task 260913-rp5 — extracted the fetch into a stable callback so
+  // the LICENSE_CHANGED_EVENT listener can re-run it when the user
+  // activates. The previous version had `useEffect(() => {...}, [])`
+  // which meant the page never recovered after activation: savedDevice
+  // stayed null and the no-device overlay kept showing.
+  const refetchDefaultDevice = useCallback((): void => {
     let cancelled = false;
     // Plan 08-11 / G-08-5 — wrap through safeInvoke so a gate-rejected
     // {ok:false} surfaces as null (no-device state) instead of feeding the
@@ -96,10 +102,13 @@ export default function ProcedureRoom(): JSX.Element {
       .finally(() => {
         if (!cancelled) setDefaultLoaded(true);
       });
-    return () => {
-      cancelled = true;
-    };
   }, []);
+
+  useEffect(() => {
+    refetchDefaultDevice();
+  }, [refetchDefaultDevice]);
+
+  useLicenseChangeRefresh(refetchDefaultDevice);
 
   useEffect(() => {
     if (!defaultLoaded || !savedDevice || deviceInitRef.current) return;
@@ -111,25 +120,34 @@ export default function ProcedureRoom(): JSX.Element {
 
   const selectedCanonical = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
 
-  useEffect(() => {
-    if (!selectedCanonical) {
-      setPreset(undefined);
-      return;
-    }
+  // Quick task 260913-rp5 — same refetch pattern: extract the preset
+  // fetch into a callback so it re-runs on license change. Without this,
+  // a `preset=undefined` set during the unactivated mount stays stuck
+  // even after activation, leaving canRecord=false permanently.
+  const refetchPreset = useCallback((deviceName: string): void => {
     let cancelled = false;
     // Plan 08-11 / G-08-5 — safeInvoke unwraps the gate object to null; the
     // `?? undefined` keeps the type contract and disables canRecord.
-    void safeInvoke(window.api.capture.getPreset({ deviceId: selectedCanonical }))
+    void safeInvoke(window.api.capture.getPreset({ deviceId: deviceName }))
       .then((nextPreset) => {
         if (!cancelled) setPreset(nextPreset ?? undefined);
       })
       .catch(() => {
         if (!cancelled) setPreset(undefined);
       });
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedCanonical]);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedCanonical) {
+      setPreset(undefined);
+      return;
+    }
+    refetchPreset(selectedCanonical);
+  }, [refetchPreset, selectedCanonical]);
+
+  useLicenseChangeRefresh(() => {
+    if (selectedCanonical) refetchPreset(selectedCanonical);
+  });
 
   useEffect(() => {
     const unsubscribe = window.api.recording.onStatus((status) => {

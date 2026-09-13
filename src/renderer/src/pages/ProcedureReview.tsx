@@ -37,6 +37,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import { TrimControls } from '@/components/TrimControls';
 import { useProcedures } from '@/hooks/useProcedures';
 import { useReport } from '@/hooks/useReport';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { useRoute } from '@/store/route';
 import { useLastLost, recordingStore } from '@/store/recording';
 import { useScreenshotToasts, screenshotToastStore } from '@/store/screenshot-toast';
@@ -222,12 +223,12 @@ export default function ProcedureReview({
   // patients.get OR the useProcedures hook may flip it.
   const [patientGated, setPatientGated] = useState(false);
   const gated = patientGated || proceduresGated;
-  useEffect(() => {
-    if (!procedure?.patientId) {
-      setPatient(null);
-      setPatientGated(false);
-      return;
-    }
+  // Quick task 260913-rp5 — extracted into a stable callback so the
+  // LICENSE_CHANGED_EVENT listener below can re-run it when the user
+  // activates. The previous version had `useEffect(() => {...},
+  // [procedure?.patientId])` which never re-ran after the first gate
+  // rejection; patientGated stayed true forever.
+  const refetchPatient = useCallback((patientId: string): void => {
     let cancelled = false;
     // ponytail: optional-chain `.then` so a mid-render mutation of
     // `window.api` (cascade pollution from a prior test's stashed
@@ -235,7 +236,7 @@ export default function ProcedureReview({
     // of undefined (reading 'then')". Production callers always seed
     // `window.api` before mount; the optional chain is a defensive
     // zero-cost guard for renderer tests + HMR edge cases.
-    const promise = window.api.patients?.get?.(procedure.patientId);
+    const promise = window.api.patients?.get?.(patientId);
     if (promise && typeof promise.then === 'function') {
       promise
         .then(async (raw) => {
@@ -256,13 +257,28 @@ export default function ProcedureReview({
             setPatientGated(true);
           }
         });
-    } else if (!cancelled) {
-      setPatient(null);
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [procedure?.patientId]);
+  }, []);
+
+  useEffect(() => {
+    if (!procedure?.patientId) {
+      setPatient(null);
+      setPatientGated(false);
+      return;
+    }
+    refetchPatient(procedure.patientId);
+  }, [procedure?.patientId, refetchPatient]);
+
+  // Quick task 260913-rp5 — when the user activates, clear the local
+  // patientGated flag and re-fetch the patient row. useProcedures (via
+  // useLicenseChangeRefresh wired into the hook) re-fetches procedures /
+  // segments / notes / screenshots in parallel.
+  useLicenseChangeRefresh(() => {
+    setPatientGated(false);
+    if (procedure?.patientId) {
+      refetchPatient(procedure.patientId);
+    }
+  });
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [currentMs, setCurrentMs] = useState(0);

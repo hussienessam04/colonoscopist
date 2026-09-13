@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Save, Settings, Video } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
+import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import EmptyStateCard from '@/components/EmptyStateCard';
@@ -77,12 +78,13 @@ export default function SettingsCapture(): JSX.Element {
   // hydration in the expired/unactivated state).
   const [gated, setGated] = useState(false);
 
-  // Hydrate from main: saved default device. The dshow list is always
-  // available; the browser list may be empty until the user grants the
-  // camera permission. We wait for `bridgeLoading` to flip false, which
-  // means at least the dshow list is loaded.
-  useEffect(() => {
-    if (bridgeLoading || hydrated) return;
+  // Quick task 260913-rp5 — extracted the hydration fetch into a stable
+  // callback so the LICENSE_CHANGED_EVENT listener can re-run it when
+  // the user activates. The previous version had `useEffect(() => {...},
+  // [bridgeLoading, hydrated, pickBrowserId])` with `hydrated=true` after
+  // the first run, so the page never recovered after activation: `gated`
+  // stayed true and the EmptyStateCard kept showing.
+  const hydrate = useCallback((): void => {
     let cancelled = false;
     void (async (): Promise<void> => {
       const device = await safeInvoke(window.api.capture.getDefaultDevice());
@@ -98,6 +100,7 @@ export default function SettingsCapture(): JSX.Element {
         setHydrated(true);
         return;
       }
+      setGated(false);
       setSavedDeviceId(device);
       const browserId = pickBrowserId(device);
       if (!browserId) {
@@ -117,10 +120,20 @@ export default function SettingsCapture(): JSX.Element {
       setNoSavedDevice(true);
       setHydrated(true);
     });
-    return () => {
-      cancelled = true;
-    };
-  }, [bridgeLoading, hydrated, pickBrowserId]);
+  }, [pickBrowserId]);
+
+  useEffect(() => {
+    if (bridgeLoading || hydrated) return;
+    hydrate();
+  }, [bridgeLoading, hydrate, hydrated]);
+
+  // Quick task 260913-rp5 — clear the local gated flag when the user
+  // activates so the EmptyStateCard disappears. The hydrate() callback
+  // also re-runs, which clears gated via the success branch above.
+  useLicenseChangeRefresh(() => {
+    setGated(false);
+    hydrate();
+  });
 
   const canonicalName = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
   const previewPreset = useMemo(() => buildPreviewPreset(form), [form]);
