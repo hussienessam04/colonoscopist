@@ -65,3 +65,15 @@ Fix:
 
 Test count: 893 passed, 3 pre-existing unrelated failures (PDF smoke opt-in + Playwright e2e harness).
 
+---
+
+# Follow-up commit (260913-rp5-c): chicken-and-egg device picker disable
+
+User reported "License required gone but the choose device dropdown is disabled in Settings → Capture but in Preview & setup page I can choose device from the dropdown". `SettingsCapture.tsx:295` had `disabled={browser.length === 0 || selectedBrowserId === null}` — the second clause is a chicken-and-egg bug (the user can't pick a device because the picker is disabled until they pick one). `ProcedurePreview` doesn't have this bug (its device Select has no `disabled` prop).
+
+Fix: removed `selectedBrowserId === null` from the dropdown's `disabled` prop. Save + Start Preview stay correctly gated on `canSave` (separate predicate). The dropdown now only disables when there are zero devices to choose from at all.
+
+Regression test added: device picker is enabled when devices exist but no saved device is picked yet. `useCaptureDeviceMap`'s `browser` is stubbed via the existing `procedure-preview.test.tsx` `navigator.mediaDevices` polyfill so the test can probe the picker state.
+
+Test count: 894 passed, 3 pre-existing unrelated failures (PDF smoke opt-in + Playwright e2e harness).
+
