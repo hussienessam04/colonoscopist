@@ -1,9 +1,29 @@
-import { app, BrowserWindow, shell } from 'electron';
+import { app, BrowserWindow, nativeImage, shell } from 'electron';
 import path from 'node:path';
+import fs from 'node:fs';
 import { logStartup } from './startup-log';
 
 const FILE_PROTOCOL = 'file:';
 const DEV_SERVER_URL = 'http://localhost:5173';
+
+// ponytail: lazy icon lookup. The icon SVG ships with the renderer (it's
+// also the favicon), so we resolve relative to __dirname. Two paths tried,
+// because electron-vite's "out/renderer/" layout differs by version + the
+// user might rename it. Falls back to undefined if missing — Electron uses
+// its built-in default icon in that case.
+function resolveAppIcon(): Electron.NativeImage | undefined {
+  const candidates = [
+    path.join(__dirname, '../renderer/icon.svg'),
+    path.join(__dirname, '../renderer/assets/icon.svg'),
+  ];
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return nativeImage.createFromPath(candidate);
+    }
+  }
+  logStartup('icon-missing');
+  return undefined;
+}
 
 export function createMainWindow(): BrowserWindow {
   const preloadPath = path.join(__dirname, '../preload/index.js');
@@ -18,6 +38,12 @@ export function createMainWindow(): BrowserWindow {
     title: 'Colonoscopist',
     show: false,
     autoHideMenuBar: true,
+    // App icon — Health Icons "gastroenterology" (CC0 / public domain).
+    // vite copies src/renderer/public/ → <renderer-output>/ at build time,
+    // so this path resolves in both dev and prod. SVG window icons render
+    // via Chromium in Electron 32+. Bail to no-icon if the file is missing
+    // (e.g. someone deletes it) so the app still launches.
+    icon: resolveAppIcon(),
     // Per D-11 + PITFALLS Integration Gotchas — sandboxed renderer needs
     // explicit `media` permission to call getUserMedia. Electron 32's
     // `WebPreferences` type does not expose `permissions`; the actual
