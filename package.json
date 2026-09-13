@@ -53,7 +53,7 @@
     "portable": {},
     "publish": {
       "provider": "github",
-      "owner": "hussienessam",
+      "owner": "hussienessam04",
       "repo": "colonoscopist",
       "releaseType": "release",
       "publishAutoUpdate": true
