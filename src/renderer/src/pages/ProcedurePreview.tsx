@@ -15,8 +15,8 @@ import { useCaptureDeviceMap } from '@/hooks/useCaptureDeviceMap';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import EmptyStateCard from '@/components/EmptyStateCard';
 import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
+import { isGateRejected, safeInvoke } from '@/lib/ipc-result';
 import { useRoute } from '@/store/route';
-import { safeInvoke } from '@/lib/ipc-result';
 import type { Procedure } from '@shared/ipc-contract';
 
 // Quick task 20260907-procedure-preview-ui-enhance — design
@@ -84,19 +84,17 @@ export default function ProcedurePreview(): JSX.Element {
   // `useEffect(() => {...}, [])` which meant the page never recovered
   // after activation: savedDevice stayed null and the no-device overlay
   // kept showing.
+  //
+  // Follow-up: distinguish gate rejection from legitimate "no saved
+  // device" via isGateRejected so the IPC contract stays lossless.
   const refetchDefaultDevice = useCallback((): void => {
     let cancelled = false;
-    void window.api.capture
-      .getDefaultDevice()
-      .then((device) => {
-        if (!cancelled) setSavedDevice(device);
-      })
-      .catch(() => {
-        if (!cancelled) setSavedDevice(null);
-      })
-      .finally(() => {
-        if (!cancelled) setDefaultLoaded(true);
-      });
+    void (async (): Promise<void> => {
+      const raw = await window.api.capture.getDefaultDevice();
+      if (cancelled) return;
+      setSavedDevice(isGateRejected(raw) ? null : (raw ?? null));
+      setDefaultLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {

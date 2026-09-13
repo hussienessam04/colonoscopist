@@ -17,7 +17,7 @@ import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { SettingsLayout } from '@/components/SettingsLayout';
 import EmptyStateCard from '@/components/EmptyStateCard';
-import { safeInvoke } from '@/lib/ipc-result';
+import { isGateRejected, safeInvoke } from '@/lib/ipc-result';
 import { qualityPresetSchema } from '@shared/validators';
 import { toast } from 'sonner';
 import type { QualityPreset } from '@shared/ipc-contract';
@@ -84,23 +84,40 @@ export default function SettingsCapture(): JSX.Element {
   // [bridgeLoading, hydrated, pickBrowserId])` with `hydrated=true` after
   // the first run, so the page never recovered after activation: `gated`
   // stayed true and the EmptyStateCard kept showing.
+  //
+  // Follow-up: distinguish gate rejection (license issue → EmptyStateCard)
+  // from "no saved device" (legitimate null when the user is licensed
+  // but has never saved a device OR has no USB capture plugged in). The
+  // raw IPC response shape is checked via isGateRejected BEFORE passing
+  // through safeInvoke — safeInvoke collapses both shapes into null,
+  // which is the bug we hit when a licensed user with no USB device
+  // still saw "License required — open Settings → License to activate.".
   const hydrate = useCallback((): void => {
     let cancelled = false;
     void (async (): Promise<void> => {
-      const device = await safeInvoke(window.api.capture.getDefaultDevice());
+      const rawDevice = await window.api.capture.getDefaultDevice();
       if (cancelled) return;
-      if (device === null) {
-        // Plan 08-11 / G-08-5 — gate rejected the read. Treat as "no
-        // device" rather than feeding the {ok:false} object into state.
-        // EmptyStateCard surfaces the license path; the no-device hint
-        // stays rendered for the legitimate empty case.
+      if (isGateRejected(rawDevice)) {
+        // Plan 08-11 / G-08-5 — gate rejected the read. EmptyStateCard
+        // surfaces the license path; the no-device hint stays rendered
+        // for the legitimate empty case (handled below).
         setSavedDeviceId(null);
         setNoSavedDevice(true);
         setGated(true);
         setHydrated(true);
         return;
       }
+      // rawDevice is now legitimately `string | null | undefined`.
+      // null = "no saved device" (license is fine, doctor just hasn't
+      // picked one yet); treat as the no-device hint, NOT gated.
+      const device = rawDevice ?? null;
       setGated(false);
+      if (device === null) {
+        setSavedDeviceId(null);
+        setNoSavedDevice(true);
+        setHydrated(true);
+        return;
+      }
       setSavedDeviceId(device);
       const browserId = pickBrowserId(device);
       if (!browserId) {

@@ -84,12 +84,13 @@ describe('useCaptureDeviceMap', () => {
   });
 
   it('surfaces an error message when the IPC call rejects', async () => {
-    // Plan 08-12 / G-08-6 — safeInvoke (per Plan 08-10 / G-08-4) absorbs
-    // throws into null, matching the convention used by every other
-    // capture.* consumer (SettingsCapture, ProcedureRoom). The hook then
-    // routes null through the same license-aware message as gate
-    // rejection. The contract here is "surface an error" — not "echo the
-    // raw rejection message", which is what the OLD .catch branch did.
+    // Plan 08-12 / G-08-6 + Quick task 260913-rp5 — IPC throws are
+    // surfaced as the raw error message (NOT collapsed into the
+    // license-required message the way safeInvoke used to). Gate
+    // rejections still surface the license-required message so the
+    // downstream page renders the EmptyStateCard path. The contract
+    // here is "surface an error" — gate rejection is tested in the
+    // next case.
     getApi().capture.listDevices.mockRejectedValueOnce(new Error('boom'));
     mockBrowserDevices([]);
 
@@ -99,7 +100,7 @@ describe('useCaptureDeviceMap', () => {
     });
 
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.error).toMatch(/license required/i);
+    expect(result.current.error).toMatch(/boom/i);
   });
 
   // Plan 08-12 / G-08-6 — when the main-process license gate returns

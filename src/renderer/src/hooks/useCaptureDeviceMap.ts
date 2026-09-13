@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CaptureDevice } from '@shared/ipc-contract';
-import { safeInvoke } from '@/lib/ipc-result';
+import { isGateRejected } from '@/lib/ipc-result';
 import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 
 const comparable = (value: string): string => value.trim().toLocaleLowerCase();
@@ -26,36 +26,36 @@ export function useCaptureDeviceMap(): {
   // error and lets the capture page work normally.
   const refetch = useCallback((): void => {
     let cancelled = false;
-    // Plan 08-12 / G-08-6 — wrap capture.listDevices through safeInvoke.
-    // On license state 'expired' / 'unactivated' the main-process gate
-    // returns {ok:false, code:'IPC_LICENSE_*'}; safeInvoke yields null
-    // and we surface an empty device list + a license-aware error so
-    // downstream SettingsCapture / ProcedureRoom render the EmptyStateCard
-    // path instead of crashing on dshow.find() (which would receive the
-    // {ok:false} object as if it were CaptureDevice[]).
+    // Plan 08-12 / G-08-6 — distinguish gate rejection from a legitimate
+    // empty device list. safeInvoke collapses both into null; the raw
+    // shape is checked via isGateRejected so a licensed user with no
+    // USB capture plugged in (which returns `[]`) doesn't trigger the
+    // "License required" error path.
     setLoading(true);
-    void safeInvoke(window.api.capture.listDevices())
-      .then((dshowDevices) => {
+    void (async (): Promise<void> => {
+      try {
+        const raw = await window.api.capture.listDevices();
         if (cancelled) return;
-        if (dshowDevices === null) {
+        if (isGateRejected(raw)) {
           setDshow([]);
           setError('License required — activate to list capture devices.');
           return;
         }
-        setError(null);
-        return navigator.mediaDevices.enumerateDevices().then((mediaDevices) => {
-          if (cancelled) return;
-          setDshow(dshowDevices);
-          setBrowser(mediaDevices.filter((device) => device.kind === 'videoinput'));
-        });
-      })
-      .catch((cause: unknown) => {
+        const dshowDevices = raw ?? [];
+        const mediaDevices = await navigator.mediaDevices.enumerateDevices();
         if (cancelled) return;
-        setError(cause instanceof Error ? cause.message : 'Capture devices could not be listed.');
-      })
-      .finally(() => {
+        setDshow(dshowDevices);
+        setError(null);
+        setBrowser(mediaDevices.filter((device) => device.kind === 'videoinput'));
+      } catch (cause: unknown) {
+        if (cancelled) return;
+        setError(
+          cause instanceof Error ? cause.message : 'Capture devices could not be listed.',
+        );
+      } finally {
         if (!cancelled) setLoading(false);
-      });
+      }
+    })();
   }, []);
 
   useEffect(() => {

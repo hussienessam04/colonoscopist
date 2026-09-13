@@ -16,6 +16,7 @@ import { useMediaUrl } from '@/hooks/useMediaUrl';
 import { useVideoPreview } from '@/hooks/useVideoPreview';
 import { useScreenshotIntake } from '@/hooks/useScreenshotIntake';
 import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
+import { isGateRejected } from '@/lib/ipc-result';
 import { useRoute } from '@/store/route';
 import { recordingStore, useRecordingState, useTimerSnapshot, useLastLost } from '@/store/recording';
 import { screenshotToastStore } from '@/store/screenshot-toast';
@@ -86,22 +87,23 @@ export default function ProcedureRoom(): JSX.Element {
   // activates. The previous version had `useEffect(() => {...}, [])`
   // which meant the page never recovered after activation: savedDevice
   // stayed null and the no-device overlay kept showing.
+  //
+  // Follow-up: distinguish gate rejection from legitimate "no saved
+  // device" — both flow through safeInvoke as null. ProcedureRoom
+  // renders the existing no-device overlay either way (a license
+  // rejection surfaces the same UI as "no device"), but the raw shape
+  // is checked so the IPC contract isn't lossy.
   const refetchDefaultDevice = useCallback((): void => {
     let cancelled = false;
-    // Plan 08-11 / G-08-5 — wrap through safeInvoke so a gate-rejected
-    // {ok:false} surfaces as null (no-device state) instead of feeding the
-    // gate object into setSavedDevice. The existing no-device overlay
-    // (lines 365-378) renders naturally when savedDevice stays null.
-    void safeInvoke(window.api.capture.getDefaultDevice())
-      .then((device) => {
-        if (!cancelled) setSavedDevice(device);
-      })
-      .catch(() => {
-        if (!cancelled) setSavedDevice(null);
-      })
-      .finally(() => {
-        if (!cancelled) setDefaultLoaded(true);
-      });
+    void (async (): Promise<void> => {
+      const raw = await window.api.capture.getDefaultDevice();
+      if (cancelled) return;
+      // Gate rejection → null (same UI as no-device, no crash).
+      // Legitimate null → null (no saved device, license fine).
+      // String → saved device name.
+      setSavedDevice(isGateRejected(raw) ? null : (raw ?? null));
+      setDefaultLoaded(true);
+    })();
   }, []);
 
   useEffect(() => {

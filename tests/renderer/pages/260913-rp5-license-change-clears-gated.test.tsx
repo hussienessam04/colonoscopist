@@ -120,4 +120,41 @@ describe('Quick task 260913-rp5 — SettingsCapture recovers from gated-empty-st
     });
     void session;
   });
+
+  // Follow-up: licensed user with NO USB device plugged in (the
+  // user's actual situation). Previously the page misrendered the
+  // "License required — open Settings → License to activate." card
+  // because safeInvoke collapsed BOTH gate rejection AND legitimate
+  // null into a single null value. With isGateRejected, hydrate()
+  // only flips gated=true on actual `{ok:false}` shapes — a
+  // null = no saved device renders the "no device saved yet" hint
+  // instead of the gated card.
+  it('licensed user with no USB device plugged in renders the no-device hint, NOT the EmptyStateCard', async () => {
+    setSession();
+    const api = getApi();
+    // Licensed clinic, no USB device. listDevices returns an empty
+    // array (handler always returns an array, even empty). getDefaultDevice
+    // returns null (legitimate — no saved device).
+    api.capture.listDevices.mockResolvedValue([]);
+    api.capture.getDefaultDevice.mockResolvedValue(null);
+
+    render(<SettingsCapture />);
+
+    // Hydration settles; gated stays false (no gate rejection).
+    await waitFor(() => {
+      expect(api.capture.getDefaultDevice).toHaveBeenCalled();
+    });
+    // The EmptyStateCard MUST NOT render.
+    expect(screen.queryByTestId('gated-empty-state')).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/License required.*open Settings.*License to activate/i),
+    ).not.toBeInTheDocument();
+    // The no-device hint DOES render.
+    await waitFor(() => {
+      expect(
+        screen.getByText(/no device saved yet/i),
+      ).toBeInTheDocument();
+    });
+    void session;
+  });
 });

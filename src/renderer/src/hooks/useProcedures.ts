@@ -26,7 +26,7 @@ import type {
   ProcedureSegment,
   Screenshot,
 } from '@shared/ipc-contract';
-import { safeInvoke } from '@/lib/ipc-result';
+import { isGateRejected } from '@/lib/ipc-result';
 import { useLicenseChangeRefresh } from '@/hooks/useLicenseStatus';
 import { screenshotToastStore } from '@/store/screenshot-toast';
 
@@ -78,17 +78,23 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
       setLoading(true);
       setError(null);
       try {
-        // Plan 08-10 / G-08-4 — branch on the discriminated union via
-        // safeInvoke. Any gate-rejected arm flips `gated=true` so the
-        // consumer renders <EmptyStateCard>. The success arm proceeds
-        // unchanged.
-        const [proc, segs, noteRows, shotRows] = await Promise.all([
-          safeInvoke(window.api.procedures.get({ id: procedureId })),
-          safeInvoke(window.api.procedures.listSegments({ procedureId })),
-          safeInvoke(window.api.procedureNotes.list({ procedureId })),
-          safeInvoke(window.api.screenshots.list({ procedureId })),
+        // Plan 08-10 / G-08-4 — check the raw IPC shape per call so
+        // gate rejection (`{ok:false}`) is distinguished from a
+        // legitimate null return (procedures.get returns null when the
+        // procedure id doesn't exist). safeInvoke collapses both into
+        // null which previously over-flipped `gated=true` for licensed
+        // users with a stale procedure id in the route.
+        const [rawProc, rawSegs, rawNotes, rawShots] = await Promise.all([
+          window.api.procedures.get({ id: procedureId }),
+          window.api.procedures.listSegments({ procedureId }),
+          window.api.procedureNotes.list({ procedureId }),
+          window.api.screenshots.list({ procedureId }),
         ]);
-        if (proc === null || segs === null || noteRows === null || shotRows === null) {
+        const procIsGated = isGateRejected(rawProc);
+        const segsIsGated = isGateRejected(rawSegs);
+        const notesIsGated = isGateRejected(rawNotes);
+        const shotsIsGated = isGateRejected(rawShots);
+        if (procIsGated || segsIsGated || notesIsGated || shotsIsGated) {
           setGated(true);
           setProcedure(null);
           setSegments([]);
@@ -96,6 +102,12 @@ export function useProcedures(procedureId: string | null): UseProceduresResult {
           setScreenshots([]);
           return;
         }
+        // Any of these could still be null on a licensed clinic with no
+        // data — render the empty UI rather than the gated card.
+        const proc = rawProc ?? null;
+        const segs = Array.isArray(rawSegs) ? rawSegs : [];
+        const noteRows = Array.isArray(rawNotes) ? rawNotes : [];
+        const shotRows = Array.isArray(rawShots) ? rawShots : [];
         setProcedure(proc);
         setSegments(segs);
         setNotes(noteRows);
