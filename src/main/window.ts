@@ -6,19 +6,29 @@ import { logStartup } from './startup-log';
 const FILE_PROTOCOL = 'file:';
 const DEV_SERVER_URL = 'http://localhost:5173';
 
-// ponytail: lazy icon lookup. The icon SVG ships with the renderer (it's
-// also the favicon), so we resolve relative to __dirname. Two paths tried,
-// because electron-vite's "out/renderer/" layout differs by version + the
-// user might rename it. Falls back to undefined if missing — Electron uses
-// its built-in default icon in that case.
+// ponytail: lazy icon lookup. Resolution order:
+//   1. .ico in packaged build (process.resourcesPath — electron-builder
+//      copies buildResources/icon.ico → resources/icon.ico by default)
+//   2. SVG candidates in renderer output (also serves as favicon)
+// SVG fallback covers `npm run dev` (app.isPackaged === false) AND any
+// packaged build where the .ico is missing/corrupt. Falls back to
+// undefined if everything is missing — Electron uses its built-in default
+// icon in that case.
+// Sizes baked into the .ico: 16/24/32/48/64/128 (see scripts/build-icon.mjs).
 function resolveAppIcon(): Electron.NativeImage | undefined {
-  const candidates = [
+  const candidates: string[] = [];
+  if (app.isPackaged) {
+    // electron-builder default: buildResources/icon.ico → resources/icon.ico
+    candidates.push(path.join(process.resourcesPath, 'icon.ico'));
+  }
+  candidates.push(
     path.join(__dirname, '../renderer/icon.svg'),
     path.join(__dirname, '../renderer/assets/icon.svg'),
-  ];
+  );
   for (const candidate of candidates) {
     if (fs.existsSync(candidate)) {
-      return nativeImage.createFromPath(candidate);
+      const img = nativeImage.createFromPath(candidate);
+      if (!img.isEmpty()) return img;
     }
   }
   logStartup('icon-missing');

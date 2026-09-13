@@ -27,9 +27,20 @@
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
-      ]
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "buildResources/icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -43,7 +54,8 @@
   },
   "scripts": {
     "dev": "electron-vite dev",
-    "build": "electron-vite build",
+    "build:icon": "node scripts/build-icon.mjs",
+    "build": "npm run build:icon && electron-vite build",
     "start": "electron-vite preview",
     "package": "npm run build && electron-builder --win nsis",
     "package:portable": "npm run build && electron-builder --win portable",
@@ -97,6 +109,7 @@
   "devDependencies": {
     "@electron/rebuild": "^3.7.1",
     "@playwright/test": "^1.50.0",
+    "@resvg/resvg-js": "^2.6.2",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -113,6 +126,7 @@
     "electron-vite": "2.3.0",
     "happy-dom": "^20.11.1",
     "jsdom": "^30.0.1",
+    "png-to-ico": "^2.1.1",
     "postcss": "^8.4.47",
     "tailwindcss": "3.4.19",
     "typescript": "^5.5.4",

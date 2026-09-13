@@ -1,0 +1,1 @@
+# electron-builder reads buildResources/icon.ico at packaging time. Keep this directory in git even when the .ico is regenerated.
