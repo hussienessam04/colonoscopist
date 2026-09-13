@@ -190,6 +190,9 @@ export const IPC = {
   STORAGE_GET_LOCATION: 'storage:get-location',
   STORAGE_SET_LOCATION: 'storage:set-location',
   STORAGE_PICK_FOLDER: 'storage:pick-folder',
+  // Quick task 20260913-5b0 — workstation-level diagnostic bundle for
+  // vendor support. EXEMPT from the license gate (see gate.ts).
+  APP_GET_DIAGNOSTIC: 'app:get-diagnostic',
 } as const;
 
 // Phase 7 / Plan 07-01 — Restore preview shape returned by
@@ -563,6 +566,29 @@ export type LicenseActivateResult =
   | { ok: true; vendorId: string; licensedAt: number }
   | { ok: false; code: 'IPC_LICENSE_INVALID'; reason: string };
 
+// Quick task 20260913-5b0 — workstation-level diagnostic bundle for
+// vendor support (Settings → Diagnostics). All fields are best-effort
+// — main wraps each section in try/catch and returns safe defaults so
+// a broken license cache / missing config never blocks the read.
+export type DiagnosticInfo = {
+  appVersion: string;
+  electronVersion: string;
+  nodeVersion: string;
+  chromeVersion: string;
+  userDataDir: string;
+  logsDir: string;
+  currentLogPath: string;
+  logLines: string[];
+  storageLocation: {
+    enabled: boolean;
+    effectivePath: string;
+    localPath: string;
+  } | null;
+  machineId: string;
+  licenseState: LicenseState | null;
+  trialDaysRemaining: number | null;
+};
+
 // What `contextBridge.exposeInMainWorld('api', api)` exposes to the renderer.
 export interface IpcContract {
   auth: {
@@ -898,6 +924,12 @@ export interface IpcContract {
     getLocation: () => Promise<StorageLocationResult>;
     setLocation: (input: StorageSetLocationInput) => Promise<StorageSetLocationResult>;
     pickFolder: () => Promise<StoragePickFolderResult>;
+  };
+  // Quick task 20260913-5b0 — workstation-level diagnostic bundle
+  // (Settings → Diagnostics). Returns the bundle the doctor copies
+  // when they email support. EXEMPT from the license gate (gate.ts).
+  app: {
+    getDiagnostic: () => Promise<DiagnosticInfo>;
   };
 }
 

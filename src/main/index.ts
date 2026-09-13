@@ -21,10 +21,14 @@ import { registerLicenseIpc } from './ipc/license';
 // Quick task 20260912-shared-database-optional — opt-in shared
 // DB across devices (Settings → Storage).
 import { registerStorageIpc } from './ipc/storage';
+// Quick task 20260913-5b0 — workstation-level diagnostic bundle for
+// vendor support (Settings → Diagnostics). Registered FIRST so an
+// expired / unactivated clinic can still export the bundle.
+import { registerDiagnosticsIpc } from './ipc/diagnostics';
 import { enumerateDshowDevices } from './capture/devices';
 import { getDb, closeDb } from './db';
 import { proceduresRepo } from './db/procedures-repo';
-import { logStartup } from './startup-log';
+import { logEvent, logStartup } from './startup-log';
 import {
   initMediaServer,
   initRecorder,
@@ -44,6 +48,22 @@ if (process.platform === 'win32') {
   app.setAppUserModelId(APP_USER_MODEL_ID);
 }
 
+// Quick task 20260913-5b0 — process-level crash capture. Wired at
+// module top (BEFORE `app.whenReady`) so any failure during the
+// boot path itself lands in startup.log. We deliberately DO NOT
+// exit — Electron handles process lifecycle; the renderer is
+// sandboxed so a crash here usually means a bad spawn/IO, and
+// exiting would leave the doctor staring at a dead window with
+// no diagnostic trail.
+process.on('uncaughtException', (err) => {
+  logEvent('error', 'uncaught_exception', { err: err.stack ?? err.message });
+});
+
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  logEvent('error', 'unhandled_rejection', { err: err.stack ?? err.message });
+});
+
 let recorderSingleton: { newRecorder: () => Recorder } | null = null;
 
 // per D-01 + AUDIT-01 — DB open + migrations BEFORE any IPC handler registration.
@@ -52,6 +72,12 @@ let recorderSingleton: { newRecorder: () => Recorder } | null = null;
 // Recorder init BEFORE the IPC registrations so the registry exists when handlers run.
 app.whenReady().then(() => {
   getDb();
+  // Quick task 20260913-5b0 — register diagnostics FIRST so an
+  // expired / unactivated clinic can still read the diagnostic
+  // bundle from Settings → Diagnostics. The channel is EXEMPT
+  // from the license gate (gate.ts), but registering it first
+  // means there's no temporal window where it could be missed.
+  registerDiagnosticsIpc();
   const recorderModule = initRecorder();
   recorderSingleton = {
     newRecorder: () => recorderModule.newRecorder(),

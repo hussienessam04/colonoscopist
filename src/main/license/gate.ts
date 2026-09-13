@@ -75,6 +75,10 @@ export const EXEMPT_CHANNELS: ReadonlySet<string> = new Set<string>([
   // action; happens whenever the doctor copies the machine id. Not
   // gating this would block a normal workflow for an expired license.
   IPC.CLIPBOARD_COPY_TEXT,
+  // Quick task 20260913-5b0 — diagnostic info is a workstation-level
+  // read for support. A clinic with an expired license should still
+  // be able to ship us the diagnostic bundle.
+  IPC.APP_GET_DIAGNOSTIC,
 ]);
 
 export type LicenseGateError =

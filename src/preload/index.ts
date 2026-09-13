@@ -217,6 +217,13 @@ const api: IpcContract = {
     setLocation: (input) => ipcRenderer.invoke(IPC.STORAGE_SET_LOCATION, input),
     pickFolder: () => ipcRenderer.invoke(IPC.STORAGE_PICK_FOLDER),
   },
+  // Quick task 20260913-5b0 — workstation-level diagnostic bundle
+  // for the Settings → Diagnostics page. Single read channel; the
+  // page renders the result + a Copy button that writes the JSON
+  // to the clipboard via `clipboard.copyText`.
+  app: {
+    getDiagnostic: () => ipcRenderer.invoke(IPC.APP_GET_DIAGNOSTIC),
+  },
 };
 
 try {
