@@ -35,10 +35,18 @@ import yauzl from 'yauzl';
 // derived public is:
 //   ed.getPublicKeyAsync(hex'92f11c11...0b8a')
 //   === hex'3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363'
-// so the tests can sign with the documented private key and verify
-// against the shipped constant end-to-end.
+// Quick task 260913-fix-key-mismatch — swapped to match the vendor private
+// key in `secrets/ed25519.private` (the key the vendor uses via
+// `gen-license.cjs`). Derived public key: ad49a4d8fcb62216dff615beaa06137d
+// 2e21c88a91ee3b585d2c38817b13f5c9. The previous constant
+// (3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363)
+// matched the test fixture's key (92f11c11f05e...) so the roundtrip
+// tests stayed green, but `gen-license.cjs` was signing with a
+// DIFFERENT private key → real-world licenses failed SIGNATURE_MISMATCH.
+// Tests updated in lockstep (license-gate-blocks-procedure.test.ts,
+// license-verify-roundtrip.test.ts).
 export const VENDOR_PUBLIC_KEY_HEX =
-  '3b04db95c08623afa65c81dff66bef16ead59ad913348d2348bfa19aa2cf3363';
+  'ad49a4d8fcb62216dff615beaa06137d2e21c88a91ee3b585d2c38817b13f5c9';
 
 export type VerifyResult =
   | {

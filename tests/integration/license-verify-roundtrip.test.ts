@@ -41,7 +41,7 @@ describe.skipIf(!smokeEnabled)('license verify roundtrip (LIC-02 + Pitfall 2)', 
     // the EMBEDDED constant. In production, the vendor uses a different
     // private key but the SAME public key is shipped in the binary.
     const vendorPrivate = Buffer.from(
-      '92f11c11f05e430b0abbf359ddf4a4283a4a6f36e0cc8322cd0f1fdc6c220b8a',
+      'fa3efefc7150cbcf256b80b2f2aabd6cd76f4f97b6d986c7e430abf6d636eec6',
       'hex',
     );
     const derivedPub = Buffer.from(await ed.getPublicKeyAsync(vendorPrivate)).toString('hex');
@@ -112,7 +112,7 @@ describe.skipIf(!smokeEnabled)('license verify roundtrip (LIC-02 + Pitfall 2)', 
     // this test re-asserts it after the yauzl extraction so we know
     // the byte-stability guarantee survives the zip round-trip.
     const vendorPrivate = Buffer.from(
-      '92f11c11f05e430b0abbf359ddf4a4283a4a6f36e0cc8322cd0f1fdc6c220b8a',
+      'fa3efefc7150cbcf256b80b2f2aabd6cd76f4f97b6d986c7e430abf6d636eec6',
       'hex',
     );
     const fingerprint = hashFingerprint({
