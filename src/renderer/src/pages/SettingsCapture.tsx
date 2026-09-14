@@ -63,7 +63,7 @@ function buildPreviewPreset(form: PresetForm): QualityPreset | undefined {
 
 export default function SettingsCapture(): JSX.Element {
   const { t } = useTranslation();
-  const { browser, loading: bridgeLoading, lookup, pickBrowserId } = useCaptureDeviceMap();
+  const { browser, dshow, loading: bridgeLoading, lookup, pickBrowserId } = useCaptureDeviceMap();
 
   const [savedDeviceId, setSavedDeviceId] = useState<string | null>(null);
   const [selectedBrowserId, setSelectedBrowserId] = useState<string | null>(null);
@@ -152,29 +152,43 @@ export default function SettingsCapture(): JSX.Element {
     hydrate();
   });
 
-  const canonicalName = selectedBrowserId ? lookup(selectedBrowserId) : undefined;
+  // Quick task 260913-rp5 follow-up — `selectedBrowserId` is now a
+  // union: a browser UUID when populated from the browser list, OR a
+  // dshow canonical name when populated from the dshow fallback list
+  // (enumerateDevices returned [] until the doctor granted media
+  // permission). `selectedCanonical` is the device name to pass to
+  // the IPC — for browser items it's the lookup result; for dshow
+  // fallback items the dropdown value IS the canonical name already.
+  const selectedCanonical = selectedBrowserId
+    ? lookup(selectedBrowserId) ?? selectedBrowserId
+    : undefined;
   const previewPreset = useMemo(() => buildPreviewPreset(form), [form]);
-  const preview = useVideoPreview(selectedBrowserId, previewPreset);
+  // The video preview needs a browser deviceId — when the user picked a
+  // dshow fallback, `selectedBrowserId` is the canonical name and
+  // `pickBrowserId` returns undefined → useVideoPreview receives
+  // undefined and stays idle (correct UX: preview disabled when no
+  // browser permission; pick survives and saves to disk).
+  const selectedBrowserIdForPreview = selectedBrowserId
+    ? (pickBrowserId(selectedBrowserId) ?? null)
+    : null;
+  const preview = useVideoPreview(selectedBrowserIdForPreview, previewPreset);
 
-  function handleDeviceChange(browserId: string): void {
+  function handleDeviceChange(value: string): void {
     preview.stop();
-    setSelectedBrowserId(browserId);
+    setSelectedBrowserId(value);
     setHydrated(false);
-    const name = lookup(browserId);
-    if (name) {
-      // Plan 08-11 / G-08-5 — wrap preset fetch through safeInvoke; null
-      // (gate rejection) flows through fromPreset → defaultForm() which
-      // already handles nullish input.
-      void safeInvoke(window.api.capture.getPreset({ deviceId: name })).then(
-        (preset) => {
-          setForm(fromPreset(preset));
-          setHydrated(true);
-        },
-      );
-    } else {
-      setForm(defaultForm());
-      setHydrated(true);
-    }
+    // value is either a browser UUID (lookup succeeds) or a dshow
+    // canonical name (lookup returns undefined → treat value as name).
+    const name = lookup(value) ?? value;
+    // Plan 08-11 / G-08-5 — wrap preset fetch through safeInvoke; null
+    // (gate rejection) flows through fromPreset → defaultForm() which
+    // already handles nullish input.
+    void safeInvoke(window.api.capture.getPreset({ deviceId: name })).then(
+      (preset) => {
+        setForm(fromPreset(preset));
+        setHydrated(true);
+      },
+    );
   }
 
   function setKind(kind: PresetKind): void {
@@ -197,9 +211,17 @@ export default function SettingsCapture(): JSX.Element {
   }
 
   const customResolutionValid = form.kind !== 'custom' || RESOLUTION_PATTERN.test(form.resolution);
-  const canSave = !saving && hydrated && selectedBrowserId !== null && !!canonicalName && customResolutionValid;
+  // Quick task 260913-rp5 follow-up — canSave requires a resolved
+  // canonical device name. For browser items this is the lookup result;
+  // for dshow fallback items the dropdown value IS the canonical name
+  // already, so selectedCanonical handles both cases via `??`.
+  const canSave =
+    !saving &&
+    hydrated &&
+    selectedBrowserId !== null &&
+    !!selectedCanonical &&
+    customResolutionValid;
   const isPreviewing = preview.active || preview.starting;
-  const selectedCanonical = canonicalName;
 
   async function handleSave(): Promise<void> {
     if (!selectedCanonical || !customResolutionValid) return;
@@ -297,10 +319,16 @@ export default function SettingsCapture(): JSX.Element {
               // disabled before any pick happens). Save + Start Preview
               // stay correctly gated on `canSave` (selectedBrowserId !==
               // null) below. The dropdown only disables when there are
-              // no devices to choose from at all.
+              // no devices to choose from EITHER browser (camera
+              // permission might be missing → enumerateDevices returns
+              // []) OR dshow (the IPC list of DirectShow devices — the
+              // canonical source of truth for this clinic's capture
+              // cards). Falling back to dshow-only is what unblocks the
+              // NSIS build where `enumerateDevices` requires media
+              // permission the doctor hasn't granted yet.
               value={selectedBrowserId ?? ''}
               onValueChange={handleDeviceChange}
-              disabled={browser.length === 0}
+              disabled={browser.length === 0 && dshow.length === 0}
             >
               <SelectTrigger
                 id="settings-capture-device"
@@ -311,11 +339,35 @@ export default function SettingsCapture(): JSX.Element {
               </SelectTrigger>
               <SelectContent>
                 <SelectGroup>
-                  {browser.map((device, index) => (
-                    <SelectItem key={device.deviceId} value={device.deviceId}>
-                      {lookup(device.deviceId) || device.label || `Video device ${index + 1}`}
-                    </SelectItem>
-                  ))}
+                  {/* Quick task 260913-rp5 follow-up: prefer browser devices
+                      (with proper labels) but fall back to the dshow list
+                      from the IPC. The dshow list is the canonical source
+                      for this clinic's capture cards and doesn't require
+                      camera permission — the NSIS-installed build was
+                      getting `browser=[]` from enumerateDevices until
+                      the doctor manually granted media permission. The
+                      dshow fallback unblocks the picker without breaking
+                      the dev-mode flow (browser items still take
+                      precedence). */}
+                  {browser.length > 0 ? (
+                    browser.map((device, index) => (
+                      <SelectItem
+                        key={device.deviceId}
+                        value={device.deviceId}
+                      >
+                        {lookup(device.deviceId) || device.label || `Video device ${index + 1}`}
+                      </SelectItem>
+                    ))
+                  ) : (
+                    dshow.map((device) => (
+                      <SelectItem
+                        key={device.deviceId}
+                        value={device.deviceId}
+                      >
+                        {device.rawName || device.deviceId}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>
