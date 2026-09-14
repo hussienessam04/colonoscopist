@@ -84,11 +84,18 @@ jobs:
         id: tag
         # Quick task 260913-rp5: Git Bash on windows-latest is dash-flavored
         # and rejects bash-4 `${VAR:-default}` with `bad substitution`.
-        # POSIX-only parameter expansion works in both Git Bash and core bash.
+        # POSIX-only `[ -n "$VAR" ]` works in both Git Bash and core bash.
+        #
+        # Read `inputs.tag` via an env-var passthrough on the step's
+        # `env:` block — embedding `${{ inputs.tag }}` directly inside
+        # the bash multi-line `run:` was producing a hard-to-debug
+        # empty substitution in the prior iteration (see run 34870011279).
         shell: bash
+        env:
+          INPUTS_TAG: ${{ inputs.tag }}
         run: |
-          if [ -n "$inputs.tag" ]; then
-            TAG="$inputs.tag"
+          if [ -n "$INPUTS_TAG" ]; then
+            TAG="$INPUTS_TAG"
           else
             TAG="$GITHUB_REF_NAME"
           fi
@@ -100,12 +107,19 @@ jobs:
       # `gh release create` idempotently skips creating if the tag
       # exists, and `gh release upload --clobber` overwrites assets
       # of the same name (lets us re-run on the same tag).
+      #
+      # `shell: bash` is mandatory — the script uses POSIX features
+      # (arrays, `set -euo pipefail`, `[[ -n ... ]]`) that PowerShell
+      # can't parse. Without it, windows-latest falls back to
+      # pwsh.EXE which throws `Missing '(' after 'if'`.
       - name: Publish to colonoscopist-releases
+        shell: bash
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          RELEASE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.tag.outputs.tag }}"
+          TAG="${RELEASE_TAG}"
           DEST=hussienessam04/colonoscopist-releases
 
           echo "Publishing Colonoscopist ${TAG} → ${DEST}"
