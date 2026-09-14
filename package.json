@@ -34,7 +34,8 @@
           ]
         }
       ],
-      "icon": "buildResources/icon.ico"
+      "icon": "buildResources/icon.ico",
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -44,7 +45,9 @@
       "createStartMenuShortcut": true,
       "shortcutName": "Colonoscopist"
     },
-    "portable": {},
+    "portable": {
+      "artifactName": "${productName}-${version}.${ext}"
+    },
     "publish": {
       "provider": "github",
       "owner": "hussienessam04",
