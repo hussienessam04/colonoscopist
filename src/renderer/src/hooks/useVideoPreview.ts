@@ -85,23 +85,61 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   }, [release]);
 
   const start = useCallback(() => {
-    // Quick task 260913-rp5 — previously `if (!browserDeviceId) return;`
-    // silently bailed with no UI feedback, leaving the user staring at
-    // a disabled-looking Start Preview button. The dshow-fallback
-    // path (Settings → Capture when enumerateDevices returns []) sets
-    // selectedBrowserIdForPreview to null even though the user DID
-    // pick a device. Surface a clear error so the next click tells
-    // the user what's wrong instead of doing nothing.
-    if (!browserDeviceId) {
-      setError({
-        code: 'Unknown',
-        message:
-          'Live preview needs camera permission. Open Settings → Privacy → Camera and allow Colonoscopist, then reload this page.',
-      });
+    if (browserDeviceId) {
+      setError(null);
+      setStartRequested(true);
       return;
     }
+    // No browser UUID (dshow-fallback path). The main process
+    // auto-grants the `media` permission (window.ts:76-79), but
+    // `navigator.mediaDevices.enumerateDevices()` returns an empty
+    // list until a getUserMedia call has been initiated in this
+    // session — Chromium's device enumeration is lazy. Procedure
+    // Room + Preview & setup incidentally trigger this on first
+    // mount via their own auto-start path; SettingsCapture doesn't.
+    // Open a default `video: true` stream here so Chromium populates
+    // its internal device list AND the user sees a preview. The
+    // default video device is whatever the OS routes first (usually
+    // the only plugged-in USB capture card in this clinic).
     setError(null);
-    setStartRequested(true);
+    setStarting(true);
+    const request = requestRef.current + 1;
+    requestRef.current = request;
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: false })
+      .then((stream) => {
+        if (request !== requestRef.current) {
+          // A newer start() request superseded us — release the
+          // probe stream and let the newer request take over.
+          stream.getTracks().forEach((track) => track.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          void videoRef.current.play().catch(() => undefined);
+        }
+        setStarting(false);
+        setActive(true);
+      })
+      .catch((err: unknown) => {
+        if (request !== requestRef.current) return;
+        setStarting(false);
+        const name = err instanceof Error ? err.name : '';
+        const code = name === 'NotAllowedError' ? 'NotAllowedError' :
+                     name === 'NotFoundError' ? 'NotFoundError' :
+                     name === 'NotReadableError' ? 'NotReadableError' : 'Unknown';
+        setError({
+          code,
+          message: name === 'NotAllowedError'
+            ? 'Camera access was denied. Allow camera access and try again.'
+            : name === 'NotFoundError'
+            ? 'No capture device is available right now. Plug in your USB card and retry.'
+            : code === 'Unknown'
+            ? 'Preview could not be started.'
+            : 'The selected device is busy or could not be opened.',
+        });
+      });
   }, [browserDeviceId]);
 
   const resolution = presetHints(preset).resolution;
