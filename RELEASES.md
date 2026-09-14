@@ -1,39 +1,112 @@
-# Quick task 260913-rp5 (option 2 split) — why the source repo and the
-# releases repo are now separate.
-#
-# The release flow has three actors:
-#
-#   1. Colonoscopist (private source) — full code + tests + this doc.
-#   2. electron-builder @ Windows CI runner — packs out/ into NSIS +
-#      portable exes, generates latest.yml (the manifest electron-updater
-#      polls at runtime to detect a new release).
-#   3. colonoscopist-releases (PUBLIC, no code) — receives the
-#      installer artifacts + latest.yml. electron-updater downloads from
-#      here at the user's installed workstation.
-#
-# The split keeps the source code private while letting the auto-updater
-# reach end users. A single-token GH Actions workflow in
-# .github/workflows/release.yml does the cross-repo publish; the
-# `RELEASE_TOKEN` repo secret must be a PAT scoped to the releases
-# repo (cross-repo publish isn't possible from the default GITHUB_TOKEN).
-#
-# Manual runbook:
-#
-#   # local — package without publishing
-#   npm run package          # NSIS only
-#   npm run package:portable # portable only
-#   npm run publish:dry      # build + publish dry-run (no upload)
-#
-#   # release via CI (recommended)
-#   git tag v0.1.3            # bump version in package.json first
-#   git push origin v0.1.3
-#   # .github/workflows/release.yml fires; results land in
-#   # https://github.com/hussienessam04/colonoscopist-releases/releases
-#
-#   # ad-hoc rebuild via Actions → Run workflow → optional tag input
-#
-# Manual download (no CI):
-#   1. electron-builder build auto-generates `dist/latest.yml` alongside
-#      the installer.
-#   2. Upload the `dist/*.exe` + `dist/latest.yml` + `dist/*.blockmap` to
-#      the colonoscopist-releases repo's Releases page manually.
+# Release Pipeline
+
+**Quick task 260913-rp5 — option 2: source-private + releases-public split.**
+
+This repo's source stays **private**. End-user installer artifacts and
+the `latest.yml` manifest electron-updater polls at runtime live in a
+separate public repo (`hussienessam04/colonoscopist-releases`).
+
+## Why split
+
+- Clinic operators never need to clone or read source code.
+- The releases repo can be `public` (electron-updater needs to fetch
+  `latest.yml` anonymously at runtime) without leaking the codebase.
+- License files / Ed25519 secret material stays in the private repo.
+
+## How to ship a release
+
+1. Bump `package.json#version` (e.g. `0.1.3` → `0.1.4`).
+2. Commit + push to `main` on the source repo.
+3. Tag and push:
+   ```bash
+   git tag v0.1.4
+   git push origin v0.1.4
+   ```
+4. `.github/workflows/release.yml` triggers on tag push. It:
+   - Builds NSIS + portable on `windows-latest`
+   - Runs `electron-builder --publish never` so the build doesn't try
+     to publish via the default `GITHUB_TOKEN` (which can only write
+     to the source repo, not the cross-repo releases destination).
+   - Uploads assets via `gh release` to `colonoscopist-releases` using
+     a cross-repo PAT stored as `RELEASE_TOKEN`.
+5. Verify at https://github.com/hussienessam04/colonoscopist-releases/releases
+
+## Setup (already done)
+
+The pipeline is one-shot configured:
+
+| Step | Status |
+|------|--------|
+| `hussienessam04/colonoscopist-releases` public repo | Created via `gh repo create --public --source=.` |
+| PAT with `repo` scope on `hussienessam04` | Stored as `RELEASE_TOKEN` secret in source repo via `gh secret set` |
+| `package.json#build.publish.repo` | `colonoscopist-releases` |
+| `package.json#build.win.artifactName` | `${productName}-Setup-${version}.${ext}` (dashes; see below) |
+| `package.json#build.portable.artifactName` | `${productName}-${version}.${ext}` |
+| `.github/workflows/release.yml` | Wired to build on `v*` tag push |
+
+## File-name gotcha (and why `artifactName` is pinned)
+
+`gh release upload` silently replaces **spaces** in asset names with
+**dots**. electron-builder's `latest.yml` keeps the original spaces
+(turned into dashes per its default name template), so without an
+explicit `artifactName` the names don't match and `electron-updater`
+404s at runtime.
+
+Pin both:
+
+```jsonc
+"win":      { "artifactName": "${productName}-Setup-${version}.${ext}" },
+"portable": { "artifactName": "${productName}-${version}.${ext}" }
+```
+
+Result: `Colonoscopist-Setup-0.1.3.exe` + `Colonoscopist-0.1.3.exe`,
+both uploadable and both referenced in `latest.yml` — agree, update
+works.
+
+## Bash gotchas on `windows-latest`
+
+Git Bash on the runner is dash-flavored, so two things bit:
+
+1. `${VAR:-default}` is bash-4 syntax — fails with `bad substitution`.
+   Use POSIX `[ -n "$VAR" ]` instead.
+2. The default shell on `windows-latest` is **PowerShell**, not bash.
+   Every step with bash syntax (arrays, `set -euo pipefail`,
+   `[[ ... ]]`) needs an explicit `shell: bash` or it'll fail with
+   `ParserError: Missing '(' after 'if'`.
+3. `${{ ... }}` expressions embedded inside a multi-line bash `run:`
+   can be silently stripped to empty on this image — they look like
+   `TAG=".tag"` in the rendered command. Route values through the
+   step's `env:` block so they land as ordinary shell variables.
+
+## Why not `samuelmeuli/action-electron-builder` or
+`softprops/action-gh-release`?
+
+Neither action supports a cross-repo publish — both honor
+`GITHUB_REPOSITORY` only, so assets land on the source repo, not the
+cross-repo releases destination. Using the `gh` CLI directly with
+`GH_TOKEN=${{ secrets.RELEASE_TOKEN }}` is the simplest portable path.
+
+## Local dry-run
+
+```bash
+npm run build:installers   # builds to ./dist without publishing
+# or
+npm run package              # NSIS only
+npm run package:portable     # portable only
+```
+
+To actually publish from a workstation:
+
+```bash
+GH_TOKEN=<your-PAT> gh release create v0.1.3 \
+  --repo hussienessam04/colonoscopist-releases \
+  --title "Colonoscopist v0.1.3" \
+  --notes "..." \
+  dist/*.exe dist/*.exe.blockmap dist/latest*.yml
+```
+
+## References
+
+- Workflow: `.github/workflows/release.yml`
+- electron-builder publish docs: https://www.electron.build/configuration/publish
+- electron-updater GitHub provider: https://www.electron.build/auto-update#github
