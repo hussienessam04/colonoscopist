@@ -485,7 +485,7 @@ export default function SettingsCapture(): JSX.Element {
             ) : (
               <Button
                 onClick={preview.start}
-                disabled={!selectedBrowserId || !previewPreset}
+                disabled={!selectedBrowserIdForPreview || !previewPreset}
                 data-testid="start-preview"
                 className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
               >

@@ -122,4 +122,20 @@ describe('Settings → About (auto-update card)', () => {
     expect(await screen.findByTestId('settings-about-update-install')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-about-update-download')).toBeNull();
   });
+
+  // Quick task 260913-rp5 — the always-visible "Check for updates"
+  // button lets the user manually trigger a check on demand. The
+  // conditional button inside the update card only mounts after the
+  // initial boot-time auto-check surfaces something; this one is in
+  // the always-shown app-info card so the user can poke the system
+  // any time.
+  it('always-visible manual "Check for updates" button fires the IPC even when no update is available', async () => {
+    const api = getApi();
+    api.app.update.check.mockResolvedValue(undefined);
+    render(<SettingsAbout />);
+    const checkBtn = await screen.findByTestId('settings-about-check-update');
+    expect(checkBtn).toBeInTheDocument();
+    await userEvent.click(checkBtn);
+    await waitFor(() => expect(api.app.update.check).toHaveBeenCalledTimes(1));
+  });
 });

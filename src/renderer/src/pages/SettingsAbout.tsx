@@ -195,6 +195,26 @@ export default function SettingsAbout(): JSX.Element {
           <p className="text-xs text-[#5C6770] pt-2" data-testid="settings-about-description">
             {t('about.description')}
           </p>
+
+          {/* Quick task 260913-rp5 — always-visible "Check for updates"
+              so the user can manually trigger a check on demand instead
+              of waiting for the boot-time auto-check to surface one.
+              The check button inside the conditional update card is
+              hidden until an update is available, which made manual
+              checks impossible. */}
+          <div className="flex items-center justify-end pt-2 border-t border-[#E0D9C6]">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void check()}
+              disabled={Boolean(state.progress)}
+              data-testid="settings-about-check-update"
+              className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
+            >
+              <RefreshCw className="size-4 mr-1" aria-hidden="true" />
+              {t('update.checkButton')}
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </SettingsLayout>

@@ -227,7 +227,14 @@ export default function Audit(): JSX.Element {
       2,
     );
     try {
-      await navigator.clipboard.writeText(json);
+      // Quick task 260913-rp5 — route the copy through the main-process
+      // clipboard IPC (same pattern as SettingsDiagnostics and License).
+      // Electron's sandbox blocks the renderer-side
+      // `navigator.clipboard.writeText` in some contexts (the user saw
+      // "Write permission denied" when the menu had no focus token).
+      // Main-process `clipboard.writeText` is the canonical Electron
+      // path and works regardless of focus / permission state.
+      await window.api.clipboard.copyText({ text: json });
       toast.success(t('audit.copySuccess'));
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Copy failed';

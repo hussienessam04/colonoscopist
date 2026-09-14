@@ -122,9 +122,19 @@ function AssetUploader({
         className="text-xs text-[#8C8478]"
         data-testid={`profile-editor-${kind}-status`}
       >
-        {uploadedAt === null
+        {/* Quick task 260913-rp5 — the original logic used uploadedAt
+            only, which is a session-local timestamp set when the user
+            uploads. Loading an existing asset (refreshPreviews on
+            mount) populates `preview` but leaves `uploadedAt` null,
+            so the panel misleadingly displayed "Not uploaded" even
+            though the image was right below it. Use `preview` as the
+            source of truth — if a preview exists, the asset is on
+            disk; we just don't have a timestamp to show for it. */}
+        {preview === null
           ? t(`profile.${kind}NotUploaded`)
-          : t(`profile.${kind}UploadedAt`, { time: formatHHMMSS(uploadedAt) })}
+          : uploadedAt !== null
+            ? t(`profile.${kind}UploadedAt`, { time: formatHHMMSS(uploadedAt) })
+            : t(`profile.${kind}Uploaded`)}
       </p>
       {preview !== null ? (
         <img
