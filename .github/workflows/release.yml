@@ -129,11 +129,6 @@ jobs:
           fi
 
           echo "Published: https://github.com/${DEST}/releases/tag/${TAG}"
-          # Mark the workflow run with the release URL.
-          echo "RELEASE_URL=https://github.com/${DEST}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Annotate run with release URL
-        if: env.RELEASE_URL
-        run: echo "Release published: $RELEASE_URL"
-        env:
-          RELEASE_URL: ${{ steps.publish.outputs.RELEASE_URL }}
+          # Mark the workflow run with the release URL via a step summary.
+          echo "## Release published" >> "$GITHUB_STEP_SUMMARY"
+          echo "URL: https://github.com/${DEST}/releases/tag/${TAG}" >> "$GITHUB_STEP_SUMMARY"
