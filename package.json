@@ -32,12 +32,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "icon": "buildResources/icon.ico"
@@ -54,7 +48,7 @@
     "publish": {
       "provider": "github",
       "owner": "hussienessam04",
-      "repo": "colonoscopist",
+      "repo": "colonoscopist-releases",
       "releaseType": "release",
       "publishAutoUpdate": true
     }

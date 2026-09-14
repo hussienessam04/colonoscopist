@@ -73,19 +73,12 @@ const ROW3: AuditEntry = {
 
 beforeEach(() => {
   setRoute(initialRoute);
-  // ponytail: clipboard.writeText is not implemented in happy-dom — stub
-  // it so the Copy JSON button doesn't throw. The assertion is on the
-  // call args, not the implementation.
-  if (!navigator.clipboard) {
-    Object.defineProperty(navigator, 'clipboard', {
-      value: { writeText: vi.fn().mockResolvedValue(undefined) },
-      configurable: true,
-    });
-  } else {
-    (navigator.clipboard.writeText as ReturnType<typeof vi.fn>) = vi
-      .fn()
-      .mockResolvedValue(undefined) as typeof navigator.clipboard.writeText;
-  }
+  // Quick task 260913-rp5 — Audit copy-JSON now routes through
+  // window.api.clipboard.copyText (main-process IPC, same pattern as
+  // License + SettingsDiagnostics). The setup.ts mockApi already
+  // exposes clipboard.copyText with a default `ok: true` resolver, so
+  // no per-test navigator.clipboard stub is needed — the assertion
+  // is on the IPC call args below.
 });
 
 async function renderAudit(): Promise<void> {
@@ -198,13 +191,13 @@ describe('Audit page', () => {
     expect(dialog.textContent).toContain(OTHER_USER.id);
     expect(dialog.textContent).toContain('login');
     expect(dialog.textContent).toContain('ok');
-    // Click Copy JSON → navigator.clipboard.writeText gets the JSON +
+    // Click Copy JSON → window.api.clipboard.copyText gets the JSON +
     // toast.success fires (we don't assert the toast helper here; the
-    // assertion is that the clipboard write was invoked with the JSON).
-    const writeText = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
+    // assertion is that the IPC call was invoked with the JSON).
+    const copyText = api.clipboard.copyText as ReturnType<typeof vi.fn>;
     fireEvent.click(screen.getByTestId('audit-copy-json'));
-    await waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const written = writeText.mock.calls[0]?.[0] as string;
+    await waitFor(() => expect(copyText).toHaveBeenCalledTimes(1));
+    const written = (copyText.mock.calls[0]?.[0] as { text: string }).text;
     expect(written).toContain('"action": "login"');
     expect(written).toContain('"metadata"');
     expect(written).toContain('"ip"');

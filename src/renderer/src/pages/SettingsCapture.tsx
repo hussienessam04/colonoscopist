@@ -176,7 +176,16 @@ export default function SettingsCapture(): JSX.Element {
   function handleDeviceChange(value: string): void {
     preview.stop();
     setSelectedBrowserId(value);
-    setHydrated(false);
+    // Quick task 260913-rp5 — previously called setHydrated(false)
+    // here, which re-fired the mount-time hydrate effect. Hydrate
+    // then ran the IPC getDefaultDevice + setSelectedBrowserId call,
+    // overwriting the just-picked value with whatever's on disk. The
+    // user saw the dropdown revert to its original choice the moment
+    // they picked a new camera.
+    //
+    // Preset loading + the device map don't need a re-hydrate cycle
+    // — the device map is stable for the session (refreshed only on
+    // license change) and the preset is fetched explicitly below.
     // value is either a browser UUID (lookup succeeds) or a dshow
     // canonical name (lookup returns undefined → treat value as name).
     const name = lookup(value) ?? value;
@@ -186,9 +195,12 @@ export default function SettingsCapture(): JSX.Element {
     void safeInvoke(window.api.capture.getPreset({ deviceId: name })).then(
       (preset) => {
         setForm(fromPreset(preset));
-        setHydrated(true);
       },
     );
+    // Auto-restart the preview with the new device so the live feed
+    // tracks the dropdown without forcing the doctor to click Start
+    // Preview twice. Safe no-op if the preview wasn't already running.
+    if (preview.active) preview.start();
   }
 
   function setKind(kind: PresetKind): void {
@@ -198,16 +210,21 @@ export default function SettingsCapture(): JSX.Element {
       if (kind === 'hd') return { kind: 'hd', resolution: '1920x1080', framerate: 30 };
       return { ...current, kind: 'custom' };
     });
+    // Re-arm the preview so the preset change propagates to the live
+    // stream — otherwise the doctor has to click Start Preview twice.
+    if (preview.active) preview.start();
   }
 
   function setResolution(value: string): void {
     preview.stop();
     setForm((current) => ({ ...current, resolution: value }));
+    if (preview.active) preview.start();
   }
 
   function setFramerate(value: number): void {
     preview.stop();
     setForm((current) => ({ ...current, framerate: value }));
+    if (preview.active) preview.start();
   }
 
   const customResolutionValid = form.kind !== 'custom' || RESOLUTION_PATTERN.test(form.resolution);

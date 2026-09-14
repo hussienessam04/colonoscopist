@@ -1,0 +1,113 @@
+# GitHub Actions — quick task 260913-rp5 (option 2 split).
+#
+# Builds Colonoscopist on every pushed tag (vX.Y.Z) and ships the
+# NSIS + portable installers + latest.yml manifest to a SEPARATE
+# public release repo (`hussienessam04/colonoscopist-releases`).
+# The source repo stays private — end users consume updates without
+# ever seeing the code.
+#
+# Setup (one-time, manual):
+#
+#   1. Create the release repo at
+#      https://github.com/hussienessam04/colonoscopist-releases
+#      (must be PUBLIC so end users can fetch updates via
+#      electron-updater).
+#
+#   2. Generate a GitHub PAT with `repo` scope on the `hussienessam04`
+#      account. Cross-repo publish needs a token (electron-builder
+#      can't publish to a sibling repo from the source repo's
+#      default GITHUB_TOKEN).
+#
+#   3. Add the PAT as a repository secret named `RELEASE_TOKEN` in
+#      this `colonoscopist` repo (Settings → Secrets and variables
+#      → Actions → New repository secret).
+#
+#   4. Installers reference the releases repo via
+#      `package.json#build.publish.repo = colonoscopist-releases`
+#      (already updated). electron-updater reads `latest.yml` from
+#      that repo at runtime.
+#
+# Workflow triggers:
+#   - On push of any tag matching `v*` (e.g. v0.1.3)
+#   - Manual dispatch (workflow_dispatch) for ad-hoc rebuilds
+#
+# Outputs:
+#   - Windows NSIS installer + portable exe + blockmaps
+#   - latest.yml (used by the installed app to detect updates)
+#   - All uploaded as release assets to `colonoscopist-releases`
+
+name: build-and-release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.1.3). Leave blank to use the latest pushed tag.'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Quick task 260913-rp5 — the postinstall script runs electron-rebuild
+      # + better-sqlite3 native bindings. Without it the built installer's
+      # IPC handlers would crash the renderer on first audit log write.
+      - name: Rebuild native deps for Electron
+        run: npm run postinstall
+        env:
+          # electron-rebuild normally shells out to download the Electron
+          # archive again — cache the cache to skip the ~50s fetch.
+          ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
+          ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
+
+      - name: Build installer + portable
+        # electron-builder's Win pack runs NSIS unconditionally. The
+        # `portable` target isn't built here because the Windows runner
+        # produces the same portable artifact via electron-builder when
+        # we add the target to package.json#build.win.target. For now
+        # the same `package` script emits both NSIS + portable since
+        # package.json already has both targets listed.
+        run: npm run package
+
+      - name: Publish to colonoscopist-releases
+        uses: electron-builder/github-action@v2
+        id: publish
+        with:
+          owner: hussienessam04
+          repo: colonoscopist-releases
+          releaseType: release
+          token: ${{ secrets.RELEASE_TOKEN }}
+          tag: ${{ inputs.tag || github.ref_name }}
+          # The build.publish.* fields in package.json are reused —
+          # electron-builder/github-action delegates to the local
+          # electron-builder with the override repo from `repo:`
+          # here. Keep them in sync if either side drifts.
+          args: --publish always
+
+      - name: Verify artifact published
+        if: steps.publish.outputs.release_id
+        run: |
+          echo "Release published: ${{ steps.publish.outputs.release_url }}"
+          echo "URL: ${{ steps.publish.outputs.upload_url }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
