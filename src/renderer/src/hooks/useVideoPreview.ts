@@ -85,7 +85,21 @@ export function useVideoPreview(browserDeviceId: string | null, preset?: Quality
   }, [release]);
 
   const start = useCallback(() => {
-    if (!browserDeviceId) return;
+    // Quick task 260913-rp5 — previously `if (!browserDeviceId) return;`
+    // silently bailed with no UI feedback, leaving the user staring at
+    // a disabled-looking Start Preview button. The dshow-fallback
+    // path (Settings → Capture when enumerateDevices returns []) sets
+    // selectedBrowserIdForPreview to null even though the user DID
+    // pick a device. Surface a clear error so the next click tells
+    // the user what's wrong instead of doing nothing.
+    if (!browserDeviceId) {
+      setError({
+        code: 'Unknown',
+        message:
+          'Live preview needs camera permission. Open Settings → Privacy → Camera and allow Colonoscopist, then reload this page.',
+      });
+      return;
+    }
     setError(null);
     setStartRequested(true);
   }, [browserDeviceId]);

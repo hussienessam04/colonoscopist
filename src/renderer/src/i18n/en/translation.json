@@ -678,6 +678,7 @@
     "framerateLabel": "Framerate",
     "framerateFps": "{{count}} fps",
     "previewHint": "Choose a device and a preset, then start the preview to verify the configuration.",
+    "previewErrorTitle": "Preview can't start",
     "stopPreview": "Stop Preview",
     "startPreview": "Start Preview",
     "captureLastUsed": "Last used: {{device}}",
@@ -887,6 +888,9 @@
     "restartButton": "Restart now",
     "upToDate": "You're on the latest version ({{version}}).",
     "checkFailed": "Could not check for updates. Will retry automatically.",
+    "checkInProgress": "Checking for updates…",
+    "checkComplete": "Up to date — no update available.",
+    "checkCompleteUpdate": "Update available — see card above.",
     "checkButton": "Check now",
     "whatsNew": "View release notes"
   }

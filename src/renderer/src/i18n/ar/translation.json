@@ -678,6 +678,7 @@
     "framerateLabel": "معدل الإطارات",
     "framerateFps": "{{count}} إطار/ثانية",
     "previewHint": "اختر جهازاً وإعداداً، ثم ابدأ المعاينة للتحقق من الإعداد.",
+    "previewErrorTitle": "تعذر بدء المعاينة",
     "stopPreview": "إيقاف المعاينة",
     "startPreview": "بدء المعاينة",
     "captureLastUsed": "آخر استخدام: {{device}}",
@@ -895,6 +896,9 @@
     "restartButton": "إعادة التشغيل الآن",
     "upToDate": "أنت تستخدم أحدث إصدار ({{version}}).",
     "checkFailed": "تعذّر التحقق من التحديثات. ستتم إعادة المحاولة تلقائياً.",
+    "checkInProgress": "جاري التحقق من التحديثات…",
+    "checkComplete": "أنت على أحدث إصدار — لا تتوفر تحديثات.",
+    "checkCompleteUpdate": "يتوفر تحديث — انظر البطاقة أعلاه.",
     "checkButton": "تحقق الآن",
     "whatsNew": "عرض ملاحظات الإصدار"
   }

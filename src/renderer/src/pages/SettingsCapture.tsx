@@ -291,9 +291,27 @@ export default function SettingsCapture(): JSX.Element {
               aria-label="Capture preview"
               className="size-full object-contain"
             />
-            {!isPreviewing ? (
+            {!isPreviewing && !preview.error ? (
               <div className="absolute inset-0 grid place-items-center p-6 text-center text-sm text-slate-400">
                 {t('settings.previewHint')}
+              </div>
+            ) : null}
+            {/* Quick task 260913-rp5 — mirror ProcedurePreview's pattern.
+                Surface the preview error inline so the user sees WHY
+                Start Preview failed (most often: dshow-fallback case
+                with no camera permission). Previously the error was
+                set but never rendered, leaving the user with a
+                working video element + blank screen. */}
+            {preview.error ? (
+              <div
+                className="absolute inset-0 grid place-items-center p-6 text-center text-white"
+                data-testid="capture-preview-error"
+              >
+                <div className="flex max-w-md flex-col items-center gap-3">
+                  <Video aria-hidden="true" className="size-9 text-rose-400" />
+                  <p className="font-medium">{t('settings.previewErrorTitle')}</p>
+                  <p className="text-xs text-slate-300">{preview.error.message}</p>
+                </div>
               </div>
             ) : null}
           </div>
@@ -485,7 +503,7 @@ export default function SettingsCapture(): JSX.Element {
             ) : (
               <Button
                 onClick={preview.start}
-                disabled={!selectedBrowserIdForPreview || !previewPreset}
+                disabled={!selectedBrowserId || !previewPreset}
                 data-testid="start-preview"
                 className="bg-[#0E3A47] text-white hover:bg-[#0B2C36] disabled:bg-[#E0D9C6] disabled:text-[#8C8478]"
               >

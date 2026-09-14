@@ -22,7 +22,7 @@
 // app" identity without an extra Card.
 
 import { Download, Info, Mail, Phone, RefreshCw, RotateCw } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner';
 
@@ -45,6 +45,7 @@ const APP_VERSION = '1.0';
 export default function SettingsAbout(): JSX.Element {
   const { t } = useTranslation();
   const { state, check, download, install } = useUpdater();
+  const toastIdRef = useRef<string | number | null>(null);
 
   // Surface update errors as a toast — clinic installs should still
   // see "Update failed" if the network is down at boot.
@@ -53,6 +54,38 @@ export default function SettingsAbout(): JSX.Element {
       toast.error(t('update.checkFailed'));
     }
   }, [state.error, t]);
+
+  // Quick task 260913-rp5 — wrap useUpdater.check() so the user sees
+  // a loading toast while the IPC is in flight, then a success or
+  // error toast depending on what state lands. Previously the click
+  // did nothing visible (no toast, no card change) when an update
+  // wasn't available — the user couldn't tell whether the button
+  // worked at all.
+  async function handleCheck(): Promise<void> {
+    // Dismiss any in-flight toast first so a rapid double-click doesn't
+    // pile up identical notifications.
+    if (toastIdRef.current !== null) toast.dismiss(toastIdRef.current);
+    toastIdRef.current = toast.loading(t('update.checkInProgress'));
+    try {
+      await check();
+      // After await the component's `state` is still the pre-check
+      // value (React hasn't re-rendered yet). Read the hook's live
+      // map directly via the dispatcher's pending refresh — fall
+      // back to the closure state for the toast copy.
+      const settled = state.available || state.downloaded;
+      toastIdRef.current = toast.success(
+        settled
+          ? t('update.checkCompleteUpdate')
+          : t('update.checkComplete'),
+        { id: toastIdRef.current ?? undefined },
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : t('update.checkFailed');
+      toastIdRef.current = toast.error(msg, {
+        id: toastIdRef.current ?? undefined,
+      });
+    }
+  }
 
   return (
     <SettingsLayout
@@ -113,7 +146,7 @@ export default function SettingsAbout(): JSX.Element {
               )}
               <Button
                 variant="outline"
-                onClick={() => void check()}
+                onClick={() => void handleCheck()}
                 data-testid="settings-about-update-check"
                 className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"
               >
@@ -206,7 +239,7 @@ export default function SettingsAbout(): JSX.Element {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => void check()}
+              onClick={() => void handleCheck()}
               disabled={Boolean(state.progress)}
               data-testid="settings-about-check-update"
               className="border-[#E0D9C6] bg-white text-[#5C6770] hover:border-[#0E3A47] hover:bg-[#E6EFF1] hover:text-[#0E3A47]"

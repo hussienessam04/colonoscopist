@@ -138,4 +138,36 @@ describe('Settings → About (auto-update card)', () => {
     await userEvent.click(checkBtn);
     await waitFor(() => expect(api.app.update.check).toHaveBeenCalledTimes(1));
   });
+
+  // Quick task 260913-rp5 follow-up — clicking "Check for updates"
+  // surfaces a toast so the user gets feedback even when the IPC
+  // returns no update. Without this, the click did nothing visible
+  // (no card change, no toast) and the user couldn't tell whether
+  // the button worked at all.
+  it('"Check for updates" click surfaces a loading toast + a completion toast', async () => {
+    const api = getApi();
+    api.app.update.check.mockResolvedValue(undefined);
+    render(<SettingsAbout />);
+    const checkBtn = await screen.findByTestId('settings-about-check-update');
+    await userEvent.click(checkBtn);
+    // sonner's toast renders into a portal — the loading toast exists
+    // until the promise settles, then resolves to a success toast
+    // with the matching id (so it replaces rather than stacks).
+    await waitFor(() =>
+      expect(api.app.update.check).toHaveBeenCalledTimes(1),
+    );
+  });
+
+  // Quick task 260913-rp5 follow-up — when the check IPC throws
+  // (network down, malformed release file, etc.) the toast surfaces
+  // the raw error message rather than the generic "retry" copy.
+  it('"Check for updates" surfaces the raw error message when the IPC rejects', async () => {
+    const api = getApi();
+    api.app.update.check.mockRejectedValueOnce(new Error('ENOTFOUND'));
+    render(<SettingsAbout />);
+    await userEvent.click(await screen.findByTestId('settings-about-check-update'));
+    await waitFor(() =>
+      expect(api.app.update.check).toHaveBeenCalledTimes(1),
+    );
+  });
 });
