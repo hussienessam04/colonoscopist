@@ -14,27 +14,22 @@
 #      electron-updater).
 #
 #   2. Generate a GitHub PAT with `repo` scope on the `hussienessam04`
-#      account. Cross-repo publish needs a token (electron-builder
-#      can't publish to a sibling repo from the source repo's
-#      default GITHUB_TOKEN).
+#      account. Cross-repo publish needs a token (the default
+#      GITHUB_TOKEN only writes to the same repo).
 #
 #   3. Add the PAT as a repository secret named `RELEASE_TOKEN` in
 #      this `colonoscopist` repo (Settings → Secrets and variables
 #      → Actions → New repository secret).
 #
-#   4. Installers reference the releases repo via
-#      `package.json#build.publish.repo = colonoscopist-releases`
-#      (already updated). electron-updater reads `latest.yml` from
-#      that repo at runtime.
-#
 # Workflow triggers:
 #   - On push of any tag matching `v*` (e.g. v0.1.3)
 #   - Manual dispatch (workflow_dispatch) for ad-hoc rebuilds
 #
-# Outputs:
-#   - Windows NSIS installer + portable exe + blockmaps
-#   - latest.yml (used by the installed app to detect updates)
-#   - All uploaded as release assets to `colonoscopist-releases`
+# Outputs (uploaded as GitHub Release assets to colonoscopist-releases):
+#   - Colonoscopist Setup X.Y.Z.exe (NSIS installer)
+#   - Colonoscopist Setup X.Y.Z.exe.blockmap (delta updates)
+#   - Colonoscopist X.Y.Z.exe (portable)
+#   - latest.yml (used by electron-updater at runtime to detect releases)
 
 name: build-and-release
 
@@ -53,7 +48,7 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
+  build-and-publish:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -71,45 +66,74 @@ jobs:
 
       # Quick task 260913-rp5 — the postinstall script runs electron-rebuild
       # + better-sqlite3 native bindings. Without it the built installer's
-      # IPC handlers would crash the renderer on first audit log write.
+      # IPC handlers would crash on the first SQLite call.
       - name: Rebuild native deps for Electron
         run: npm run postinstall
         env:
-          # electron-rebuild normally shells out to download the Electron
-          # archive again — cache the cache to skip the ~50s fetch.
           ELECTRON_CACHE: ${{ github.workspace }}/.cache/electron
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
+      # Quick task 260913-rp5 --publish never so the implicit CI
+      # detection in electron-builder doesn't try to auto-publish
+      # with the default (broken) GITHUB_TOKEN. The script step
+      # below owns publishing with the RELEASE_TOKEN PAT.
       - name: Build installer + portable
-        # Quick task 260913-rp5 — must use --publish never so the
-        # implicit CI detection in electron-builder doesn't try to
-        # publish via the default (broken) GITHUB_TOKEN. The
-        # samuelmeuli/action-electron-builder step below owns publishing.
-        # The package.json `publish.*` config still controls the
-        # destination repo (colonoscopist-releases).
         run: npm run build:installers
 
+      - name: Determine release tag
+        id: tag
+        shell: bash
+        run: echo "tag=${inputs.tag:-${GITHUB_REF_NAME}}" >> "$GITHUB_OUTPUT"
+
+      # Cross-repo publish to colonoscopist-releases via gh CLI.
+      # The `GH_TOKEN` env var is what `gh` uses for auth — set to
+      # the cross-repo PAT so we land assets on the right repo.
+      # `gh release create` idempotently skips creating if the tag
+      # exists, and `gh release upload --clobber` overwrites assets
+      # of the same name (lets us re-run on the same tag).
       - name: Publish to colonoscopist-releases
-        uses: samuelmeuli/action-electron-builder@v1
-        id: publish
-        with:
-          owner: hussienessam04
-          repo: colonoscopist-releases
-          # Token is a PAT scoped to colonoscopist-releases with
-          # Contents: Read+Write (cross-repo publish needs a token;
-          # the default GITHUB_TOKEN can't reach a sibling repo).
-          token: ${{ secrets.RELEASE_TOKEN }}
-          # The build.publish.* fields in package.json are reused.
-          # Keep them in sync with owner+repo above.
-          release_type: release
-          tag: ${{ inputs.tag || github.ref_name }}
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
-
-      - name: Verify artifact published
-        if: steps.publish.outputs.release_id
         run: |
-          echo "Release published: ${{ steps.publish.outputs.release_url }}"
-          echo "URL: ${{ steps.publish.outputs.upload_url }}"
+          set -euo pipefail
+          TAG="${{ steps.tag.outputs.tag }}"
+          DEST=hussienessam04/colonoscopist-releases
+
+          echo "Publishing Colonoscopist ${TAG} → ${DEST}"
+
+          # Build the file list for `gh release create`. Glob order
+          # is alphabetical so the NSIS (Setup) lands before the
+          # portable in the asset list.
+          shopt -s nullglob
+          ASSETS=( dist/*.exe dist/*.exe.blockmap dist/latest*.yml )
+          shopt -u nullglob
+          echo "Assets to upload:"
+          printf '  %s\n' "${ASSETS[@]}"
+
+          # Create-or-update the release. `gh release create` is the
+          # right primitive for creating + uploading in one step;
+          # we use `--draft false` so it publishes immediately.
+          # If the release already exists on the target repo (idempotent
+          # retry), fall back to `gh release upload --clobber`.
+          if gh release view "$TAG" --repo "$DEST" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists on ${DEST}; uploading assets to existing release."
+            gh release upload "$TAG" "${ASSETS[@]}" --repo "$DEST" --clobber
+          else
+            gh release create "$TAG" \
+              --repo "$DEST" \
+              --title "Colonoscopist ${TAG}" \
+              --notes "Colonoscopist ${TAG} — Windows NSIS installer, portable build, and latest.yml manifest.
+
+          See CHANGELOG.md / commit messages for detailed changes." \
+              "${ASSETS[@]}"
+          fi
+
+          echo "Published: https://github.com/${DEST}/releases/tag/${TAG}"
+          # Mark the workflow run with the release URL.
+          echo "RELEASE_URL=https://github.com/${DEST}/releases/tag/${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Annotate run with release URL
+        if: env.RELEASE_URL
+        run: echo "Release published: $RELEASE_URL"
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_URL: ${{ steps.publish.outputs.RELEASE_URL }}
