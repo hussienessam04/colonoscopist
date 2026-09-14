@@ -90,19 +90,21 @@ jobs:
         run: npm run package
 
       - name: Publish to colonoscopist-releases
-        uses: electron-builder/github-action@v2
+        uses: samuelmeuli/action-electron-builder@v1
         id: publish
         with:
           owner: hussienessam04
           repo: colonoscopist-releases
-          releaseType: release
+          # Token is a PAT scoped to colonoscopist-releases with
+          # Contents: Read+Write (cross-repo publish needs a token;
+          # the default GITHUB_TOKEN can't reach a sibling repo).
           token: ${{ secrets.RELEASE_TOKEN }}
+          # The build.publish.* fields in package.json are reused.
+          # Keep them in sync with owner+repo above.
+          release_type: release
           tag: ${{ inputs.tag || github.ref_name }}
-          # The build.publish.* fields in package.json are reused —
-          # electron-builder/github-action delegates to the local
-          # electron-builder with the override repo from `repo:`
-          # here. Keep them in sync if either side drifts.
-          args: --publish always
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
 
       - name: Verify artifact published
         if: steps.publish.outputs.release_id
