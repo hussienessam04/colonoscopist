@@ -81,13 +81,13 @@ jobs:
           ELECTRON_BUILDER_CACHE: ${{ github.workspace }}/.cache/electron-builder
 
       - name: Build installer + portable
-        # electron-builder's Win pack runs NSIS unconditionally. The
-        # `portable` target isn't built here because the Windows runner
-        # produces the same portable artifact via electron-builder when
-        # we add the target to package.json#build.win.target. For now
-        # the same `package` script emits both NSIS + portable since
-        # package.json already has both targets listed.
-        run: npm run package
+        # Quick task 260913-rp5 — must use --publish never so the
+        # implicit CI detection in electron-builder doesn't try to
+        # publish via the default (broken) GITHUB_TOKEN. The
+        # samuelmeuli/action-electron-builder step below owns publishing.
+        # The package.json `publish.*` config still controls the
+        # destination repo (colonoscopist-releases).
+        run: npm run build:installers
 
       - name: Publish to colonoscopist-releases
         uses: samuelmeuli/action-electron-builder@v1
