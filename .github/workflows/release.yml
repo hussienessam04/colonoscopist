@@ -82,8 +82,17 @@ jobs:
 
       - name: Determine release tag
         id: tag
+        # Quick task 260913-rp5: Git Bash on windows-latest is dash-flavored
+        # and rejects bash-4 `${VAR:-default}` with `bad substitution`.
+        # POSIX-only parameter expansion works in both Git Bash and core bash.
         shell: bash
-        run: echo "tag=${inputs.tag:-${GITHUB_REF_NAME}}" >> "$GITHUB_OUTPUT"
+        run: |
+          if [ -n "$inputs.tag" ]; then
+            TAG="$inputs.tag"
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
 
       # Cross-repo publish to colonoscopist-releases via gh CLI.
       # The `GH_TOKEN` env var is what `gh` uses for auth — set to
