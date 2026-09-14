@@ -5,8 +5,8 @@
 // the list themselves (D-10 locks "re-enter to refresh").
 
 import { spawn } from 'node:child_process';
-import ffmpegStatic from 'ffmpeg-static';
 import { canonicalizeName } from './canonicalize';
+import { defaultFfmpegPath } from '../recorder/ffmpeg-path';
 import type { CaptureDevice } from '@shared/ipc-contract';
 
 export type EnumerateDshowOptions = {
@@ -16,12 +16,15 @@ export type EnumerateDshowOptions = {
   ffmpegPath?: string;
 };
 
-function defaultFfmpegPath(): string {
-  if (!ffmpegStatic) throw new Error('ffmpeg-static not bundled');
-  // ponytail: in dev `node_modules/ffmpeg-static` is the path. Phase 4 will
-  // rewrite `app.asar` -> `app.asar.unpacked` for the packaged build.
-  return ffmpegStatic;
-}
+// Quick task 260913-rp5 — use the shared `defaultFfmpegPath` from
+// `recorder/ffmpeg-path.ts` (which rewrites `app.asar` →
+// `app.asar.unpacked` so the binary is executable on Windows when
+// shipped inside an asar). The local helper that previously lived
+// here returned the raw `ffmpeg-static` path INSIDE app.asar, which
+// spawn() can't execute (`Error: spawn ENOENT`) — exactly the error
+// the user hit running the installed app. recorder.ts + trim.ts have
+// always used the shared helper; capture/devices.ts shipped without
+// the rewrite, hence the long-standing gap.
 
 export async function enumerateDshowDevices(
   opts: EnumerateDshowOptions = {},
